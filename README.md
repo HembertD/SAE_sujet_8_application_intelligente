@@ -16,10 +16,39 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
 - **Rémi Cozot**
 - **Rémi Synave**
 
+## Lien du Trello :
+*https://trello.com/invite/b/6a9e6bc6e505a585bbe40bf8/ATTIa7cd65089f34fb9e4d5b7e8d388a9f602737B962/saesujet8applicationintelligente*
+
 ## Langage utilisés :
 - **GO en front-end**
 - **Python en back-end**
 
+## Répartition des tâches
+
+### Auteurs
+
+- **Dorian HEMBERT**
+
+  * Mise en place et gestion du dépôt Git
+  * Mise en place et configuration du système de Git Hooks
+  * Détection et récupération des modifications avec `git diff`
+  * Analyse et structuration des informations issues des modifications
+  * Filtrage des fichiers binaires et des données sensibles
+
+- **Enzo CIUFFA**
+
+  * Conception et mise en place des prompts destinés au LLM
+  * Encadrement des réponses de l'IA
+  * Génération des messages de commit selon la norme Conventional Commits
+  * Traitement et validation des réponses générées par le LLM
+
+- **Maxence LAURENCE**
+
+  * Développement du CLI
+  * Intégration des différentes parties de l'application
+  * Génération et affichage des notes de version (Release Notes)
+  * Gestion du Trello
+  * Tests du langage "Go"
 
 ### Auteurs : 
 - **Dorian HEMBERT**

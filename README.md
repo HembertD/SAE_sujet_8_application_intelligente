@@ -16,7 +16,9 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
 - **Rémi Cozot**
 - **Rémi Synave**
 
-
+## Langage utilisés :
+- **GO en front-end**
+- **Python en back-end**
 
 
 ### Auteurs : 

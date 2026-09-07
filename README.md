@@ -12,20 +12,18 @@ Génération structurée : utilisation de gemma4:12b avec un prompt strict pour 
 Synthèse de version : extraction de l'historique entre deux tags Git et génération d'un changelog organisé par catégories (Corrections, Nouveautés, Régressions) au format Markdown.
 Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibles (clés d'API) avant l'envoi au modèle.
 ```
-### Auteurs du sujet :
-- **Rémi Cozot**
-- **Rémi Synave**
+#### Auteurs du sujet :
+- ***Rémi Cozot***
+- ***Rémi Synave***
 
 ## Lien du Trello :
 *https://trello.com/invite/b/6a9e6bc6e505a585bbe40bf8/ATTIa7cd65089f34fb9e4d5b7e8d388a9f602737B962/saesujet8applicationintelligente*
 
-## Langage utilisés :
+## Langages utilisés :
 - **GO en front-end**
 - **Python en back-end**
 
 ## Répartition des tâches
-
-### Auteurs
 
 - **Dorian HEMBERT**
 

@@ -1,6 +1,6 @@
 # Python
 
-**pycache**/
+__pycache__/
 *.py[cod]
 *$py.class
 
@@ -23,6 +23,7 @@ htmlcov/
 .mypy_cache/
 .pyre/
 .ruff_cache/
+
 
 # Variables d'environnement
 

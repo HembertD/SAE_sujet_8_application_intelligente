@@ -1,0 +1,10 @@
+# Dépendances de production
+# (aucune dépendance externe requise au runtime)
+
+# Dépendances de développement et test
+pytest>=7.4.0
+flake8>=6.0.0
+black>=23.7.0
+mypy>=1.5.0
+setuptools>=68.0.0
+wheel>=0.41.0

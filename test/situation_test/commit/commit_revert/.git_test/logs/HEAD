@@ -1,0 +1,7 @@
+0000000000000000000000000000000000000000 894d19b7d6d38ea74dab9df277a86d965242b066 Test Dev <dev@test.local> 1788783022 +0200	commit (initial): feat: initialisation de la calculatrice
+894d19b7d6d38ea74dab9df277a86d965242b066 21093070102020025a6798afdcfea9ffaa7a2773 Test Dev <dev@test.local> 1788783022 +0200	commit: docs: ajout du guide d'utilisation
+21093070102020025a6798afdcfea9ffaa7a2773 5853a7b21d7f20cd2b71b7db144451418c4d74db Test Dev <dev@test.local> 1788783022 +0200	commit: ci: ajout du workflow github actions et dependances
+5853a7b21d7f20cd2b71b7db144451418c4d74db 02de92e3182ed75c0c1bfdc6c17ee9cbd0e9d2e7 Test Dev <dev@test.local> 1788783022 +0200	commit: test: ajout des tests unitaires unittest
+02de92e3182ed75c0c1bfdc6c17ee9cbd0e9d2e7 12086f0ed32839bafb26afb63650013f494b3baa Test Dev <dev@test.local> 1788783659 +0200	commit: feat: ajout de la fonction experimentale inverse
+12086f0ed32839bafb26afb63650013f494b3baa b4e604e2091b0f8226e06186ebffd4723d25cc82 Test Dev <dev@test.local> 1789388791 +0200	commit (amend): feat: ajout de la fonction experimentale inverse
+b4e604e2091b0f8226e06186ebffd4723d25cc82 e1b1f272ef20678dc8ef8e436a3798e50b1d97b2 Test Dev <dev@test.local> 1789388996 +0200	commit (amend): feat: ajout de la fonction experimentale inverse

@@ -1,0 +1,53 @@
+# Python
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+
+build/
+dist/
+
+# Tests / couverture
+
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Linters / type checkers
+
+.mypy_cache/
+.pyre/
+.ruff_cache/
+
+
+# Variables d'environnement
+
+.env
+.env.*
+
+!.env.example
+
+# IDE
+
+.vscode/
+
+# Logs
+
+*.log
+
+# Fichiers temporaires
+
+*.tmp
+*.temp
+
+# Secrets / certificats
+
+*.pem
+*.key
+*.p12
+*.pfx

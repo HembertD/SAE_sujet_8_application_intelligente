@@ -23,6 +23,12 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
 - **GO en front-end**
 - **Python en back-end**
 
+## Documentation technique
+- **Voir doc_architecture.md**
+
+## Documentation utilisateur
+- **TODO**
+
 ## Répartition des tâches
 
 - **Dorian HEMBERT**

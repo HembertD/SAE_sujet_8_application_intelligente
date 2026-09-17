@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from git_generator.service.git_wrapper import GitWrapper
+from git_commit_release_notes_generator.service.git_wrapper import GitWrapper
 
 
 class GitWrapperParsingTests(unittest.TestCase):
@@ -65,7 +65,8 @@ index 3333333..4444444 100644
         self.assertIn("added", payload[0])
         self.assertIn("removed", payload[0])
         self.assertIn("patch", payload[0])
-        self.assertIn("binary", payload[0])
+        self.assertIn("is_binary", payload[0])
+        self.assertNotIn("binary", payload[0])
         self.assertEqual(payload[0]["path"], "app.py")
         self.assertIn("+new", payload[0]["patch"])
 

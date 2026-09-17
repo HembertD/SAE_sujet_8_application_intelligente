@@ -6,33 +6,11 @@ from pathlib import Path
 
 from git import InvalidGitRepositoryError, Repo
 
+from git_commit_release_notes_generator.models import DiffFile
+
 
 class GitWrapperError(Exception):
     """Exception métier levée lors d'un échec de commande Git."""
-
-
-@dataclass(frozen=True)
-class DiffFile:
-    path: str
-    status: str = "M"
-    added: int = 0
-    removed: int = 0
-    patch: str = ""
-    binary: bool = False
-
-    @property
-    def content(self) -> str:
-        return self.patch
-
-    def to_dict(self) -> dict[str, str | int | bool]:
-        return {
-            "path": self.path,
-            "status": self.status,
-            "added": self.added,
-            "removed": self.removed,
-            "patch": self.patch,
-            "binary": self.binary,
-        }
 
 
 @dataclass(frozen=True)
@@ -124,8 +102,8 @@ class GitWrapper:
                         status=status,
                         added=0,
                         removed=0,
+                        is_binary=True,
                         patch=section,
-                        binary=True,
                     )
                 )
                 continue
@@ -144,8 +122,8 @@ class GitWrapper:
                     status=status,
                     added=added,
                     removed=removed,
+                    is_binary=False,
                     patch=section,
-                    binary=False,
                 )
             )
 
@@ -161,7 +139,7 @@ class GitWrapper:
             parsed = self._parse_diff(diff_text)
             sanitized_files: list[DiffFile] = []
             for diff_file in parsed:
-                if diff_file.binary:
+                if diff_file.is_binary:
                     continue
                 patch = diff_file.patch
                 if len(patch) > max_chars:
@@ -172,8 +150,8 @@ class GitWrapper:
                         status=diff_file.status,
                         added=diff_file.added,
                         removed=diff_file.removed,
+                        is_binary=False,
                         patch=patch,
-                        binary=False,
                     )
                 )
             return sanitized_files
@@ -190,7 +168,7 @@ class GitWrapper:
         return {
             "summary": {
                 "file_count": len(files),
-                "binary_file_count": sum(1 for diff in files if diff.binary),
+                "binary_file_count": sum(1 for diff in files if diff.is_binary),
                 "truncated": any(len(diff.patch) >= max_chars for diff in files),
             },
             "files": [diff.to_dict() for diff in files],
@@ -214,7 +192,7 @@ class GitWrapper:
                 )
                 for c in commits
             ]
-        except Exception as exc: 
+        except Exception as exc:
             raise GitWrapperError(f"Erreur d'extraction entre {tag_a} et {tag_b} : {exc}") from exc
 
     def commit(self, message: str) -> str:

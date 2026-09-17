@@ -89,3 +89,12 @@ def test_validate_rejects_unknown_type():
 def test_validate_accepts_well_formed_message():
     error = llm._validate({"type": "docs", "subject": "met à jour le README"})
     assert error is None
+
+
+def test_diff_file_accepts_legacy_binary_keyword():
+    diff = DiffFile(path="image.png", status="A", added=0, removed=0, binary=True, patch="binary patch")
+
+    assert diff.is_binary is True
+    assert diff.binary is True
+    assert diff.to_dict()["is_binary"] is True
+    assert "binary" not in diff.to_dict()

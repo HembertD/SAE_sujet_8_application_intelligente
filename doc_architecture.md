@@ -22,8 +22,8 @@ Exemples :
 - src/git_commit_release_notes_generator/config.py
 - docs/doc_src_files/git_commit_release_notes_generator/config.md
 
-- src/git_generator/service/git_wrapper.py
-- docs/doc_src_files/git_generator/service/git_wrapper.md
+- src/git_commit_release_notes_generator/service/git_wrapper.py
+- docs/doc_src_files/git_commit_release_notes_generator/service/git_wrapper.md
 
 ## Arborescence actuelle
 
@@ -52,37 +52,29 @@ Exemples :
 │  │     ├─ __init__.py
 │  │     ├─ core.py
 │  │     └─ utils.py
-│  └─ git_generator/
-│     ├─ __init__.py
-│     └─ service/
-│        ├─ __init__.py
-│        └─ git_wrapper.py
+│  └─ (ancien module legacy supprimé : git_generator/)
 ├─ docs/
 │  ├─ monitoring/
 │  │  └─ sprint-00.md
 │  └─ doc_src_files/
 │     ├─ README.md
-│     ├─ git_commit_release_notes_generator/
-│     │  ├─ __init__.md
-│     │  ├─ config.md
-│     │  ├─ models.md
-│     │  ├─ ollama_client/
-│     │  │  ├─ __init__.md
-│     │  │  ├─ base.md
-│     │  │  ├─ embedding.md
-│     │  │  ├─ exceptions.md
-│     │  │  ├─ llm.md
-│     │  │  └─ prompts/
-│     │  │     └─ commit_message_system.md
-│     │  └─ service/
-│     │     ├─ __init__.md
-│     │     ├─ core.md
-│     │     └─ utils.md
-│     └─ git_generator/
+│     └─ git_commit_release_notes_generator/
 │        ├─ __init__.md
+│        ├─ config.md
+│        ├─ models.md
+│        ├─ ollama_client/
+│        │  ├─ __init__.md
+│        │  ├─ base.md
+│        │  ├─ embedding.md
+│        │  ├─ exceptions.md
+│        │  ├─ llm.md
+│        │  └─ prompts/
+│        │     └─ commit_message_system.md
 │        └─ service/
 │           ├─ __init__.md
-│           └─ git_wrapper.md
+│           ├─ core.md
+│           ├─ git_wrapper.md
+│           └─ utils.md
 ├─ test/
 │  ├─ ...
 └─ scripts/

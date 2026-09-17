@@ -3,15 +3,18 @@
 
 La Documentation technique est placée dans :
 
-- docs/doc_src_files
+- docs/doc_src_files : documentation des fichiers de src
+- docs/doc_test_files : documentation des fichiers de test
 
-C’est un miroir de :
+Les deux dossiers sont des miroirs de :
 
 - src
+- test
 
 La règle est simple :
 
 - un fichier Python dans src a son équivalent .md dans docs/doc_src_files ;
+- un fichier Python dans test a son équivalent .md dans docs/doc_test_files ;
 - les noms de fichiers sont identiques, avec l’extension .md ;
 - la structure des dossiers est conservée autant que possible.
 
@@ -52,31 +55,48 @@ Exemples :
 │  │     ├─ __init__.py
 │  │     ├─ core.py
 │  │     └─ utils.py
-│  └─ (ancien module legacy supprimé : git_generator/)
 ├─ docs/
 │  ├─ monitoring/
 │  │  └─ sprint-00.md
-│  └─ doc_src_files/
+│  ├─ doc_src_files/
+│  │  ├─ README.md
+│  │  └─ git_commit_release_notes_generator/
+│  │     ├─ __init__.md
+│  │     ├─ config.md
+│  │     ├─ models.md
+│  │     ├─ ollama_client/
+│  │     │  ├─ __init__.md
+│  │     │  ├─ base.md
+│  │     │  ├─ embedding.md
+│  │     │  ├─ exceptions.md
+│  │     │  ├─ llm.md
+│  │     │  └─ prompts/
+│  │     │     └─ commit_message_system.md
+│  │     └─ service/
+│  │        ├─ __init__.md
+│  │        ├─ core.md
+│  │        ├─ git_wrapper.md
+│  │        └─ utils.md
+│  └─ doc_test_files/
 │     ├─ README.md
-│     └─ git_commit_release_notes_generator/
-│        ├─ __init__.md
-│        ├─ config.md
-│        ├─ models.md
-│        ├─ ollama_client/
-│        │  ├─ __init__.md
-│        │  ├─ base.md
-│        │  ├─ embedding.md
-│        │  ├─ exceptions.md
-│        │  ├─ llm.md
-│        │  └─ prompts/
-│        │     └─ commit_message_system.md
-│        └─ service/
-│           ├─ __init__.md
-│           ├─ core.md
-│           ├─ git_wrapper.md
-│           └─ utils.md
+│     ├─ test_git_wrapper.md
+│     ├─ test_ollama_llm.md
+│     ├─ README_situation_test.md
+│     ├─ fixtures/
+│     │  └─ golden_diffs.md
+│     └─ situation_test/
+│        ├─ init_test.md
+│        └─ deinit_test.md
 ├─ test/
-│  ├─ ...
+│  ├─ __init__.py
+│  ├─ test_git_wrapper.py
+│  ├─ test_ollama_llm.py
+│  ├─ README_situation_test.md
+│  ├─ fixtures/
+│  │  └─ golden_diffs.py
+│  └─ situation_test/
+│     ├─ init_test.py
+│     └─ deinit_test.py
 └─ scripts/
    └─ run_metrics.py
 ```
@@ -89,16 +109,21 @@ Le code applicatif du projet.
 ### docs/doc_src_files/
 La documentation technique détaillant les fichiers de src, avec le même arbre que le code et des fichiers .md.
 
+### docs/doc_test_files/
+La documentation technique détaillant les fichiers de test, avec le même arbre que les tests et des fichiers .md.
+
 ### docs/monitoring/
 La gestion des sprints, de l’avancement et du suivi projet.
 
 ## Règles de maintenance
 
 1. Ajouter les fichiers .md dans docs/doc_src_files en gardant le même chemin que src.
-2. Ne pas mélanger la documentation technique avec la gestion de sprint.
-3. Mettre à jour la doc lorsqu’un module est ajouté, renommé ou refactoré.
-4. Conserver la séparation claire entre :
+2. Ajouter les fichiers .md dans docs/doc_test_files en gardant le même chemin que test.
+3. Ne pas mélanger la documentation technique avec la gestion de sprint.
+4. Mettre à jour la doc lorsqu’un module est ajouté, renommé ou refactoré.
+5. Conserver la séparation claire entre :
    - architecture technique : docs/doc_src_files
+   - tests et scénarios : docs/doc_test_files
    - planification / sprints : docs/monitoring
 
 ## Pourquoi cette organisation ?
@@ -106,5 +131,6 @@ La gestion des sprints, de l’avancement et du suivi projet.
 Cette structure rend le projet plus lisible et extensible :
 
 - il est possible de retrouver rapidement le code et sa documentation correspondante ;
+- les tests disposent aussi d’une documentation explicite, sans mélange avec le code applicatif ;
 - les sprints restent séparés de l’architecture technique ;
 - l’arborescence peut évoluer sans casser la logique documentaire.

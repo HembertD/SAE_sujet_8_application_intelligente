@@ -1,1 +1,0 @@
-"""Package Git generator."""

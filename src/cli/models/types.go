@@ -66,6 +66,7 @@ type ConfigResponse struct {
 	OllamaModel   string  `json:"ollama_model"`
 	TimeoutS      float64 `json:"timeout_s"`
 	Language      string  `json:"language"`
+	MockInterface bool    `json:"mock_interface"`
 }
 
 // PingResponse contient le diagnostic de joignabilité du serveur Ollama IUT.

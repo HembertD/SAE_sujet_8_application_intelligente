@@ -11,7 +11,7 @@ import (
 )
 
 // ShowReleaseNotesFlow orchestre l'écran de génération de changelog / release notes
-func ShowReleaseNotesFlow(reader *bufio.Reader, client *bridge.BackendClient, status *models.RepoStatus) {
+func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
 	ui.ClearTerminal()
 	ui.PrintBanner(status)
 	width := 72

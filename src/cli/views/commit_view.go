@@ -11,7 +11,7 @@ import (
 )
 
 // ShowCommitFlow orchestre l'écran interactif de génération de commit
-func ShowCommitFlow(reader *bufio.Reader, client *bridge.BackendClient, status *models.RepoStatus) {
+func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
 	ui.ClearTerminal()
 	ui.PrintBanner(status)
 	width := 72

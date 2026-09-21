@@ -12,7 +12,7 @@ import (
 )
 
 // ShowConfigFlow orchestre l'écran de visualisation et modification de la configuration
-func ShowConfigFlow(reader *bufio.Reader, client *bridge.BackendClient, status *models.RepoStatus) {
+func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
 	for {
 		ui.ClearTerminal()
 		ui.PrintBanner(status)
@@ -31,6 +31,14 @@ func ShowConfigFlow(reader *bufio.Reader, client *bridge.BackendClient, status *
 		lines = append(lines, fmt.Sprintf("  • %sModèle LLM%s        : %s%s%s", ui.Bold, ui.Reset, ui.Yellow, cfg.OllamaModel, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sTimeout requête%s   : %.0fs", ui.Bold, ui.Reset, cfg.TimeoutS))
 		lines = append(lines, fmt.Sprintf("  • %sLangue%s            : %s", ui.Bold, ui.Reset, cfg.Language))
+
+		mockColor := ui.Green
+		mockStatus := "Désactivé"
+		if cfg.MockInterface {
+			mockColor = ui.Yellow
+			mockStatus = "Activé"
+		}
+		lines = append(lines, fmt.Sprintf("  • %sMode démo%s          : %s%s%s", ui.Bold, ui.Reset, mockColor, mockStatus, ui.Reset))
 		lines = append(lines, "")
 		lines = append(lines, ui.Dim+"  (Toute modification est répercutée dans le .env sans recompilation)"+ui.Reset)
 		lines = append(lines, "")
@@ -104,9 +112,17 @@ func ShowConfigFlow(reader *bufio.Reader, client *bridge.BackendClient, status *
 				cfg.Language = newLang
 			}
 
+			fmt.Printf("  Mode démo (true/false) [%t] : ", cfg.MockInterface)
+			newMockStr, _ := reader.ReadString('\n')
+			newMockStr = strings.TrimSpace(newMockStr)
+			if newMockStr != "" {
+				lower := strings.ToLower(newMockStr)
+				cfg.MockInterface = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
+			}
+
 			spinnerSave := ui.NewSpinner("Sauvegarde des paramètres dans le .env...")
 			spinnerSave.Start()
-			res, saveErr := client.SaveConfig(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.Language)
+			res, saveErr := client.SaveConfig(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.Language, cfg.MockInterface)
 			spinnerSave.Stop("")
 
 			if saveErr != nil {

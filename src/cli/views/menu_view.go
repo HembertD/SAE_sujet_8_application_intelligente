@@ -11,7 +11,7 @@ import (
 )
 
 // ShowMainMenu affiche le menu principal et retourne le choix de l'utilisateur
-func ShowMainMenu(reader *bufio.Reader, client *bridge.BackendClient, status *models.RepoStatus) string {
+func ShowMainMenu(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) string {
 	ui.ClearTerminal()
 	ui.PrintBanner(status)
 
@@ -24,8 +24,8 @@ func ShowMainMenu(reader *bufio.Reader, client *bridge.BackendClient, status *mo
 	menuLines = append(menuLines, fmt.Sprintf("  %s[4]%s 🚪 %sQuitter%s", ui.Yellow+ui.Bold, ui.Reset, ui.Bold, ui.Reset))
 	menuLines = append(menuLines, "")
 
-	if client.UseMockMode {
-		menuLines = append(menuLines, ui.Dim+"  ℹ Mode simulation actif (le backend Python se connectera automatiquement)"+ui.Reset)
+	if client.IsMock() {
+		menuLines = append(menuLines, ui.Dim+"  ℹ Mode simulation actif (MOCK_INTERFACE=true dans le .env)"+ui.Reset)
 	}
 
 	ui.PrintCard("Menu Principal", menuLines, width, ui.Cyan)

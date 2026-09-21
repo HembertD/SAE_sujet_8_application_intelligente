@@ -6,11 +6,11 @@
 
 ## Comment Go communique avec Python (Le Pont / Bridge)
 
-Toute la communication repose sur le fichier [`src/cli/bridge/backend_client.go`](file:///home/maxence/Documents/DATA/Ecole/but3_info/sae_applicationIntelligente/SAE_sujet_8_application_intelligente/src/cli/bridge/backend_client.go).
+Toute la communication repose sur le paquet [`src/cli/bridge/`](file:///SAE_sujet_8_application_intelligente/src/cli/bridge/), structuré autour de l'interface Go idiomatique `BackendClient`.
 
 ### Le mécanisme d'appel système (`exec.Command`)
 Go n'utilise pas de socket réseau ou de serveur HTTP local pour parler à Python (ce qui serait lourd et risquerait des conflits de ports).  
-Go lance simplement Python en sous-processus système :
+Go lance simplement Python en sous-processus système (implémenté dans `python_client.go`) :
 
 ```go
 // Exemple simplifié de ce que fait Go sous le capot :
@@ -37,61 +37,73 @@ err := json.Unmarshal(stdout.Bytes(), &diffResp)
 // Maintenant, Go manipule des variables fortement typées : diffResp.Files, etc.
 ```
 
-### Mock
+### Architecture du Mock & Inversion des Dépendances (DIP)
 
-#### Implémentation du mock
-Dans la structure `BackendClient`, nous avons défini un drapeau booléen :
-```go
-type BackendClient struct {
-    pythonBin   string
-    moduleName  string
-    repoRoot    string
-    UseMockMode bool   // <--- Le drapeau qui active ou désactive la simulation
-}
-```
+Afin de respecter les conventions Go (*"Accept interfaces, return structs"*) et le principe de responsabilité unique (SRP), le pont sépare strictement les contrats, les appels réels et la simulation :
 
-Au démarrage, Go teste si le backend Python répond :
-```go
-func (b *BackendClient) isBackendAvailable() bool {
-    cmd := exec.Command(b.pythonBin, "-m", b.moduleName, "--action", "ping-backend")
-    cmd.Dir = b.repoRoot
-    err := cmd.Run()
-    return err == nil // Si Python plante ou n'existe pas -> renvoie false !
-}
-```
-Si Python ne répond pas (ou si on passe le flag `./git-generator --demo`), `b.UseMockMode` passe à `true`.
-
-#### Les fausses données codées en dur dans les fonctions
-Dans chaque fonction du client (`GetDiff`, `GenerateCommit`, `PingOllama`, etc.), une bifurcation `if b.UseMockMode` intercepte l'appel et renvoie des données factices mais réalistes :
-
-```go
-func (b *BackendClient) GenerateCommit(feedback string) (*models.CommitProposal, error) {
-    // BRANCHE SIMULATION (MOCK) :
-    if b.UseMockMode {
-        // Pause artificielle de 1.4s pour imiter le temps de réflexion de l'IA
-        time.Sleep(1400 * time.Millisecond)
-
-        return &models.CommitProposal{
-            Success: true,
-            Type:    "feat",
-            Scope:   "auth",
-            Subject: "ajout de l'authentification OAuth2 sécurisée",
-            Body:    "Intègre la gestion des jetons d'accès et filtre automatiquement les variables d'environnement sensibles.",
-            RawFormatted: "feat(auth): ajout de l'authentification OAuth2 sécurisée...",
-        }, nil
+```mermaid
+classDiagram
+    class BackendClient {
+        <<interface>>
+        +GetRepoStatus() (*RepoStatus, error)
+        +GetDiff() (*DiffResponse, error)
+        +StageAll() (*ActionResult, error)
+        +GenerateCommit(feedback string) (*CommitProposal, error)
+        +ApplyCommit(message string) (*ActionResult, error)
+        +Push() (*ActionResult, error)
+        +GetReleaseNotes(fromTag, toTag string) (*ReleaseNotesResponse, error)
+        +GetConfig() (*ConfigResponse, error)
+        +SaveConfig(url, model, timeout, lang, mock) (*ActionResult, error)
+        +PingOllama() (*PingResponse, error)
+        +IsMock() bool
     }
 
-    // BRANCHE RÉELLE (Appel sous-processus Python) :
-    out, err := b.runPythonCommand("--action", "generate-commit")
-    // Désérialisation du vrai JSON renvoyé par Python...
-}
+    class BridgeClient {
+        -isMock bool
+        -realClient *PythonClient
+        -mockClient *MockClient
+        +activeDelegate() BackendClient
+    }
+
+    class PythonClient {
+        -pythonBin string
+        -moduleName string
+        +runPythonCommand()
+    }
+
+    class MockClient {
+        +SimulateDelay bool
+        +CustomDiff *DiffResponse
+        +CustomError error
+    }
+
+    BackendClient <|.. BridgeClient
+    BackendClient <|.. PythonClient
+    BackendClient <|.. MockClient
+    BridgeClient --> PythonClient : délègue si réel
+    BridgeClient --> MockClient : délègue si simulation
 ```
 
-#### La bascule automatique vers le réel
-Dès que on aura le `core.py` dans `Dev` :
-1. `isBackendAvailable()` renverra `true`.
-2. `UseMockMode` passera à `false`.
-3. Le bloc `if b.UseMockMode` sera ignoré, et Go exécutera le vrai Python sans nécessiter **la moindre modification de code côté Go**.
+#### Configuration via le fichier `.env` (`MOCK_INTERFACE`)
+L'activation du mode démo / test est pilotée par la variable `MOCK_INTERFACE` dans le fichier `.env` ou par le drapeau `--demo` en ligne de commande :
+
+```dotenv
+# Dans src/.env (et src/.env.exemple)
+MOCK_INTERFACE=true   # -> Active le mode démo / test hors-ligne
+MOCK_INTERFACE=false  # -> Mode standard : délègue au backend Python
+```
+
+Lorsque `MOCK_INTERFACE=false`, le client communique avec le sous-processus Python et remonte fidèlement les données ou erreurs réelles.
+
+#### Implémentation du mode démo (`mock_client.go`)
+Le `MockClient` implémente `BackendClient` en fournissant des réponses cohérentes avec les cas de test du projet (secrets masqués, détection binaire, latence de traitement).  
+Pour les tests unitaires automatisés (`bridge_test.go`), il permet de désactiver les délais (`SimulateDelay = false`) et de surcharger les retours ou erreurs (`CustomError`, `CustomDiff`).
+
+#### La bascule dynamique sans recompilation
+La fonction factory `NewBackendClient(repoRoot, forceDemo)` instancie le coordinateur `BridgeClient`.  
+Lorsque l'utilisateur modifie la configuration depuis l'écran `[3]` de la CLI :
+1. `SaveConfig` met à jour le fichier `.env` via le module dédié `env.go`.
+2. Le `BridgeClient` bascule instantanément son délégué actif entre `MockClient` et `PythonClient` sans nécessiter **la moindre modification ni recompilation de code côté Go**.
 
 ---
 
@@ -100,12 +112,16 @@ Dès que on aura le `core.py` dans `Dev` :
 ### Arborescence détaillée
 ```text
 src/cli/
-├── go.mod                     # Définition du module Go (go 1.22, 0 dépendance)
+├── go.mod                     # Définition du module Go (go 1.22, 0 dépendance externe)
 ├── main.go                    # Point d'entrée, capture Ctrl+C, boucle du menu
 ├── models/
 │   └── types.go               # Structs Go typées mappées sur les schémas JSON
 ├── bridge/
-│   └── backend_client.go      # Exécution sous-processus Python & parsing JSON
+│   ├── client.go              # Interface BackendClient et coordinateur BridgeClient
+│   ├── python_client.go       # Implémentation réelle (exec.Command & unmarshal JSON)
+│   ├── mock_client.go         # Implémentation simulation / mock pour mode démo & tests
+│   ├── env.go                 # Gestionnaire autonome du fichier .env (lecture/écriture)
+│   └── bridge_test.go         # Tests unitaires du pont et du mock (go test ./...)
 ├── ui/
 │   ├── styles.go              # Codes ANSI, TrueColor, calcul VisualLen, StripANSI
 │   ├── box.go                 # Tracé des fenêtres, bordures Unicode, tableaux
@@ -119,9 +135,9 @@ src/cli/
 
 ### Rôle de chaque paquet :
 * **`models`** : Ne contient aucune logique. Seulement les définitions de structures (`RepoStatus`, `DiffFile`, `CommitProposal`, `ConfigResponse`, etc.).
-* **`bridge`** : Le seul composant qui a le droit d'exécuter des commandes système pour joindre Python.
+* **`bridge`** : Expose l'interface `BackendClient` et orchestre les communications avec Python ou le mock.
 * **`ui`** : La boîte à outils graphique. Gère l'affichage à l'écran, les couleurs, les bordures et les animations.
-* **`views`** : Contient les 4 écrans interactifs. Chaque vue prend en paramètre le `bufio.Reader` (pour lire le clavier), le `BackendClient` (pour demander des données) et le `RepoStatus`.
+* **`views`** : Contient les 4 écrans interactifs. Chaque vue prend en paramètre le `bufio.Reader`, l'interface `BackendClient` et le `RepoStatus`.
 
 
 ## Fonctionnement Écran par Écran
@@ -135,6 +151,7 @@ src/cli/
 * Go génère la bannière d'en-tête avec les pastilles de couleur :
   * Si `staged_count > 0` : affiché en vert.
   * Si `staged_count == 0` : affiché en jaune avec avertissement.
+  * Indication discrète du mode uniquement si la simulation est active : `ℹ Mode simulation actif (MOCK_INTERFACE=true dans le .env)` (aucun message superflu en mode réel standard).
 * L'utilisateur tape `1`, `2`, `3`, `4` ou `q` pour naviguer.
 
 ---
@@ -178,14 +195,15 @@ C'est le cœur de l'outil :
 
 ### Écran 4 : Configuration (.env) & Diagnostic Ping Ollama
 Cet écran répond directement aux **consignes impératives de contrôle de l'IUT** :
-* Affiche les variables lues par Python :
+* Affiche les variables lues par Python et Go :
   * `OLLAMA_BASE_URL` (par défaut `http://10.22.28.190:11434`)
   * `OLLAMA_MODEL` (par défaut `gemma4:12b`)
   * `OLLAMA_TIMEOUT_S` (60s)
   * `APP_LANGUAGE` (fr)
+  * `MOCK_INTERFACE` (true / false)
 * **Action `[T]` (Test Ping)** : Go demande à Python d'effectuer une requête rapide vers le serveur Ollama. S'il répond, l'écran affiche en vert la latence en millisecondes et la liste réelle des modèles installés sur le serveur !
-* **Action `[M]` (Modification)** : Permet de modifier l'adresse IP, le modèle ou le timeout. Python sauvegarde immédiatement les valeurs dans le fichier `.env`.  
-  👉 **Aucune recompilation du binaire Go n'est nécessaire.**
+* **Action `[M]` (Modification)** : Permet de modifier l'adresse IP, le modèle, le timeout ou d'activer/désactiver le mode démo (`true`/`false`). Go sauvegarde immédiatement les valeurs dans le fichier `.env`.  
+   👉 **Aucune recompilation du binaire Go n'est nécessaire.**
 
 ---
 
@@ -200,10 +218,10 @@ go build -o git-generator main.go
 
 ### Lancer l'application :
 ```bash
-# Lancement normal (détecte le backend Python s'il est présent) :
+# Lancement standard (le mode dépend de MOCK_INTERFACE dans src/.env) :
 ./git-generator
 
-# Lancement forcé en mode simulation (idéal pour démo ou oral si le serveur IUT est éteint) :
+# Lancement forcé en mode démo (autonome, sans backend Python requis) :
 ./git-generator --demo
 
 # Lancement en ciblant un autre dépôt Git :

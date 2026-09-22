@@ -36,6 +36,10 @@ nav:
               - Initialisation: doc_test_files/situation_test/init_test.md
               - Désinitialisation: doc_test_files/situation_test/deinit_test.md
 
+      - CI et déploiement:
+          - Déploiement de la documentation: deploiement_documentation.md
+          - Tests automatiques via GitHub Actions: deploiement_tests_workflows.md
+
   - Monitoring:
       - Sprint 00: monitoring/sprint-00.md
       - Sprint 01: monitoring/sprint-01.md

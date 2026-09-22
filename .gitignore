@@ -28,7 +28,6 @@ htmlcov/
 # Variables d'environnement
 
 .env
-.env.*
 
 !.env.example
 
@@ -51,3 +50,8 @@ htmlcov/
 *.key
 *.p12
 *.pfx
+
+# Binaires compilés Go
+src/cli/git-generator
+git-generator
+*.exe

@@ -55,6 +55,9 @@ def generate_commit_message(diff_files: list[DiffFile]) -> CommitMessage:
     lève CommitMessageValidationError plutôt que de renvoyer un message
     bancal en silence.
     """
+    if not diff_files:
+        raise ValueError("generate_commit_message() nécessite au moins un DiffFile.")
+
     system_prompt = _PROMPT_PATH.read_text(encoding="utf-8")
     messages: list[dict] = [
         {"role": "system", "content": system_prompt},

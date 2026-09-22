@@ -91,6 +91,11 @@ def test_validate_accepts_well_formed_message():
     assert error is None
 
 
+def test_generate_commit_message_rejects_empty_diff_list():
+    with pytest.raises(ValueError):
+        llm.generate_commit_message([])
+
+
 def test_diff_file_accepts_legacy_binary_keyword():
     diff = DiffFile(path="image.png", status="A", added=0, removed=0, binary=True, patch="binary patch")
 

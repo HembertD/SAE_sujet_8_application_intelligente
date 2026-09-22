@@ -1,18 +1,13 @@
-"""Test d'intégration réel : GitWrapper (Dorian) -> generate_commit_message (Enzo).
+"""Test d'intégration réel : GitWrapper (module Git) -> generate_commit_message (module C).
 
-But : vérifier que le vrai `list[DiffFile]` produit par le module Git/sécurité
-peut être consommé tel quel par le module C, sans conversion manuelle - malgré
-le fait que ce soient deux classes DiffFile distinctes (champ `binary` côté
-Dorian, `is_binary` côté module C). Ça fonctionne uniquement parce que
-generate_commit_message() ne lit jamais `is_binary`.
+But : vérifier que le vrai `list[DiffFile]` produit par
+`GitWrapper.get_staged_diff()` est consommé tel quel par le module C, sans
+conversion manuelle.
 
 Nécessite :
 - `pip install GitPython`
 - les fixtures activées : `python test/situation_test/init_test.py`
 - réseau vers le serveur Ollama partagé (test marqué "slow")
-
-Ce fichier vit sur la branche test/llm-integration (PR séparée vers Dev),
-pas sur llm : il dépend du code de deux modules différents.
 """
 import subprocess
 import sys
@@ -24,7 +19,7 @@ import pytest
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from git_generator.service.git_wrapper import GitWrapper
+from git_commit_release_notes_generator.service.git_wrapper import GitWrapper
 from git_commit_release_notes_generator.ollama_client.llm import generate_commit_message
 
 FIXTURES_DIR = ROOT / "test" / "situation_test" / "commit"

@@ -21,19 +21,7 @@ Le fichier `.github/workflows/ci.yml` est déclenché sur les pull requests cibl
 
 #### `python-tests`
 
-Ce job vérifie les tests Python rapides :
-
-1. récupération du dépôt
-2. installation de Python 3.12
-3. installation des dépendances depuis `requirements.txt`
-4. installation de `pytest`
-5. exécution de :
-
-```bash
-python -m pytest -m "not slow" -q
-```
-
-Il ne lance que les tests non marqués comme `slow` pour garder la validation rapide.
+Ce job a été retirer car les tests pythons ont besoin de la connection à l'IUT pour questionner l'IA local à cet connection, il est donc impossible que le workflows vérifie les tests
 
 #### `go-tests`
 
@@ -47,30 +35,6 @@ go test ./...
 ```
 
 Il est lancé depuis le dossier `src/cli` pour vérifier le sous-projet Go.
-
-#### `slow-tests`
-
-Ce job est conditionné par :
-
-```yaml
-if: github.event_name == 'workflow_dispatch'
-```
-
-Cela signifie qu’il ne s’exécute que lorsqu’un workflow est déclenché manuellement. Il lance les tests Python marqués `slow` :
-
-```bash
-python -m pytest -m slow -q
-```
-
-## Rôle des marqueurs de tests
-
-Le projet utilise les marqueurs `slow` pour distinguer les tests lourds ou plus longs des validations rapides.
-
-Cela permet :
-
-- d’avoir une CI courte et réactive pour les PR
-- de garder les tests longs hors du flux standard
-- d’exécuter les validations lourdes à la demande
 
 ## Vérification locale
 

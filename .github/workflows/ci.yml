@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - Dev
+  push:
+    branches:
+      - main
+      - Dev
 
 jobs:
   go-tests:

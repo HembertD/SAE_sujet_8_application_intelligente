@@ -25,6 +25,11 @@ func NewPythonClient(repoRoot string) *PythonClient {
 	pyBin := "python3"
 	if customPy := os.Getenv("PYTHON_BIN"); customPy != "" {
 		pyBin = customPy
+	} else if home, err := os.UserHomeDir(); err == nil {
+		monenvPy := filepath.Join(home, "monenv", "bin", "python")
+		if _, statErr := os.Stat(monenvPy); statErr == nil {
+			pyBin = monenvPy
+		}
 	}
 
 	return &PythonClient{
@@ -38,6 +43,35 @@ func NewPythonClient(repoRoot string) *PythonClient {
 func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 	cmd := exec.Command(p.pythonBin, append([]string{"-m", p.moduleName}, args...)...)
 	cmd.Dir = p.repoRoot
+
+	env := os.Environ()
+	candidates := []string{
+		filepath.Join(p.repoRoot, "src"),
+		filepath.Join(p.repoRoot, "SAE_sujet_8_application_intelligente", "src"),
+		filepath.Join(".", "src"),
+		filepath.Join("..", "src"),
+	}
+	for _, cand := range candidates {
+		if abs, err := filepath.Abs(cand); err == nil {
+			if stat, err := os.Stat(abs); err == nil && stat.IsDir() {
+				existing := os.Getenv("PYTHONPATH")
+				if existing != "" {
+					env = append(env, fmt.Sprintf("PYTHONPATH=%s:%s", abs, existing))
+				} else {
+					env = append(env, fmt.Sprintf("PYTHONPATH=%s", abs))
+				}
+				break
+			}
+		}
+	}
+	cfg := LoadConfigFromEnv(p.repoRoot, false)
+	env = append(env,
+		fmt.Sprintf("OLLAMA_BASE_URL=%s", cfg.OllamaBaseURL),
+		fmt.Sprintf("OLLAMA_MODEL=%s", cfg.OllamaModel),
+		fmt.Sprintf("OLLAMA_TIMEOUT_S=%.0f", cfg.TimeoutS),
+		fmt.Sprintf("APP_LANGUAGE=%s", cfg.Language),
+	)
+	cmd.Env = env
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

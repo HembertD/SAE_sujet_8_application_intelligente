@@ -230,3 +230,46 @@ func TestBridgeClientSwitching(t *testing.T) {
 		t.Errorf("attendu bridgeNormal.IsMock() == false après SaveConfig(mockInterface=false)")
 	}
 }
+
+func TestPythonClientRealIntegration(t *testing.T) {
+	repoRoot, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatalf("impossible de déterminer la racine : %v", err)
+	}
+
+	client := NewPythonClient(repoRoot)
+	if client.IsMock() {
+		t.Errorf("attendu IsMock() == false pour PythonClient")
+	}
+
+	// GetRepoStatus
+	status, err := client.GetRepoStatus()
+	if err != nil {
+		t.Fatalf("GetRepoStatus a échoué : %v", err)
+	}
+	if !status.IsGitRepo {
+		t.Errorf("attendu is_git_repo == true, obtenu false (repo: %s)", repoRoot)
+	}
+	if status.Branch == "" {
+		t.Errorf("attendu nom de branche non vide")
+	}
+
+	// GetDiff
+	diff, err := client.GetDiff()
+	if err != nil {
+		t.Fatalf("GetDiff a échoué : %v", err)
+	}
+	if !diff.Success {
+		t.Errorf("attendu diff.Success == true")
+	}
+
+	// PingOllama (répond propre même si serveur inaccessible)
+	ping, err := client.PingOllama()
+	if err != nil {
+		t.Fatalf("PingOllama a échoué : %v", err)
+	}
+	if !ping.Success {
+		t.Errorf("attendu ping.Success == true")
+	}
+}
+

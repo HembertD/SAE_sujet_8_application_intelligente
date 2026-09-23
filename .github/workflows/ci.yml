@@ -42,10 +42,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Pandoc and LaTeX
+      - name: Install Pandoc, LaTeX and Python dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc texlive-xetex texlive-latex-recommended texlive-fonts-recommended lmodern
+          python3 -m pip install --upgrade pip pyyaml
 
       - name: Build combined markdown source from MkDocs navigation
         run: |
@@ -117,7 +118,7 @@ jobs:
       - name: Generate PDF
         run: |
           pandoc .tmp-doc/documentation.md \
-            --from=gfm+raw_tex \
+            --from=markdown+raw_tex \
             --standalone \
             --toc \
             --number-sections \

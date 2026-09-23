@@ -41,10 +41,23 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 	notes, err := client.GetReleaseNotes(fromTag, toTag)
 	spinner.Stop("")
 
-	if err != nil {
-		ui.PrintError(fmt.Sprintf("Impossible de générer les Release Notes : %v", err))
-		waitForEnter(reader)
-		return
+	isError := (err != nil) || (notes != nil && (!notes.Success || notes.Markdown == ""))
+	if isError {
+		errMsg := "délai d'attente dépassé (timeout) ou aucune réponse du serveur LLM"
+		if err != nil {
+			errMsg = err.Error()
+		} else if notes != nil && notes.Error != "" {
+			errMsg = notes.Error
+		}
+
+		ui.PrintError(fmt.Sprintf("Impossible de générer les Release Notes : %s", errMsg))
+		notes = &models.ReleaseNotesResponse{
+			Success:  false,
+			Error:    errMsg,
+			FromTag:  fromTag,
+			ToTag:    toTag,
+			Markdown: fmt.Sprintf("# Erreur\n\nImpossible de générer les Release Notes : %s\n\nVérifiez l'état du serveur Ollama dans le menu [3] Configuration.", errMsg),
+		}
 	}
 
 	fmt.Println()
@@ -52,7 +65,11 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 	for _, l := range strings.Split(notes.Markdown, "\n") {
 		lines = append(lines, l)
 	}
-	ui.PrintCard(fmt.Sprintf("Release Notes (%s ➔ %s)", fromTag, toTag), lines, width, ui.Magenta)
+	cardColor := ui.Magenta
+	if isError {
+		cardColor = ui.Red
+	}
+	ui.PrintCard(fmt.Sprintf("Release Notes (%s ➔ %s)", fromTag, toTag), lines, width, cardColor)
 	fmt.Println()
 
 	// Choix utilisateur
@@ -68,6 +85,11 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 	choice = strings.ToUpper(strings.TrimSpace(choice))
 
 	if choice == "S" {
+		if !notes.Success {
+			ui.PrintError("Impossible d'enregistrer des Release Notes en erreur.")
+			waitForEnter(reader)
+			return
+		}
 		saveErr := client.SaveMarkdownFile("RELEASE_NOTES.md", notes.Markdown)
 		if saveErr != nil {
 			ui.PrintError(fmt.Sprintf("Erreur lors de l'enregistrement du fichier : %v", saveErr))

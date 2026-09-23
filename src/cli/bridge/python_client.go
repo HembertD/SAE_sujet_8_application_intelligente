@@ -115,6 +115,9 @@ func (p *PythonClient) GetDiff() (*models.DiffResponse, error) {
 	if err := json.Unmarshal(out, &diffResp); err != nil {
 		return nil, fmt.Errorf("erreur de parsing du diff JSON : %w", err)
 	}
+	if !diffResp.Success && diffResp.Error != "" {
+		return nil, fmt.Errorf("%s", diffResp.Error)
+	}
 	return &diffResp, nil
 }
 
@@ -147,6 +150,13 @@ func (p *PythonClient) GenerateCommit(feedback string) (*models.CommitProposal, 
 	var proposal models.CommitProposal
 	if err := json.Unmarshal(out, &proposal); err != nil {
 		return nil, fmt.Errorf("erreur lors du décodage de la proposition LLM : %w", err)
+	}
+	if !proposal.Success {
+		errMsg := proposal.Error
+		if errMsg == "" {
+			errMsg = "erreur : aucune réponse du serveur LLM (timeout)"
+		}
+		return &proposal, fmt.Errorf("%s", errMsg)
 	}
 	return &proposal, nil
 }
@@ -189,6 +199,9 @@ func (p *PythonClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNo
 	var res models.ReleaseNotesResponse
 	if err := json.Unmarshal(out, &res); err != nil {
 		return nil, err
+	}
+	if !res.Success && res.Error != "" {
+		return &res, fmt.Errorf("%s", res.Error)
 	}
 	return &res, nil
 }

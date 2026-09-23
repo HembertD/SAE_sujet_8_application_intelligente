@@ -77,10 +77,25 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		proposal, errGen := client.GenerateCommit(feedback)
 		spinnerLLM.Stop("")
 
-		if errGen != nil {
-			ui.PrintError(fmt.Sprintf("Erreur lors de la génération IA : %v", errGen))
-			waitForEnter(reader)
-			return
+		isError := (errGen != nil) || (proposal != nil && (!proposal.Success || proposal.Subject == "" || strings.ToLower(proposal.Type) == "erreur"))
+		if isError {
+			errMsg := "délai d'attente dépassé (timeout) ou aucune réponse du serveur LLM"
+			if errGen != nil {
+				errMsg = errGen.Error()
+			} else if proposal != nil && proposal.Error != "" {
+				errMsg = proposal.Error
+			}
+
+			ui.PrintError(fmt.Sprintf("Échec de la génération : %s", errMsg))
+
+			proposal = &models.CommitProposal{
+				Success: false,
+				Type:    "erreur",
+				Scope:   "",
+				Subject: "aucune réponse du serveur LLM (timeout)",
+				Body:    fmt.Sprintf("Détail de l'erreur : %s\n\nVous pouvez :\n  - Réessayer la génération avec une consigne [R]\n  - Saisir manuellement votre message de commit [M]\n  - Annuler l'opération [A]", errMsg),
+				Error:   errMsg,
+			}
 		}
 
 		fmt.Println()
@@ -103,6 +118,11 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 		switch choice {
 		case "V":
+			if isError || proposal.Type == "erreur" || !proposal.Success {
+				ui.PrintError("Impossible de valider un message en erreur. Modifiez-le manuellement avec [M] ou réessayez avec [R].")
+				continue
+			}
+
 			finalMessage := formatCommit(proposal.Type, proposal.Scope, proposal.Subject, proposal.Body)
 			spinnerCommit := ui.NewSpinner("Application du commit via Git...")
 			spinnerCommit.Start()
@@ -145,15 +165,21 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			if feedback == "" {
 				feedback = "Corrige et améliore la précision du message."
 			}
-			// Boucle à nouveau avec le feedback !
 
 		case "M":
 			fmt.Println(ui.Bold + "\n  ✏️ Modification manuelle :" + ui.Reset)
-			fmt.Printf("  Type [%s] : ", proposal.Type)
+
+			defaultType := proposal.Type
+			if strings.ToLower(defaultType) == "erreur" {
+				defaultType = "feat"
+			}
+			fmt.Printf("  Type [%s] : ", defaultType)
 			newType, _ := reader.ReadString('\n')
 			newType = strings.TrimSpace(newType)
 			if newType != "" {
 				proposal.Type = newType
+			} else {
+				proposal.Type = defaultType
 			}
 
 			fmt.Printf("  Scope [%s] : ", proposal.Scope)
@@ -163,11 +189,21 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				proposal.Scope = newScope
 			}
 
-			fmt.Printf("  Sujet [%s] : ", proposal.Subject)
+			defaultSubject := proposal.Subject
+			if strings.Contains(strings.ToLower(defaultSubject), "aucune réponse") || strings.Contains(strings.ToLower(defaultSubject), "erreur") {
+				defaultSubject = ""
+			}
+			if defaultSubject != "" {
+				fmt.Printf("  Sujet [%s] : ", defaultSubject)
+			} else {
+				fmt.Print("  Sujet : ")
+			}
 			newSubject, _ := reader.ReadString('\n')
 			newSubject = strings.TrimSpace(newSubject)
 			if newSubject != "" {
 				proposal.Subject = newSubject
+			} else if defaultSubject != "" {
+				proposal.Subject = defaultSubject
 			}
 
 			fmt.Printf("  Description / Body [%s] : ", proposal.Body)
@@ -177,7 +213,11 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				proposal.Body = newBody
 			}
 
-			feedback = "" // Reset feedback et réaffiche la carte avec les modifications
+			feedback = ""
+			if proposal.Type != "erreur" && proposal.Subject != "" {
+				proposal.Success = true
+				isError = false
+			}
 
 		case "A":
 			ui.PrintInfo("Opération abandonnée. Aucun commit n'a été créé.")

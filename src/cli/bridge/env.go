@@ -77,7 +77,7 @@ func LoadConfigFromEnv(repoRoot string, isMockActive bool) *models.ConfigRespons
 	cfg := &models.ConfigResponse{
 		Success:       true,
 		OllamaBaseURL: "http://10.22.28.190:11434",
-		OllamaModel:   "gemma4:12b",
+		OllamaModel:   "gemma4:26b",
 		TimeoutS:      60.0,
 		Language:      "fr",
 		MockInterface: isMockActive,

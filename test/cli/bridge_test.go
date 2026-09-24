@@ -1,23 +1,25 @@
-package bridge
+package cli_test
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"sae-git-cli/bridge"
 	"sae-git-cli/models"
 )
 
 // Vérifications de conformité d'interface à la compilation
 var (
-	_ BackendClient = (*BridgeClient)(nil)
-	_ BackendClient = (*PythonClient)(nil)
-	_ BackendClient = (*MockClient)(nil)
+	_ bridge.BackendClient = (*bridge.BridgeClient)(nil)
+	_ bridge.BackendClient = (*bridge.PythonClient)(nil)
+	_ bridge.BackendClient = (*bridge.MockClient)(nil)
 )
 
 func TestMockClientBasics(t *testing.T) {
-	mock := NewMockClient("/tmp/fake-repo")
+	mock := bridge.NewMockClient("/tmp/fake-repo")
 	mock.SimulateDelay = false // Désactive les délais pour des tests instantanés
 
 	if !mock.IsMock() {
@@ -116,7 +118,7 @@ func TestMockClientBasics(t *testing.T) {
 }
 
 func TestMockClientOverrides(t *testing.T) {
-	mock := NewMockClient("/tmp/fake-repo")
+	mock := bridge.NewMockClient("/tmp/fake-repo")
 	mock.SimulateDelay = false
 
 	// Test injection d'erreur
@@ -155,14 +157,14 @@ func TestMockClientOverrides(t *testing.T) {
 func TestParseBoolFromString(t *testing.T) {
 	truthy := []string{"true", "True", "TRUE", "1", "yes", "YES", "oui", "OUI"}
 	for _, v := range truthy {
-		if !ParseBoolFromString(v) {
+		if !bridge.ParseBoolFromString(v) {
 			t.Errorf("attendu true pour '%s'", v)
 		}
 	}
 
 	falsy := []string{"false", "False", "0", "no", "non", "", "random"}
 	for _, v := range falsy {
-		if ParseBoolFromString(v) {
+		if bridge.ParseBoolFromString(v) {
 			t.Errorf("attendu false pour '%s'", v)
 		}
 	}
@@ -173,13 +175,13 @@ func TestEnvFileReadWrite(t *testing.T) {
 	envPath := filepath.Join(tempDir, ".env")
 
 	// Écriture du fichier .env
-	err := WriteEnvFile(envPath, "http://localhost:11434", "mistral:latest", 45.0, "fr", true)
+	err := bridge.WriteEnvFile(envPath, "http://localhost:11434", "mistral:latest", 45.0, "fr", true)
 	if err != nil {
 		t.Fatalf("WriteEnvFile échoué : %v", err)
 	}
 
 	// Lecture de la configuration
-	cfg := LoadConfigFromEnv(tempDir, false)
+	cfg := bridge.LoadConfigFromEnv(tempDir, false)
 	if cfg.OllamaBaseURL != "http://localhost:11434" {
 		t.Errorf("URL attendue 'http://localhost:11434', obtenue '%s'", cfg.OllamaBaseURL)
 	}
@@ -198,13 +200,13 @@ func TestBridgeClientSwitching(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Initialisation en forçant le mode démo
-	bridgeDemo := NewBackendClient(tempDir, true)
+	bridgeDemo := bridge.NewBackendClient(tempDir, true)
 	if !bridgeDemo.IsMock() {
 		t.Errorf("attendu bridgeDemo.IsMock() == true avec forceDemo=true")
 	}
 
 	// Initialisation normale
-	bridgeNormal := NewBackendClient(tempDir, false)
+	bridgeNormal := bridge.NewBackendClient(tempDir, false)
 	// Sans configuration, le mode démo est inactif
 	if bridgeNormal.IsMock() {
 		t.Errorf("attendu bridgeNormal.IsMock() == false par défaut sans variable d'env")
@@ -232,12 +234,9 @@ func TestBridgeClientSwitching(t *testing.T) {
 }
 
 func TestPythonClientRealIntegration(t *testing.T) {
-	repoRoot, err := filepath.Abs("../../..")
-	if err != nil {
-		t.Fatalf("impossible de déterminer la racine : %v", err)
-	}
+	repoRoot := bridge.FindAppRoot()
 
-	client := NewPythonClient(repoRoot)
+	client := bridge.NewPythonClient(repoRoot)
 	if client.IsMock() {
 		t.Errorf("attendu IsMock() == false pour PythonClient")
 	}
@@ -273,3 +272,70 @@ func TestPythonClientRealIntegration(t *testing.T) {
 	}
 }
 
+func TestAppEnvIsolationFromTargetRepo(t *testing.T) {
+	targetRepo := t.TempDir() // Répertoire du projet cible analysé
+	appRoot := t.TempDir()    // Répertoire où est installée l'application
+
+	client := bridge.NewBackendClientWithAppRoot(targetRepo, appRoot, true)
+
+	// Sauvegarde d'une configuration
+	_, err := client.SaveConfig("http://10.22.28.190:11434", "qwen3.8:27b", 250.0, "fr", true)
+	if err != nil {
+		t.Fatalf("SaveConfig a échoué : %v", err)
+	}
+
+	// 1. Le .env DOIT être créé dans appRoot
+	appEnv := filepath.Join(appRoot, ".env")
+	if _, errStat := os.Stat(appEnv); errStat != nil {
+		t.Errorf("Le fichier .env aurait dû être créé dans appRoot (%s)", appEnv)
+	}
+
+	// 2. Le .env NE DOIT PAS être créé dans targetRepo (aucun parasitage du projet analysé)
+	targetEnv := filepath.Join(targetRepo, ".env")
+	if _, errStat := os.Stat(targetEnv); errStat == nil {
+		t.Errorf("ERREUR CRITIQUE : le fichier .env a été créé dans le dépôt cible analysé (%s) au lieu de l'application !", targetEnv)
+	}
+
+	// 3. GetConfig doit bien relire la configuration applicative
+	cfg, errCfg := client.GetConfig()
+	if errCfg != nil {
+		t.Fatalf("GetConfig a échoué : %v", errCfg)
+	}
+	if cfg.OllamaModel != "qwen3.8:27b" {
+		t.Errorf("modèle attendu 'qwen3.8:27b', obtenu '%s'", cfg.OllamaModel)
+	}
+	if cfg.TimeoutS != 250.0 {
+		t.Errorf("timeout attendu 250.0, obtenu %.0f", cfg.TimeoutS)
+	}
+}
+
+func TestAppEnvNeverInSrc(t *testing.T) {
+	// Vérifie que FindAppRoot résout bien la racine du projet et JAMAIS src ou cli
+	root := bridge.FindAppRoot()
+	if filepath.Base(root) == "src" || filepath.Base(root) == "cli" {
+		t.Fatalf("FindAppRoot ne doit jamais renvoyer src ou cli, obtenu: %s", root)
+	}
+
+	envPath := bridge.FindAppEnvPath(root)
+	if filepath.Base(filepath.Dir(envPath)) == "src" {
+		t.Fatalf("FindAppEnvPath a renvoyé un chemin dans src: %s", envPath)
+	}
+
+	// Tenter d'écrire en forçant un chemin contenant /src/.env
+	forcedSrcPath := filepath.Join(root, "src", ".env")
+	err := bridge.WriteEnvFile(forcedSrcPath, "http://localhost:11434", "gemma4:12b", 30.0, "fr", true)
+	if err != nil {
+		t.Fatalf("WriteEnvFile a échoué: %v", err)
+	}
+
+	// S'assurer formellement que src/.env n'existe pas
+	if _, errStat := os.Stat(forcedSrcPath); errStat == nil {
+		t.Fatalf("CRITIQUE : src/.env a été créé alors qu'il est formellement interdit !")
+	}
+
+	// S'assurer que le fichier a bien été écrit à la racine
+	realRootEnv := filepath.Join(root, ".env")
+	if _, errStat := os.Stat(realRootEnv); errStat != nil {
+		t.Fatalf("Le fichier .env devrait exister à la racine (%s)", realRootEnv)
+	}
+}

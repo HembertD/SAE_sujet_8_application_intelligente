@@ -18,6 +18,7 @@ func main() {
 	// Options de la ligne de commande
 	demoFlag := flag.Bool("demo", false, "Force le mode simulation/démo pour tester le TUI de manière autonome")
 	repoFlag := flag.String("repo", ".", "Chemin du dépôt Git à analyser")
+	appFlag := flag.String("app-dir", "", "Chemin vers l'application Smart Commit (dossier contenant le .env applicatif)")
 	flag.Parse()
 
 	// Gestion rigoureuse des signaux OS pour restaurer le terminal (Ctrl+C)
@@ -30,14 +31,17 @@ func main() {
 	}()
 	defer fmt.Print(ui.ShowCursor + ui.Reset + "\n")
 
-	// Détermination du répertoire racine du dépôt
+	// Détermination du répertoire racine du dépôt cible à analyser
 	absRepoPath, err := filepath.Abs(*repoFlag)
 	if err != nil {
 		absRepoPath = "."
 	}
 
+	// Détermination de la racine de l'application (où réside le .env applicatif)
+	appRoot := bridge.FindAppRoot(*appFlag)
+
 	// Initialisation du client de pont (aucune logique métier en Go)
-	client := bridge.NewBackendClient(absRepoPath, *demoFlag)
+	client := bridge.NewBackendClientWithAppRoot(absRepoPath, appRoot, *demoFlag)
 	reader := bufio.NewReader(os.Stdin)
 
 	// Boucle principale du TUI

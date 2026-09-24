@@ -27,6 +27,7 @@ type BackendClient interface {
 // BridgeClient coordonne l'accès au backend en déléguant à PythonClient ou MockClient.
 type BridgeClient struct {
 	repoRoot   string
+	appRoot    string
 	forceDemo  bool
 	isMock     bool
 	realClient *PythonClient
@@ -35,20 +36,37 @@ type BridgeClient struct {
 
 // NewBackendClient instancie le client de pontage vers le backend.
 func NewBackendClient(repoRoot string, forceDemo bool) BackendClient {
-	mockActive := forceDemo || ReadMockSettingFromEnv(repoRoot)
+	appRoot := FindAppRoot(repoRoot)
+	if isTestDir(repoRoot) {
+		appRoot = repoRoot
+	}
+	return NewBackendClientWithAppRoot(repoRoot, appRoot, forceDemo)
+}
+
+// NewBackendClientWithAppRoot instancie le client en séparant le dépôt cible et la racine de l'application.
+func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceDemo bool) BackendClient {
+	if appRoot == "" {
+		if isTestDir(repoRoot) {
+			appRoot = repoRoot
+		} else {
+			appRoot = FindAppRoot(repoRoot)
+		}
+	}
+	mockActive := forceDemo || ReadMockSettingFromEnv(appRoot)
 
 	return &BridgeClient{
 		repoRoot:   repoRoot,
+		appRoot:    appRoot,
 		forceDemo:  forceDemo,
 		isMock:     mockActive,
-		realClient: NewPythonClient(repoRoot),
-		mockClient: NewMockClient(repoRoot),
+		realClient: NewPythonClientWithAppRoot(repoRoot, appRoot),
+		mockClient: NewMockClientWithAppRoot(repoRoot, appRoot),
 	}
 }
 
 // activeDelegate renvoie l'implémentation active.
 func (b *BridgeClient) activeDelegate() BackendClient {
-	if b.isMock {
+	if b.IsMock() {
 		return b.mockClient
 	}
 	return b.realClient
@@ -56,7 +74,10 @@ func (b *BridgeClient) activeDelegate() BackendClient {
 
 // IsMock indique si le mode démo / simulation est actif.
 func (b *BridgeClient) IsMock() bool {
-	return b.isMock
+	if b.forceDemo {
+		return true
+	}
+	return ReadMockSettingFromEnv(b.appRoot)
 }
 
 // GetRepoStatus délègue la récupération de l'état du dépôt au client actif
@@ -104,16 +125,16 @@ func (b *BridgeClient) SaveMarkdownFile(filename, content string) error {
 	return b.activeDelegate().SaveMarkdownFile(filename, content)
 }
 
-// GetConfig lit la configuration depuis le fichier .env
+// GetConfig lit la configuration depuis le fichier .env de l'application
 func (b *BridgeClient) GetConfig() (*models.ConfigResponse, error) {
-	return LoadConfigFromEnv(b.repoRoot, b.isMock), nil
+	return LoadConfigFromEnv(b.appRoot, b.IsMock()), nil
 }
 
-// SaveConfig persiste la nouvelle configuration dans le .env et actualise l'état du client.
+// SaveConfig persiste la nouvelle configuration dans le .env applicatif et actualise l'état du client.
 func (b *BridgeClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool) (*models.ActionResult, error) {
-	envPath := FindEnvPath(b.repoRoot)
+	envPath := FindAppEnvPath(b.appRoot)
 	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface); err != nil {
-		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env : %w", err)
+		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
 	}
 
 	// Met à jour dynamiquement le mode si pas forcé par le flag --demo
@@ -122,7 +143,7 @@ func (b *BridgeClient) SaveConfig(baseURL, model string, timeout float64, lang s
 	}
 
 	// Si en mode réel, tenter de notifier le backend Python
-	if !b.isMock {
+	if !b.IsMock() {
 		_, _ = b.realClient.runPythonCommand(
 			"--action", "save-config",
 			"--base-url", baseURL,

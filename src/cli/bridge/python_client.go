@@ -18,10 +18,26 @@ type PythonClient struct {
 	pythonBin  string
 	moduleName string
 	repoRoot   string
+	appRoot    string
 }
 
 // NewPythonClient instancie un client communiquant avec le backend Python réel.
 func NewPythonClient(repoRoot string) *PythonClient {
+	appRoot := FindAppRoot(repoRoot)
+	if isTestDir(repoRoot) {
+		appRoot = repoRoot
+	}
+	return NewPythonClientWithAppRoot(repoRoot, appRoot)
+}
+
+// NewPythonClientWithAppRoot instancie un client en précisant la racine applicative.
+func NewPythonClientWithAppRoot(repoRoot, appRoot string) *PythonClient {
+	if appRoot == "" {
+		appRoot = FindAppRoot(repoRoot)
+	}
+	if isTestDir(repoRoot) {
+		appRoot = repoRoot
+	}
 	pyBin := "python3"
 	if customPy := os.Getenv("PYTHON_BIN"); customPy != "" {
 		pyBin = customPy
@@ -36,40 +52,70 @@ func NewPythonClient(repoRoot string) *PythonClient {
 		pythonBin:  pyBin,
 		moduleName: "git_commit_release_notes_generator.service.core",
 		repoRoot:   repoRoot,
+		appRoot:    appRoot,
 	}
 }
 
 // runPythonCommand exécute la commande Python et récupère stdout
 func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
-	cmd := exec.Command(p.pythonBin, append([]string{"-m", p.moduleName}, args...)...)
+	fullArgs := []string{"-m", p.moduleName}
+	hasRepoArg := false
+	for _, a := range args {
+		if a == "--repo" {
+			hasRepoArg = true
+			break
+		}
+	}
+	fullArgs = append(fullArgs, args...)
+	if !hasRepoArg && p.repoRoot != "" {
+		fullArgs = append(fullArgs, "--repo", p.repoRoot)
+	}
+
+	cmd := exec.Command(p.pythonBin, fullArgs...)
 	cmd.Dir = p.repoRoot
 
 	env := os.Environ()
-	candidates := []string{
-		filepath.Join(p.repoRoot, "src"),
-		filepath.Join(p.repoRoot, "SAE_sujet_8_application_intelligente", "src"),
-		filepath.Join(".", "src"),
-		filepath.Join("..", "src"),
-	}
-	for _, cand := range candidates {
-		if abs, err := filepath.Abs(cand); err == nil {
-			if stat, err := os.Stat(abs); err == nil && stat.IsDir() {
-				existing := os.Getenv("PYTHONPATH")
-				if existing != "" {
-					env = append(env, fmt.Sprintf("PYTHONPATH=%s:%s", abs, existing))
-				} else {
-					env = append(env, fmt.Sprintf("PYTHONPATH=%s", abs))
+
+	// 1. PYTHONPATH pointe sur le dossier src de l'application
+	appSrc := filepath.Join(p.appRoot, "src")
+	if stat, err := os.Stat(appSrc); err == nil && stat.IsDir() {
+		existing := os.Getenv("PYTHONPATH")
+		if existing != "" {
+			env = append(env, fmt.Sprintf("PYTHONPATH=%s:%s", appSrc, existing))
+		} else {
+			env = append(env, fmt.Sprintf("PYTHONPATH=%s", appSrc))
+		}
+	} else {
+		// Candidats de secours si appSrc non résolu
+		candidates := []string{
+			filepath.Join(p.repoRoot, "src"),
+			filepath.Join(p.repoRoot, "SAE_sujet_8_application_intelligente", "src"),
+			filepath.Join(".", "src"),
+			filepath.Join("..", "src"),
+		}
+		for _, cand := range candidates {
+			if abs, err := filepath.Abs(cand); err == nil {
+				if stat, err := os.Stat(abs); err == nil && stat.IsDir() {
+					existing := os.Getenv("PYTHONPATH")
+					if existing != "" {
+						env = append(env, fmt.Sprintf("PYTHONPATH=%s:%s", abs, existing))
+					} else {
+						env = append(env, fmt.Sprintf("PYTHONPATH=%s", abs))
+					}
+					break
 				}
-				break
 			}
 		}
 	}
-	cfg := LoadConfigFromEnv(p.repoRoot, false)
+
+	// 2. Configuration chargée exclusivement depuis l'application (p.appRoot, JAMAIS p.repoRoot)
+	cfg := LoadConfigFromEnv(p.appRoot, false)
 	env = append(env,
 		fmt.Sprintf("OLLAMA_BASE_URL=%s", cfg.OllamaBaseURL),
 		fmt.Sprintf("OLLAMA_MODEL=%s", cfg.OllamaModel),
 		fmt.Sprintf("OLLAMA_TIMEOUT_S=%.0f", cfg.TimeoutS),
 		fmt.Sprintf("APP_LANGUAGE=%s", cfg.Language),
+		fmt.Sprintf("SMART_COMMIT_APP_ROOT=%s", p.appRoot),
 	)
 	cmd.Env = env
 
@@ -206,16 +252,16 @@ func (p *PythonClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNo
 	return &res, nil
 }
 
-// GetConfig lit la configuration depuis le fichier .env
+// GetConfig lit la configuration depuis le fichier .env de l'application
 func (p *PythonClient) GetConfig() (*models.ConfigResponse, error) {
-	return LoadConfigFromEnv(p.repoRoot, false), nil
+	return LoadConfigFromEnv(p.appRoot, false), nil
 }
 
-// SaveConfig enregistre la configuration dans le fichier .env et notifie Python
+// SaveConfig enregistre la configuration dans le fichier .env applicatif et notifie Python
 func (p *PythonClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool) (*models.ActionResult, error) {
-	envPath := FindEnvPath(p.repoRoot)
+	envPath := FindAppEnvPath(p.appRoot)
 	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface); err != nil {
-		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env : %w", err)
+		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
 	}
 
 	_, _ = p.runPythonCommand(

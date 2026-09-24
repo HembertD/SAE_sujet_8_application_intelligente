@@ -19,31 +19,6 @@ import time
 import urllib.error
 import urllib.request
 
-import os
-from pathlib import Path
-
-# Chargement du fichier .env pour synchroniser la configuration (ex: OLLAMA_TIMEOUT_S)
-for _candidate in (
-    Path.cwd() / ".env",
-    Path.cwd() / "src" / ".env",
-    Path(__file__).resolve().parent.parent.parent.parent / ".env",
-    Path(__file__).resolve().parent.parent.parent.parent / "src" / ".env",
-):
-    if _candidate.is_file():
-        try:
-            with open(_candidate, "r", encoding="utf-8") as _f:
-                for _line in _f:
-                    _line = _line.strip()
-                    if _line and not _line.startswith("#") and "=" in _line:
-                        _k, _v = _line.split("=", 1)
-                        _k = _k.strip()
-                        _v = _v.strip().strip("'\"")
-                        if _k and _k not in os.environ:
-                            os.environ[_k] = _v
-            break
-        except Exception:
-            pass
-
 from git_commit_release_notes_generator.config import (
     OLLAMA_BASE_URL,
     OLLAMA_MODEL,

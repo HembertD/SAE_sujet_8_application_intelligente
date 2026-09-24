@@ -26,8 +26,52 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
 ## Documentation technique
 - **Voir doc_architecture.md**
 
-## Documentation utilisateur
-- **TODO**
+## Documentation utilisateur & prise en main
+
+- Guide complet d'utilisation et de présentation du CLI : **[docs/explication_go_cli.md](docs/explication_go_cli.md)**
+
+### Démarrage rapide :
+
+1. **Configuration d'environnement :**
+   Copiez le fichier modèle à la racine du projet :
+   ```bash
+   cp .env.exemple .env
+   ```
+   Ajustez au besoin l'URL du serveur Ollama (`OLLAMA_BASE_URL`), le modèle (`OLLAMA_MODEL`) ou la langue (`APP_LANGUAGE`).
+
+2. **Compilation du CLI :**
+   ```bash
+   cd src/cli && go build -o git-generator .
+   ```
+
+3. **Exécution :**
+   ```bash
+   # Lancement standard (utilise les paramètres du .env à la racine) :
+   ./git-generator
+
+   # Lancement forcé en mode démo / test (autonome, sans serveur Ollama requis) :
+   ./git-generator --demo
+
+   # Lancement en ciblant un autre dépôt Git :
+   ./git-generator --repo /chemin/vers/un/autre/projet
+   ```
+
+   **Options disponibles :**
+   - `--repo <chemin>` : dépôt Git à analyser (par défaut `.`).
+   - `--demo` : force le mode démo / simulation autonome.
+   - `--app-dir <chemin>` : racine de l'application Smart Commit (contenant le code et le `.env`). Détectée automatiquement dans 99% des cas pour garantir l'isolation complète du `.env`.
+
+4. **Exécution des tests :**
+   Tous les tests sont centralisés dans le dossier `test/` :
+   - **Tests Python (backend & wrapper Git)** :
+     ```bash
+     pytest -m "not slow"
+     ```
+   - **Tests Go (CLI, bridge & mock)** :
+     ```bash
+     cd test/cli && go test -v ./...
+     ```
+
 
 ## Répartition des tâches
 

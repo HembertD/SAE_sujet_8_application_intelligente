@@ -8,9 +8,9 @@ Ce module permet de visualiser et de modifier les paramètres opérationnels de 
 
 ## Responsabilités
 
-- afficher les paramètres actuellement appliqués issus du fichier d'environnement `.env` ;
+- afficher les paramètres actuellement appliqués issus du fichier d'environnement `.env` situé à la racine du projet ;
 - **Action [T] (Test Ping)** : exécuter un diagnostic réseau vers l'API Ollama, mesurer la latence en millisecondes et lister l'ensemble des modèles d'IA installés sur le serveur ;
-- **Action [M] (Modification)** : permettre la saisie de nouvelles valeurs (y compris l'activation ou la désactivation à chaud du mock) et persister les modifications dans le fichier `.env` sans aucune recompilation du binaire ;
+- **Action [M] (Modification)** : permettre la saisie de nouvelles valeurs (y compris l'activation ou la désactivation à chaud du mock) et persister les modifications dans le fichier `.env` à la racine de l'application sans aucune recompilation du binaire ;
 - **Action [R]** : retour au menu principal.
 
 ## Points clés

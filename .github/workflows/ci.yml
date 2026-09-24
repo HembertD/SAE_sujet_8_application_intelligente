@@ -137,8 +137,22 @@ jobs:
           name: documentation-pdf
           path: documentation.pdf
 
-      - name: Commit PDF on main and Dev
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Dev')
+      - name: Determine target branch
+        id: target
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/main" || "${GITHUB_REF}" == "refs/heads/Dev" ]]; then
+            echo "should_update=true" >> "$GITHUB_OUTPUT"
+            echo "target_branch=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_update=false" >> "$GITHUB_OUTPUT"
+            echo "target_branch=skip" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit PDF on target protected branch
+        if: steps.target.outputs.should_update == 'true'
+        env:
+          TARGET_BRANCH: ${{ steps.target.outputs.target_branch }}
+          DOCS_BOT_TOKEN: ${{ secrets.DOCS_BOT_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -148,4 +162,9 @@ jobs:
             exit 0
           fi
           git commit -m "docs: update generated documentation PDF [skip ci]"
-          git push origin HEAD:${GITHUB_REF_NAME}
+
+          if [ -n "${DOCS_BOT_TOKEN}" ]; then
+            git push "https://x-access-token:${DOCS_BOT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:"${TARGET_BRANCH}"
+          else
+            git push origin HEAD:"${TARGET_BRANCH}"
+          fi

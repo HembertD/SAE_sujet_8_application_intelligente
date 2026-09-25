@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - Dev
+  push:
+    branches:
+      - main
+      - Dev
+
+permissions:
+  contents: write
+
+jobs:
+  go-tests:
+    name: Go tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/cli/go.mod
+
+      - name: Run Go tests
+        working-directory: src/cli
+        run: go test ./...
+
+  documentation-pdf:
+    name: Documentation PDF
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push' || github.actor != 'github-actions[bot]'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Pandoc, LaTeX and Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc texlive-xetex texlive-latex-recommended texlive-fonts-recommended lmodern
+          python3 -m pip install --upgrade pip pyyaml
+
+      - name: Build combined markdown source from MkDocs navigation
+        run: |
+          mkdir -p .tmp-doc
+          python - <<'PY'
+          import yaml
+          from pathlib import Path
+
+          root = Path('.')
+          mkdocs_path = root / 'mkdocs.yml'
+          data = yaml.safe_load(mkdocs_path.read_text(encoding='utf-8'))
+          nav = data.get('nav', [])
+
+          pages = []
+          seen = set()
+
+          def walk(entry):
+              if isinstance(entry, dict):
+                  for key, value in entry.items():
+                      if isinstance(value, str):
+                          rel = value.strip()
+                          if rel not in seen:
+                              pages.append((key, rel))
+                              seen.add(rel)
+                      elif isinstance(value, list):
+                          walk(value)
+                      elif isinstance(value, dict):
+                          walk(value)
+              elif isinstance(entry, list):
+                  for item in entry:
+                      walk(item)
+
+          walk(nav)
+
+          out = root / '.tmp-doc/documentation.md'
+          content = [
+              '# Documentation technique - SAE Application intelligente',
+              '',
+              '---',
+              '',
+              '## Table des matières',
+              '',
+              '\\tableofcontents',
+              '',
+              '---',
+              ''
+          ]
+
+          for title, rel in pages:
+              file_path = root / rel
+              if not file_path.exists():
+                  file_path = root / 'docs' / rel
+              if not file_path.exists():
+                  raise FileNotFoundError(f'Missing Markdown file referenced in mkdocs.yml: {rel}')
+
+              text = file_path.read_text(encoding='utf-8')
+              clean_title = title.strip() if title else file_path.stem.replace('_', ' ').title()
+              content.append(f"# {clean_title}")
+              content.append('')
+              content.append(text.strip())
+              content.append('')
+              content.append('---')
+              content.append('')
+
+          out.write_text('\n'.join(content).strip() + '\n', encoding='utf-8')
+          print(f'Generated {out} with {len(pages)} documentation pages.')
+          PY
+
+      - name: Generate PDF
+        run: |
+          pandoc .tmp-doc/documentation.md \
+            --from=markdown+raw_tex \
+            --standalone \
+            --toc \
+            --number-sections \
+            --pdf-engine=xelatex \
+            -V geometry:margin=1in \
+            -V colorlinks=true \
+            -V linkcolor=blue \
+            -V urlcolor=blue \
+            -V mainfont="DejaVu Sans" \
+            -V monofont="DejaVu Sans Mono" \
+            -o documentation.pdf
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-pdf
+          path: documentation.pdf
+
+      - name: Determine target branch
+        id: target
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/main" || "${GITHUB_REF}" == "refs/heads/Dev" ]]; then
+            echo "should_update=true" >> "$GITHUB_OUTPUT"
+            echo "target_branch=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_update=false" >> "$GITHUB_OUTPUT"
+            echo "target_branch=skip" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit PDF on target protected branch
+        if: steps.target.outputs.should_update == 'true'
+        env:
+          TARGET_BRANCH: ${{ steps.target.outputs.target_branch }}
+          DOCS_BOT_TOKEN: ${{ secrets.DOCS_BOT_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add documentation.pdf
+          if git diff --cached --quiet; then
+            echo "No documentation PDF changes to push."
+            exit 0
+          fi
+          git commit -m "docs: update generated documentation PDF [skip ci]"
+
+          if [ -n "${DOCS_BOT_TOKEN}" ]; then
+            git push "https://x-access-token:${DOCS_BOT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:"${TARGET_BRANCH}"
+          else
+            git push origin HEAD:"${TARGET_BRANCH}"
+          fi

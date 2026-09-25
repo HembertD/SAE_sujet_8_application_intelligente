@@ -1,0 +1,45 @@
+site_name: SAE - Application intelligente
+site_description: Documentation technique de l'application intelligente
+site_url: https://hembertd.github.io/SAE_sujet_8_application_intelligente/
+
+theme:
+  name: material
+  language: fr
+
+nav:
+  - Accueil: index.md
+
+  - Documentation technique:
+      - Code source:
+          - Présentation: doc_src_files/README.md
+          - git_commit_release_notes_generator:
+              - __init__: doc_src_files/git_commit_release_notes_generator/__init__.md
+              - config: doc_src_files/git_commit_release_notes_generator/config.md
+              - models: doc_src_files/git_commit_release_notes_generator/models.md
+              - Ollama:
+                  - __init__: doc_src_files/git_commit_release_notes_generator/ollama_client/__init__.md
+                  - base: doc_src_files/git_commit_release_notes_generator/ollama_client/base.md
+                  - embedding: doc_src_files/git_commit_release_notes_generator/ollama_client/embedding.md
+                  - exceptions: doc_src_files/git_commit_release_notes_generator/ollama_client/exceptions.md
+                  - llm: doc_src_files/git_commit_release_notes_generator/ollama_client/llm.md
+              - Services:
+                  - __init__: doc_src_files/git_commit_release_notes_generator/service/__init__.md
+                  - core: doc_src_files/git_commit_release_notes_generator/service/core.md
+                  - utils: doc_src_files/git_commit_release_notes_generator/service/utils.md
+
+      - Tests:
+          - Présentation: doc_test_files/README.md
+          - Git wrapper: doc_test_files/test_git_wrapper.md
+          - Ollama LLM: doc_test_files/test_ollama_llm.md
+          - Golden diffs: doc_test_files/fixtures/golden_diffs.md
+          - Tests de situation:
+              - Initialisation: doc_test_files/situation_test/init_test.md
+              - Désinitialisation: doc_test_files/situation_test/deinit_test.md
+
+      - CI et déploiement:
+          - Déploiement de la documentation: deploiement_documentation.md
+          - Tests automatiques via GitHub Actions: deploiement_tests_workflows.md
+
+  - Monitoring:
+      - Sprint 00: monitoring/sprint-00.md
+      - Sprint 01: monitoring/sprint-01.md

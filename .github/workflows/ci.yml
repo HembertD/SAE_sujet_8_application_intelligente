@@ -33,6 +33,7 @@ jobs:
 
   documentation-pdf:
     name: Documentation PDF
+    needs: go-tests
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'pull_request' &&

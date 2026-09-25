@@ -65,8 +65,14 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			ping, pingErr := client.PingOllama()
 			spinner.Stop("")
 
-			if pingErr != nil || !ping.Reachable {
-				ui.PrintError(fmt.Sprintf("Serveur injoignable : %v", pingErr))
+			if pingErr != nil || ping == nil || !ping.Reachable {
+				errMsg := "délai d'attente dépassé (timeout) ou serveur injoignable"
+				if pingErr != nil {
+					errMsg = pingErr.Error()
+				} else if ping != nil && ping.Error != "" {
+					errMsg = ping.Error
+				}
+				ui.PrintError(fmt.Sprintf("Erreur : Serveur injoignable (%s)", errMsg))
 			} else {
 				ui.PrintSuccess(fmt.Sprintf("Connexion réussie ! Latence : %d ms", ping.LatencyMs))
 				if len(ping.InstalledModels) > 0 {

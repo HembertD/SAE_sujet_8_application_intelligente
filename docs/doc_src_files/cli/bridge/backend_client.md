@@ -5,7 +5,7 @@ Fichiers sources associés :
 - `src/cli/bridge/python_client.go` : Implémentation réelle exécutant le sous-processus Python
 - `src/cli/bridge/mock_client.go` : Implémentation de test et mode démo hors-ligne
 - `src/cli/bridge/env.go` : Gestionnaire isolé du fichier `.env` (lecture, écriture, parsing)
-- `src/cli/bridge/bridge_test.go` : Tests unitaires automatisés du module bridge
+- `test/cli/bridge_test.go` : Tests unitaires automatisés du module bridge (situés dans `test/cli/`)
 
 ## Description
 
@@ -30,7 +30,10 @@ Ce module implémente le pont de communication entre l'interface TUI Go et le ba
    - Achemine dynamiquement les appels vers `MockClient` ou `PythonClient` selon la variable `MOCK_INTERFACE` du `.env` ou le drapeau `--demo` sans recompilation.
 
 5. **`env.go` (Gestionnaire .env)** :
-   - Découplé du transport : localisation automatique (`FindEnvPath`), lecture des booléens (`ParseBoolFromString`) et réécriture atomique sécurisée (`WriteEnvFile`).
+   - Localisation automatique de la racine de l'application (`FindAppRoot`) par exploration ascendante via `runtime.Caller`, l'exécutable Go (`os.Executable`) et le répertoire courant (`os.Getwd`) ;
+   - Résolution stricte à la racine (`FindAppEnvPath`) : garantit que le fichier `.env` est toujours à la racine du projet (`SAE_sujet_8_application_intelligente/.env`), jamais dans `src/` ni dans le dépôt cible analysé (`repoRoot`) ;
+   - Persistance sécurisée (`WriteEnvFile`) : écriture atomique du `.env` à la racine et suppression automatique de tout résidu dans `src/` ;
+   - Tests automatisés (`test/cli/bridge_test.go`) : validation de l'isolation du dépôt cible (`TestAppEnvIsolationFromTargetRepo`) et interdiction stricte de tout fichier `.env` dans `src/` (`TestAppEnvNeverInSrc`).
 
 ## Points clés
 

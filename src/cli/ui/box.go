@@ -107,7 +107,23 @@ func PrintDiffTable(files []models.DiffFile, width int) {
 func PrintCommitCard(typeStr, scope, subject, body string, width int) {
 	var lines []string
 
-	header := fmt.Sprintf("%s%s%s", Bold+Green, typeStr, Reset)
+	isErr := strings.ToLower(typeStr) == "erreur" || strings.ToLower(typeStr) == "error" || (typeStr == "" && subject == "")
+
+	borderColor := Green
+	cardTitle := "Proposition Conventional Commit"
+	headerColor := Bold + Green
+
+	if isErr {
+		borderColor = Red
+		cardTitle = "Erreur de Génération"
+		headerColor = Bold + Red
+		if typeStr == "" && subject == "" {
+			typeStr = "erreur"
+			subject = "aucune réponse du serveur (timeout ou échec IA)"
+		}
+	}
+
+	header := fmt.Sprintf("%s%s%s", headerColor, typeStr, Reset)
 	if scope != "" {
 		header = fmt.Sprintf("%s(%s%s%s)", header, Yellow, scope, Reset)
 	}
@@ -126,7 +142,7 @@ func PrintCommitCard(typeStr, scope, subject, body string, width int) {
 		lines = append(lines, "")
 	}
 
-	PrintCard("Proposition Conventional Commit", lines, width, Green)
+	PrintCard(cardTitle, lines, width, borderColor)
 }
 
 // PrintSuccess affiche un message de succès

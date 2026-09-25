@@ -25,41 +25,93 @@ Exemples :
 - src/git_commit_release_notes_generator/config.py
 - docs/doc_src_files/git_commit_release_notes_generator/config.md
 
+- src/cli/bridge/env.go
+- docs/doc_src_files/cli/bridge/env.md
+
 - src/git_commit_release_notes_generator/service/git_wrapper.py
 - docs/doc_src_files/git_commit_release_notes_generator/service/git_wrapper.md
+
+- test/cli/bridge_test.go
+- docs/doc_test_files/cli/bridge_test.md
 
 ## Arborescence actuelle
 
 ```text
 .
+├─ .env.exemple
+├─ .gitignore
+├─ pytest.ini
+├─ requirements.txt
 ├─ README.md
 ├─ contributing.md
 ├─ doc_architecture.md
-├─ pytest.ini
 ├─ .githooks/
 │  └─ prepare-commit-msg
 ├─ src/
-│  ├─ git_commit_release_notes_generator/
-│  │  ├─ __init__.py
-│  │  ├─ config.py
-│  │  ├─ models.py
-│  │  ├─ ollama_client/
-│  │  │  ├─ __init__.py
-│  │  │  ├─ base.py
-│  │  │  ├─ embedding.py
-│  │  │  ├─ exceptions.py
-│  │  │  ├─ llm.py
-│  │  │  └─ prompts/
-│  │  │     └─ commit_message_system.txt
-│  │  └─ service/
-│  │     ├─ __init__.py
-│  │     ├─ core.py
-│  │     └─ utils.py
+│  ├─ cli/
+│  │  ├─ go.mod
+│  │  ├─ main.go
+│  │  ├─ bridge/
+│  │  │  ├─ client.go
+│  │  │  ├─ python_client.go
+│  │  │  ├─ mock_client.go
+│  │  │  └─ env.go
+│  │  ├─ models/
+│  │  │  └─ types.go
+│  │  ├─ ui/
+│  │  │  ├─ box.go
+│  │  │  ├─ spinner.go
+│  │  │  └─ styles.go
+│  │  └─ views/
+│  │     ├─ commit_view.go
+│  │     ├─ config_view.go
+│  │     ├─ menu_view.go
+│  │     └─ release_notes_view.go
+│  └─ git_commit_release_notes_generator/
+│     ├─ __init__.py
+│     ├─ config.py
+│     ├─ models.py
+│     ├─ ollama_client/
+│     │  ├─ __init__.py
+│     │  ├─ base.py
+│     │  ├─ embedding.py
+│     │  ├─ exceptions.py
+│     │  ├─ llm.py
+│     │  └─ prompts/
+│     │     └─ commit_message_system.txt
+│     └─ service/
+│        ├─ __init__.py
+│        ├─ core.py
+│        ├─ git_wrapper.py
+│        └─ utils.py
 ├─ docs/
+│  ├─ explication_go_cli.md
 │  ├─ monitoring/
-│  │  └─ sprint-00.md
+│  │  ├─ sprint-00.md
+│  │  └─ sprint-01.md
+│  ├─ doc_scripts_files/
+│  │  └─ run_metrics.md
 │  ├─ doc_src_files/
-│  │  ├─ README.md
+│  │  ├─ cli/
+│  │  │  ├─ go_mod.md
+│  │  │  ├─ main.md
+│  │  │  ├─ bridge/
+│  │  │  │  ├─ backend_client.md
+│  │  │  │  ├─ client.md
+│  │  │  │  ├─ python_client.md
+│  │  │  │  ├─ mock_client.md
+│  │  │  │  └─ env.md
+│  │  │  ├─ models/
+│  │  │  │  └─ types.md
+│  │  │  ├─ ui/
+│  │  │  │  ├─ box.md
+│  │  │  │  ├─ spinner.md
+│  │  │  │  └─ styles.md
+│  │  │  └─ views/
+│  │  │     ├─ commit_view.md
+│  │  │     ├─ config_view.md
+│  │  │     ├─ menu_view.md
+│  │  │     └─ release_notes_view.md
 │  │  └─ git_commit_release_notes_generator/
 │  │     ├─ __init__.md
 │  │     ├─ config.md
@@ -78,10 +130,15 @@ Exemples :
 │  │        ├─ git_wrapper.md
 │  │        └─ utils.md
 │  └─ doc_test_files/
-│     ├─ README.md
+│     ├─ cli/
+│     │  ├─ go_mod.md
+│     │  └─ bridge_test.md
+│     ├─ test_core.md
 │     ├─ test_git_wrapper.md
 │     ├─ test_ollama_llm.md
-│     ├─ README_situation_test.md
+│     ├─ test_golden_diffs_slow.md
+│     ├─ test_integration_git_wrapper_slow.md
+│     ├─ test_ollama_llm_slow.md
 │     ├─ fixtures/
 │     │  └─ golden_diffs.md
 │     └─ situation_test/
@@ -89,14 +146,24 @@ Exemples :
 │        └─ deinit_test.md
 ├─ test/
 │  ├─ __init__.py
+│  ├─ README_situation_test.md
+│  ├─ cli/
+│  │  ├─ go.mod
+│  │  └─ bridge_test.go
+│  ├─ test_core.py
 │  ├─ test_git_wrapper.py
 │  ├─ test_ollama_llm.py
-│  ├─ README_situation_test.md
+│  ├─ test_golden_diffs_slow.py
+│  ├─ test_integration_git_wrapper_slow.py
+│  ├─ test_ollama_llm_slow.py
 │  ├─ fixtures/
+│  │  ├─ __init__.py
 │  │  └─ golden_diffs.py
 │  └─ situation_test/
 │     ├─ init_test.py
-│     └─ deinit_test.py
+│     ├─ deinit_test.py
+│     ├─ fake_project/
+│     └─ commit/
 └─ scripts/
    └─ run_metrics.py
 ```
@@ -104,13 +171,16 @@ Exemples :
 ## Rôle de chaque dossier
 
 ### src/
-Le code applicatif du projet.
+Le code applicatif du projet (Python pour le backend IA et git wrapper, Go pour l'interface TUI/CLI).
 
 ### docs/doc_src_files/
 La documentation technique détaillant les fichiers de src, avec le même arbre que le code et des fichiers .md.
 
 ### docs/doc_test_files/
 La documentation technique détaillant les fichiers de test, avec le même arbre que les tests et des fichiers .md.
+
+### docs/doc_scripts_files/
+La documentation technique des scripts utilitaires (mesures de métriques, benchmarks).
 
 ### docs/monitoring/
 La gestion des sprints, de l’avancement et du suivi projet.

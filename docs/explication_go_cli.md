@@ -1,3 +1,57 @@
+# Architecture et Fonctionnement de l'Interface CLI (Go)
+
+## Guide Pratique : Compiler, Tester et Présenter
+
+### Compiler le projet :
+Dans un terminal, placez-vous dans le dossier `src/cli` :
+```bash
+cd SAE_sujet_8_application_intelligente/src/cli
+go build -o git-generator main.go
+```
+
+### Options de la ligne de commande (Flags)
+
+Le binaire propose trois options pour s'adapter à tous les contextes d'utilisation :
+
+| Option | Valeur par défaut | Description |
+|---|---|---|
+| `--repo <chemin>` | `.` (répertoire courant) | **Dépôt Git cible à analyser** : chemin du projet sur lequel vous travaillez (pour extraire le `git diff`, générer un message de commit ou créer les release notes). |
+| `--demo` | `false` | **Mode simulation autonome** : force le `MockClient` pour manipuler et tester l'interface TUI hors-ligne sans serveur Ollama ni sous-processus Python. |
+| `--app-dir <chemin>` | Auto-détecté | **Racine de l'application Smart Commit** : chemin vers le dossier de notre outil (`SAE_sujet_8_application_intelligente`), où résident le fichier `.env` applicatif et le code Python. |
+
+> [!NOTE]
+> **Pourquoi séparer `--repo` et `--app-dir` ? (Isolation stricte)**  
+> Dans une utilisation classique, l'outil analyse un projet externe (ex: `--repo ~/projets/mon-site`). La distinction garantit que :
+> 1. Les réglages de notre application (URL Ollama, modèle, timeout, etc.) sont lus et modifiés **exclusivement** dans le `.env` de Smart Commit (`--app-dir`).
+> 2. Le projet cible analysé (`--repo`) n'est **jamais parasité** par la création d'un `.env` applicatif.
+> 
+> Dans 99% des cas, `--app-dir` est **détecté automatiquement** par l'application (en inspectant le chemin du binaire ou du code source). Ce drapeau n'est utile que si vous installez `git-generator` dans un répertoire système global (ex. `/usr/local/bin`) et que vous l'exécutez depuis un tout autre dossier.
+
+### Lancer l'application :
+```bash
+# 1. Lancement standard dans le dépôt courant (mode réel ou mock selon le .env) :
+./git-generator
+
+# 2. Lancement forcé en mode démo (autonome, sans backend Python requis) :
+./git-generator --demo
+
+# 3. Lancement en ciblant un autre dépôt Git :
+./git-generator --repo /chemin/vers/un/autre/projet
+
+# 4. Lancement avec indication explicite de la racine de l'application :
+./git-generator --repo /chemin/vers/projet --app-dir /chemin/vers/SAE_sujet_8_application_intelligente
+```
+
+### Exécuter les tests unitaires Go :
+Conformément à l'architecture du projet, tous les tests sont isolés dans le dossier `test/` :
+```bash
+cd test/cli
+go test -v ./...
+```
+
+---
+
+
 ## Pourquoi avoir choisi Go pour le Front-end ?
 * **Vitesse et instantanéité** : Go se compile directement en code machine natif. L'exécutable se lance en moins de 5 millisecondes, sans aucun temps de démarrage d'interpréteur (comme Python ou Node.js).
 * **Binaire unique et autonome** : Aucun besoin d'installer de runtime Go sur la machine cible. Le binaire embarque tout.
@@ -88,7 +142,7 @@ classDiagram
 L'activation du mode démo / test est pilotée par la variable `MOCK_INTERFACE` dans le fichier `.env` ou par le drapeau `--demo` en ligne de commande :
 
 ```dotenv
-# Dans src/.env (et src/.env.exemple)
+# Dans le .env à la racine de l'application (et .env.exemple)
 MOCK_INTERFACE=true   # -> Active le mode démo / test hors-ligne
 MOCK_INTERFACE=false  # -> Mode standard : délègue au backend Python
 ```
@@ -97,12 +151,12 @@ Lorsque `MOCK_INTERFACE=false`, le client communique avec le sous-processus Pyth
 
 #### Implémentation du mode démo (`mock_client.go`)
 Le `MockClient` implémente `BackendClient` en fournissant des réponses cohérentes avec les cas de test du projet (secrets masqués, détection binaire, latence de traitement).  
-Pour les tests unitaires automatisés (`bridge_test.go`), il permet de désactiver les délais (`SimulateDelay = false`) et de surcharger les retours ou erreurs (`CustomError`, `CustomDiff`).
+Pour les tests unitaires automatisés situés dans le dossier `test/` (`test/cli/bridge_test.go`), il permet de désactiver les délais (`SimulateDelay = false`) et de surcharger les retours ou erreurs (`CustomError`, `CustomDiff`).
 
 #### La bascule dynamique sans recompilation
-La fonction factory `NewBackendClient(repoRoot, forceDemo)` instancie le coordinateur `BridgeClient`.  
+La fonction factory `NewBackendClientWithAppRoot(repoRoot, appRoot, forceDemo)` instancie le coordinateur `BridgeClient`.  
 Lorsque l'utilisateur modifie la configuration depuis l'écran `[3]` de la CLI :
-1. `SaveConfig` met à jour le fichier `.env` via le module dédié `env.go`.
+1. `SaveConfig` met à jour le fichier `.env` à la racine de l'application via le module dédié `env.go`.
 2. Le `BridgeClient` bascule instantanément son délégué actif entre `MockClient` et `PythonClient` sans nécessiter **la moindre modification ni recompilation de code côté Go**.
 
 ---
@@ -120,8 +174,7 @@ src/cli/
 │   ├── client.go              # Interface BackendClient et coordinateur BridgeClient
 │   ├── python_client.go       # Implémentation réelle (exec.Command & unmarshal JSON)
 │   ├── mock_client.go         # Implémentation simulation / mock pour mode démo & tests
-│   ├── env.go                 # Gestionnaire autonome du fichier .env (lecture/écriture)
-│   └── bridge_test.go         # Tests unitaires du pont et du mock (go test ./...)
+│   └── env.go                 # Gestionnaire autonome du fichier .env (lecture/écriture)
 ├── ui/
 │   ├── styles.go              # Codes ANSI, TrueColor, calcul VisualLen, StripANSI
 │   ├── box.go                 # Tracé des fenêtres, bordures Unicode, tableaux
@@ -205,25 +258,3 @@ Cet écran répond directement aux **consignes impératives de contrôle de l'IU
 * **Action `[M]` (Modification)** : Permet de modifier l'adresse IP, le modèle, le timeout ou d'activer/désactiver le mode démo (`true`/`false`). Go sauvegarde immédiatement les valeurs dans le fichier `.env`.  
    👉 **Aucune recompilation du binaire Go n'est nécessaire.**
 
----
-
-## Guide Pratique : Compiler, Tester et Présenter
-
-### Compiler le projet :
-Dans un terminal, placez-vous dans le dossier `src/cli` :
-```bash
-cd SAE_sujet_8_application_intelligente/src/cli
-go build -o git-generator main.go
-```
-
-### Lancer l'application :
-```bash
-# Lancement standard (le mode dépend de MOCK_INTERFACE dans src/.env) :
-./git-generator
-
-# Lancement forcé en mode démo (autonome, sans backend Python requis) :
-./git-generator --demo
-
-# Lancement en ciblant un autre dépôt Git :
-./git-generator --repo /chemin/vers/un/autre/projet
-```

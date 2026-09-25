@@ -33,8 +33,13 @@ jobs:
 
   documentation-pdf:
     name: Documentation PDF
+    needs: go-tests
     runs-on: ubuntu-latest
-    if: github.event_name != 'push' || github.actor != 'github-actions[bot]'
+    if: |
+      github.event_name == 'pull_request' &&
+      github.head_ref != 'main' &&
+      github.head_ref != 'Dev' &&
+      github.actor != 'github-actions[bot]'
 
     steps:
       - name: Checkout repository
@@ -137,21 +142,9 @@ jobs:
           name: documentation-pdf
           path: documentation.pdf
 
-      - name: Determine target branch
-        id: target
-        run: |
-          if [[ "${GITHUB_REF}" == "refs/heads/main" || "${GITHUB_REF}" == "refs/heads/Dev" ]]; then
-            echo "should_update=true" >> "$GITHUB_OUTPUT"
-            echo "target_branch=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_update=false" >> "$GITHUB_OUTPUT"
-            echo "target_branch=skip" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Commit PDF on target protected branch
-        if: steps.target.outputs.should_update == 'true'
+      - name: Commit PDF on the PR branch
         env:
-          TARGET_BRANCH: ${{ steps.target.outputs.target_branch }}
+          TARGET_BRANCH: ${{ github.head_ref }}
           DOCS_BOT_TOKEN: ${{ secrets.DOCS_BOT_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"

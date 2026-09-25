@@ -145,7 +145,7 @@ jobs:
 
   go-tests:
     needs: documentation-pdf
-    if: ${{ always() && (needs.documentation-pdf.result == 'success' || needs.documentation-pdf.result == 'skipped') }}
+    if: "${{ github.event_name == 'pull_request' || contains(github.event.head_commit.message, 'docs: update generated documentation PDF') }}"
     name: Go tests
     runs-on: ubuntu-latest
 
@@ -164,6 +164,7 @@ jobs:
 
   documentation-build:
     needs: go-tests
+    if: ${{ always() && (needs.go-tests.result == 'success' || needs.go-tests.result == 'skipped') }}
     name: Build documentation site
     runs-on: ubuntu-latest
 

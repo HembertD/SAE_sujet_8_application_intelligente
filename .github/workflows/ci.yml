@@ -135,7 +135,7 @@ jobs:
             echo "No documentation PDF changes to push."
             exit 0
           fi
-          git commit -m "docs: update generated documentation PDF [skip ci]"
+          git commit -m "docs: update generated documentation PDF"
 
           if [ -n "${DOCS_BOT_TOKEN}" ]; then
             git push "https://x-access-token:${DOCS_BOT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:"${TARGET_BRANCH}"

@@ -28,7 +28,7 @@ htmlcov/
 # Variables d'environnement
 
 .env
-
+!.env.exemple
 !.env.example
 
 # IDE

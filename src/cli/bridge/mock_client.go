@@ -13,6 +13,7 @@ import (
 // MockClient fournit une implémentation de BackendClient pour les tests et le mode hors-ligne.
 type MockClient struct {
 	repoRoot      string
+	appRoot       string
 	SimulateDelay bool
 
 	// Champs de surcharge pour les tests unitaires
@@ -26,8 +27,17 @@ type MockClient struct {
 
 // NewMockClient instancie un client de test avec les données types du projet.
 func NewMockClient(repoRoot string) *MockClient {
+	return NewMockClientWithAppRoot(repoRoot, repoRoot)
+}
+
+// NewMockClientWithAppRoot instancie un client de test en séparant dépôt cible et application.
+func NewMockClientWithAppRoot(repoRoot, appRoot string) *MockClient {
+	if appRoot == "" {
+		appRoot = repoRoot
+	}
 	return &MockClient{
 		repoRoot:      repoRoot,
+		appRoot:       appRoot,
 		SimulateDelay: true,
 	}
 }
@@ -206,16 +216,16 @@ Date : %s
 	}, nil
 }
 
-// GetConfig lit la configuration actuelle depuis le fichier .env.
+// GetConfig lit la configuration actuelle depuis le fichier .env applicatif.
 func (m *MockClient) GetConfig() (*models.ConfigResponse, error) {
-	return LoadConfigFromEnv(m.repoRoot, true), nil
+	return LoadConfigFromEnv(m.appRoot, true), nil
 }
 
-// SaveConfig met à jour le fichier .env.
+// SaveConfig met à jour le fichier .env applicatif.
 func (m *MockClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool) (*models.ActionResult, error) {
-	envPath := FindEnvPath(m.repoRoot)
+	envPath := FindAppEnvPath(m.appRoot)
 	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface); err != nil {
-		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env : %w", err)
+		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
 	}
 
 	m.sleep(200 * time.Millisecond)

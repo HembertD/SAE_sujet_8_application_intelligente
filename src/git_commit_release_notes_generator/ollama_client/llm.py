@@ -17,6 +17,7 @@ from pathlib import Path
 from git_commit_release_notes_generator.config import (
     OLLAMA_BASE_URL,
     OLLAMA_MODEL,
+    OLLAMA_NUM_CTX,
     OLLAMA_TIMEOUT_S,
 )
 from git_commit_release_notes_generator.models import CommitMessage, DiffFile
@@ -124,6 +125,10 @@ def _call_chat(messages: list[dict]) -> dict:
         "messages": messages,
         "stream": False,
         "format": _JSON_SCHEMA,
+        # Sans ça, Ollama utilise sa fenêtre de contexte par défaut (souvent
+        # bien plus petite que les 262K annoncés pour gemma4:26b) et tronque
+        # silencieusement le début du diff sur les cas volumineux.
+        "options": {"num_ctx": OLLAMA_NUM_CTX},
     }
     request = urllib.request.Request(
         url=f"{OLLAMA_BASE_URL}/api/chat",

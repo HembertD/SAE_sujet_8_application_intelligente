@@ -138,15 +138,24 @@ jobs:
           fi
           git commit -m "docs: update generated documentation PDF"
 
-          if [ -n "${DOCS_BOT_TOKEN}" ]; then
-            git push "https://x-access-token:${DOCS_BOT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:"${TARGET_BRANCH}"
-          else
-            git push origin HEAD:"${TARGET_BRANCH}"
+          if [ -z "${DOCS_BOT_TOKEN}" ]; then
+            echo "DOCS_BOT_TOKEN is missing. Add a PAT secret so the bot push can trigger the next workflow run."
+            exit 1
           fi
+
+          git push "https://x-access-token:${DOCS_BOT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:"${TARGET_BRANCH}"
 
   go-tests:
     needs: documentation-pdf
-    if: "${{ github.event_name == 'pull_request' || (github.event_name == 'push' && contains(github.event.head_commit.message, 'docs: update generated documentation PDF')) }}"
+    if: >-
+      ${{ always() && (
+        github.event_name == 'pull_request' ||
+        (
+          github.event_name == 'push' &&
+          contains(github.event.head_commit.message, 'docs') &&
+          contains(github.event.head_commit.message, 'documentation PDF')
+        )
+      ) }}
     name: Go tests
     runs-on: ubuntu-latest
 

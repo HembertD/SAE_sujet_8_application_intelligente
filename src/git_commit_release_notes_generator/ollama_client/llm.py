@@ -33,6 +33,7 @@ _ALLOWED_TYPES = {
     "feat", "fix", "chore", "docs", "refactor", "test", "perf", "build", "ci",
 }
 _MAX_SUBJECT_LENGTH = 72
+_PING_TIMEOUT_S = 3.0
 
 _JSON_SCHEMA = {
     "type": "object",
@@ -45,6 +46,27 @@ _JSON_SCHEMA = {
     "required": ["type", "subject"],
     "additionalProperties": False,
 }
+
+
+def check_ollama_reachable() -> tuple[bool, str | None]:
+    """Vérifie rapidement si le serveur Ollama est joignable.
+
+    À appeler avant generate_commit_message() pour échouer vite (quelques
+    secondes) plutôt que d'attendre le timeout complet (OLLAMA_TIMEOUT_S,
+    jusqu'à plusieurs minutes) quand le vrai problème est réseau — typiquement
+    ne pas être sur le réseau de l'IUT — et pas un souci côté Ollama lui-même.
+
+    Ne lève jamais d'exception : retourne (True, None) si joignable, sinon
+    (False, message d'erreur explicite).
+    """
+    try:
+        urllib.request.urlopen(f"{OLLAMA_BASE_URL}/api/version", timeout=_PING_TIMEOUT_S)
+        return True, None
+    except urllib.error.URLError as e:
+        return False, (
+            f"Serveur Ollama non joignable à {OLLAMA_BASE_URL} "
+            f"(es-tu sur le réseau de l'IUT ?) : {e}"
+        )
 
 
 def generate_commit_message(diff_files: list[DiffFile]) -> CommitMessage:

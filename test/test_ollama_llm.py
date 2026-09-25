@@ -6,6 +6,7 @@ Les tests contre le vrai serveur sont marqués `@pytest.mark.slow` ailleurs.
 """
 import json
 import sys
+import urllib.error
 from pathlib import Path
 
 import pytest
@@ -89,6 +90,27 @@ def test_validate_rejects_unknown_type():
 def test_validate_accepts_well_formed_message():
     error = llm._validate({"type": "docs", "subject": "met à jour le README"})
     assert error is None
+
+
+def test_check_ollama_reachable_true_when_server_responds(monkeypatch):
+    monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: _FakeResponse({}))
+
+    reachable, error = llm.check_ollama_reachable()
+
+    assert reachable is True
+    assert error is None
+
+
+def test_check_ollama_reachable_false_on_network_error(monkeypatch):
+    def _raise(*a, **k):
+        raise urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", _raise)
+
+    reachable, error = llm.check_ollama_reachable()
+
+    assert reachable is False
+    assert "IUT" in error
 
 
 def test_generate_commit_message_rejects_empty_diff_list():

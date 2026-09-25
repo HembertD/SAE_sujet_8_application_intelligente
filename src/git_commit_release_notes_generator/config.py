@@ -44,7 +44,7 @@ def load_env() -> dict[str, str]:
                 pass
 
     # Surcharge optionnelle par l'environnement système direct (si défini explicitement)
-    for k in ("OLLAMA_BASE_URL", "OLLAMA_MODEL", "OLLAMA_TIMEOUT_S", "APP_LANGUAGE", "MOCK_INTERFACE"):
+    for k in ("OLLAMA_BASE_URL", "OLLAMA_MODEL", "OLLAMA_TIMEOUT_S", "OLLAMA_NUM_CTX", "APP_LANGUAGE", "MOCK_INTERFACE"):
         if k in os.environ and os.environ[k]:
             env_data[k] = os.environ[k]
 
@@ -59,12 +59,19 @@ if "OLLAMA_MODEL" not in ENV:
     ENV["OLLAMA_MODEL"] = "gemma4:26b"
 if "OLLAMA_TIMEOUT_S" not in ENV:
     ENV["OLLAMA_TIMEOUT_S"] = "300"
+if "OLLAMA_NUM_CTX" not in ENV:
+    # Ollama utilise par défaut une fenêtre de contexte réduite (souvent 2048-4096
+    # tokens selon le Modelfile) même si le modèle en supporte 262K. Sans ce
+    # paramètre explicite, un diff un peu volumineux peut dépasser la limite
+    # silencieusement (le contexte le plus ancien est tronqué par le serveur).
+    ENV["OLLAMA_NUM_CTX"] = "32768"
 if "APP_LANGUAGE" not in ENV:
     ENV["APP_LANGUAGE"] = "fr"
 
 OLLAMA_BASE_URL = ENV["OLLAMA_BASE_URL"]
 OLLAMA_MODEL = ENV["OLLAMA_MODEL"]
 OLLAMA_TIMEOUT_S = float(ENV["OLLAMA_TIMEOUT_S"])
+OLLAMA_NUM_CTX = int(ENV["OLLAMA_NUM_CTX"])
 APP_LANGUAGE = ENV["APP_LANGUAGE"]
 
 

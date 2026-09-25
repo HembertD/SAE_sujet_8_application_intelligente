@@ -29,31 +29,42 @@ Le workflow GitHub Actions est défini dans `.github/workflows/documentation.yml
 
 ### Déclenchement
 
-Le déploiement est exécuté lors de :
+Le build de documentation est exécuté lors de :
 
-- un `push` sur la branche `main`
+- un `push` sur les branches `main` et `Dev`
+- un `pull_request` ciblant `main` ou `Dev`
 - un déclenchement manuel via `workflow_dispatch`
+
+Le déploiement officiel sur GitHub Pages reste réservé à la branche `main`.
+
+### Marqueur de version de développement
+
+Quand la documentation est générée depuis une branche autre que `main`, le titre du site reçoit un suffixe `*` pour signaler qu’il s’agit d’une version en cours de développement.
+
+- `*` = documentation en cours de développement
+- sans `*` = documentation officielle de la branche principale
 
 ### Étapes du job `build`
 
 1. `actions/checkout` : récupération du code source
 2. `actions/setup-python` : installation de Python 3.12
 3. installation de MkDocs Material
-4. exécution de `mkdocs build`
-5. `actions/configure-pages` : préparation de GitHub Pages
-6. `actions/upload-pages-artifact` : publication de la sortie de build dans un artefact
+4. ajout du marqueur `*` pour les branches non principales
+5. exécution de `mkdocs build`
+6. publication d’un artefact de prévisualisation pour validation
+7. publication sur GitHub Pages uniquement sur `main`
 
 ### Étapes du job `deploy`
 
-Le job `deploy` dépend du job `build` et publie le contenu sur l’environnement GitHub Pages via :
+Le job `deploy` dépend du job `build` et ne se lance que pour `main`. Il publie le contenu sur l’environnement GitHub Pages via :
 
 - `actions/deploy-pages@v4`
 
-Cela permet d’exposer la documentation en ligne, selon l’URL définie par le dépôt GitHub Pages.
+Cela permet d’exposer la documentation officielle en ligne, selon l’URL définie par le dépôt GitHub Pages.
 
 ## Résultat attendu
 
-Après un push sur `main`, GitHub Actions génère le site puis le publie. La documentation devient alors accessible via la page publique GitHub Pages du dépôt.
+Après un push ou un pull request sur `main` ou `Dev`, GitHub Actions reconstruit la documentation. Les branches hors `main` affichent un suffixe `*` pour indiquer qu’il s’agit d’une version de développement. Seule la branche `main` est déployée publiquement sur GitHub Pages.
 
 ## Bonnes pratiques
 

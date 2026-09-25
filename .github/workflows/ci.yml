@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - Dev
+      - '**'
 
 permissions:
   contents: write
@@ -145,7 +146,7 @@ jobs:
 
   go-tests:
     needs: documentation-pdf
-    if: "${{ github.event_name == 'pull_request' || contains(github.event.head_commit.message, 'docs: update generated documentation PDF') }}"
+    if: "${{ github.event_name == 'pull_request' || (github.event_name == 'push' && contains(github.event.head_commit.message, 'docs: update generated documentation PDF')) }}"
     name: Go tests
     runs-on: ubuntu-latest
 

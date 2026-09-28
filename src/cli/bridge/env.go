@@ -175,6 +175,36 @@ func ReadMockSettingFromEnv(appRoot string) bool {
 	return false
 }
 
+// ReadMockAISettingFromEnv lit la variable MOCK_AI dans l'environnement ou le fichier .env applicatif.
+func ReadMockAISettingFromEnv(appRoot string) bool {
+	if envVal := os.Getenv("MOCK_AI"); envVal != "" {
+		return ParseBoolFromString(envVal)
+	}
+
+	envPath := FindAppEnvPath(appRoot)
+	data, err := os.ReadFile(envPath)
+	if err != nil {
+		return false
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			k := strings.TrimSpace(parts[0])
+			v := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+			if k == "MOCK_AI" {
+				return ParseBoolFromString(v)
+			}
+		}
+	}
+	return false
+}
+
 // LoadConfigFromEnv lit la configuration depuis le fichier .env applicatif et renvoie une structure ConfigResponse.
 func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse {
 	cfg := &models.ConfigResponse{
@@ -184,6 +214,7 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 		TimeoutS:      300.0,
 		Language:      "fr",
 		MockInterface: isMockActive,
+		MockAI:        ReadMockAISettingFromEnv(appRoot),
 	}
 
 	envPath := FindAppEnvPath(appRoot)
@@ -222,7 +253,13 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 						cfg.Language = v
 					}
 				case "MOCK_INTERFACE", "MOCKAGE_INTERFACE":
-					cfg.MockInterface = ParseBoolFromString(v)
+					if os.Getenv("MOCK_INTERFACE") == "" && os.Getenv("MOCKAGE_INTERFACE") == "" {
+						cfg.MockInterface = ParseBoolFromString(v)
+					}
+				case "MOCK_AI":
+					if os.Getenv("MOCK_AI") == "" {
+						cfg.MockAI = ParseBoolFromString(v)
+					}
 				}
 			}
 		}
@@ -232,7 +269,7 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 }
 
 // WriteEnvFile réécrit le fichier .env STRICTEMENT à la racine du projet.
-func WriteEnvFile(envPath string, baseURL, model string, timeout float64, lang string, mockInterface bool) error {
+func WriteEnvFile(envPath string, baseURL, model string, timeout float64, lang string, mockInterface bool, mockAIArgs ...bool) error {
 	cleanPath := filepath.Clean(envPath)
 	dir := filepath.Dir(cleanPath)
 	for filepath.Base(dir) == "src" || filepath.Base(dir) == "cli" {
@@ -242,6 +279,11 @@ func WriteEnvFile(envPath string, baseURL, model string, timeout float64, lang s
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
+	}
+
+	mockAI := ReadMockAISettingFromEnv(dir)
+	if len(mockAIArgs) > 0 {
+		mockAI = mockAIArgs[0]
 	}
 
 	content := fmt.Sprintf(`# ==============================================================================
@@ -256,9 +298,12 @@ OLLAMA_TIMEOUT_S=%.0f
 # Langue de l'application (fr / en)
 APP_LANGUAGE=%s
 
-# Mode hors-ligne / démo (true / false)
+# Mode hors-ligne / démo interface (true / false)
 MOCK_INTERFACE=%t
-`, baseURL, model, timeout, lang, mockInterface)
+
+# Simulation de l'IA hors-ligne (true / false)
+MOCK_AI=%t
+`, baseURL, model, timeout, lang, mockInterface, mockAI)
 
 	if err := os.WriteFile(cleanPath, []byte(content), 0644); err != nil {
 		return err

@@ -32,13 +32,21 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		lines = append(lines, fmt.Sprintf("  • %sTimeout requête%s   : %.0fs", ui.Bold, ui.Reset, cfg.TimeoutS))
 		lines = append(lines, fmt.Sprintf("  • %sLangue%s            : %s", ui.Bold, ui.Reset, cfg.Language))
 
-		mockColor := ui.Green
-		mockStatus := "Désactivé"
+		mockInterfaceColor := ui.Green
+		mockInterfaceStatus := "Désactivé"
 		if cfg.MockInterface {
-			mockColor = ui.Yellow
-			mockStatus = "Activé"
+			mockInterfaceColor = ui.Yellow
+			mockInterfaceStatus = "Activé"
 		}
-		lines = append(lines, fmt.Sprintf("  • %sMode démo%s          : %s%s%s", ui.Bold, ui.Reset, mockColor, mockStatus, ui.Reset))
+		lines = append(lines, fmt.Sprintf("  • %sMock Interface%s    : %s%s%s", ui.Bold, ui.Reset, mockInterfaceColor, mockInterfaceStatus, ui.Reset))
+
+		mockAIColor := ui.Green
+		mockAIStatus := "Désactivé"
+		if cfg.MockAI {
+			mockAIColor = ui.Yellow
+			mockAIStatus = "Activé"
+		}
+		lines = append(lines, fmt.Sprintf("  • %sMock IA%s           : %s%s%s", ui.Bold, ui.Reset, mockAIColor, mockAIStatus, ui.Reset))
 		lines = append(lines, "")
 		lines = append(lines, ui.Dim+"  (Toute modification est répercutée dans le .env sans recompilation)"+ui.Reset)
 		lines = append(lines, "")
@@ -118,17 +126,25 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				cfg.Language = newLang
 			}
 
-			fmt.Printf("  Mode démo (true/false) [%t] : ", cfg.MockInterface)
-			newMockStr, _ := reader.ReadString('\n')
-			newMockStr = strings.TrimSpace(newMockStr)
-			if newMockStr != "" {
-				lower := strings.ToLower(newMockStr)
+			fmt.Printf("  Mock Interface (true/false) [%t] : ", cfg.MockInterface)
+			newMockInterfaceStr, _ := reader.ReadString('\n')
+			newMockInterfaceStr = strings.TrimSpace(newMockInterfaceStr)
+			if newMockInterfaceStr != "" {
+				lower := strings.ToLower(newMockInterfaceStr)
 				cfg.MockInterface = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
+			}
+
+			fmt.Printf("  Mock IA (true/false) [%t] : ", cfg.MockAI)
+			newMockAIStr, _ := reader.ReadString('\n')
+			newMockAIStr = strings.TrimSpace(newMockAIStr)
+			if newMockAIStr != "" {
+				lower := strings.ToLower(newMockAIStr)
+				cfg.MockAI = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
 			}
 
 			spinnerSave := ui.NewSpinner("Sauvegarde des paramètres dans le .env...")
 			spinnerSave.Start()
-			res, saveErr := client.SaveConfig(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.Language, cfg.MockInterface)
+			res, saveErr := client.SaveConfig(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.Language, cfg.MockInterface, cfg.MockAI)
 			spinnerSave.Stop("")
 
 			if saveErr != nil {

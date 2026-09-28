@@ -22,16 +22,18 @@ Ce module gère la génération du message de commit via Ollama. Il construit le
 - validation : le code refuse les messages trop longs, absents ou non conformes ;
 - robustesse : un retry est tenté pour corriger une réponse invalide ;
 - fenêtre de contexte : `options.num_ctx` est fixé explicitement dans la requête (`OLLAMA_NUM_CTX`, config.py) car Ollama utilise sinon une fenêtre par défaut bien plus petite que celle annoncée pour le modèle, ce qui tronquait silencieusement les diffs volumineux ;
-- disponibilité : `check_ollama_reachable()` permet de vérifier rapidement (quelques secondes) si le serveur répond, avant de lancer une génération qui pourrait sinon attendre le timeout complet.
+- disponibilité : `check_ollama_reachable()` permet de vérifier rapidement (quelques secondes) si le serveur répond, avant de lancer une génération qui pourrait sinon attendre le timeout complet ;
+- simulation hors-ligne : si `config.MOCK_AI` est activé, `generate_commit_message` et `check_ollama_reachable` délèguent immédiatement au module `mock_llm` sans aucune requête réseau.
 
 ## Fonctions exposées
 
-- `generate_commit_message(diff_files)` : fonction principale, décrite ci-dessus.
+- `generate_commit_message(diff_files, feedback="")` : fonction principale, décrite ci-dessus.
 - `check_ollama_reachable()` : ping rapide du serveur (timeout court), retourne `(True, None)` ou `(False, message d'erreur)` sans jamais lever d'exception. Pensée pour être appelée par le CLI avant `generate_commit_message`, pour distinguer un problème réseau (hors réseau de l'IUT) d'une vraie erreur de génération.
 
 ## Dépendances
 
 - [config.md](../config.md)
 - [models.md](../models.md)
+- [mock_llm.md](mock_llm.md)
 - [exceptions.md](exceptions.md)
 - [commit_message_system.md](prompts/commit_message_system.md)

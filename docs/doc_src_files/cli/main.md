@@ -8,7 +8,7 @@ Ce fichier constitue le point d'entrée exécutable de l'interface en ligne de c
 
 ## Responsabilités
 
-- analyser les arguments et flags de la ligne de commande (`--demo`, `--repo`, `--app-dir`) ;
+- analyser les arguments et flags de la ligne de commande (`--mockInterface`, `--mockIA`, `--repo`, `--app-dir`) ;
 - localiser la racine applicative via `FindAppRoot` pour pointer sur le `.env` de l'application indépendamment du dépôt cible analysé ;
 - intercepter les signaux d'interruption système (`SIGINT` / `SIGTERM` / `Ctrl+C`) pour restaurer l'état du terminal (réaffichage du curseur et réinitialisation des couleurs) ;
 - initialiser le `BackendClient` relié au répertoire du dépôt Git et à la racine de l'application ;
@@ -18,7 +18,8 @@ Ce fichier constitue le point d'entrée exécutable de l'interface en ligne de c
 ## Arguments de la ligne de commande
 
 - `--repo <chemin>` : chemin vers le dépôt Git cible à analyser (défaut : `.`).
-- `--demo` : activation forcée du mode simulation hors-ligne (`MockClient`) sans dépendances externes.
+- `--mockInterface` : activation forcée du mock de l'interface (`MockClient`) sans exécuter le backend Python.
+- `--mockIA` : activation forcée du mock de l'IA (le backend Python simule les retours Ollama).
 - `--app-dir <chemin>` : chemin explicite vers la racine de l'application Smart Commit (où se trouvent le code et le `.env` applicatif). Permet d'isoler à 100% la configuration applicative lorsque le binaire est exécuté sur un dépôt tiers.
 
 ## Points clés

@@ -10,8 +10,8 @@ Ce module isole l'ensemble de la logique de localisation, de lecture et d'écrit
 
 - **Localisation stricte de la racine applicative (`FindAppRoot`)** : exploration hiérarchique ascendante combinant `runtime.Caller`, `os.Executable` et `os.Getwd` pour déterminer l'emplacement physique du dépôt applicatif, indépendamment du dépôt Git cible analysé (`--repo`).
 - **Garantie d'emplacement (`FindAppEnvPath`)** : renvoie l'emplacement unique `<racine_projet>/.env`. Élimine tout sous-chemin `src/` ou `cli/` pour empêcher la création ou lecture d'un `.env` dans les sous-dossiers.
-- **Lecture typée (`LoadConfigFromEnv`)** : parse les variables `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT_S`, `APP_LANGUAGE` et `MOCK_INTERFACE` avec valeurs par défaut de repli sécurisées.
-- **Persistance atomique (`WriteEnvFile`)** : sauvegarde à chaud les réglages dans le `.env` à la racine de l'application et purge préventivement tout fichier `.env` ou `.env.exemple` résiduel dans `src/`.
+- **Lecture typée (`LoadConfigFromEnv`)** : parse les variables `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT_S`, `APP_LANGUAGE`, `MOCK_INTERFACE` et `MOCK_AI` avec valeurs par défaut de repli sécurisées.
+- **Persistance atomique (`WriteEnvFile`)** : sauvegarde à chaud les réglages dans le `.env` à la racine de l'application (y compris `MOCK_INTERFACE` et `MOCK_AI`) et purge préventivement tout fichier `.env` ou `.env.exemple` résiduel dans `src/`.
 - **Parsing booléen robuste (`ParseBoolFromString`)** : interprète les représentations usuelles (`true`, `1`, `yes`, `oui`, `false`, `0`, etc.).
 
 ## Points clés

@@ -9,9 +9,9 @@ Ce fichier définit l'interface maîtresse `BackendClient` et le coordinateur ad
 ## Responsabilités
 
 - Définir le contrat d'interface haut niveau `BackendClient` regroupant les actions du domaine Git, Ollama et configuration.
-- Instancier le coordinateur via `NewBackendClientWithAppRoot(repoRoot, appRoot, forceDemo)`.
+- Instancier le coordinateur via `NewBackendClientWithAppRoot(repoRoot, appRoot, forceMockInterface, forceMockIA)`.
 - Maintenir la référence vers le dépôt cible (`repoRoot`) et la racine de l'application (`appRoot`).
-- Assurer le routage dynamique vers le délégué actif en fonction du drapeau `--demo` ou du paramètre `MOCK_INTERFACE` du `.env`.
+- Assurer le routage dynamique vers le délégué actif en fonction du drapeau `--mockInterface` ou du paramètre `MOCK_INTERFACE` du `.env`.
 - Fournir les méthodes de consultation et modification de la configuration (`GetConfig`, `SaveConfig`).
 
 ## Points clés

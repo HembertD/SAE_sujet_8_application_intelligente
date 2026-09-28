@@ -22,6 +22,7 @@ nav:
                   - embedding: doc_src_files/git_commit_release_notes_generator/ollama_client/embedding.md
                   - exceptions: doc_src_files/git_commit_release_notes_generator/ollama_client/exceptions.md
                   - llm: doc_src_files/git_commit_release_notes_generator/ollama_client/llm.md
+                  - mock_llm: doc_src_files/git_commit_release_notes_generator/ollama_client/mock_llm.md
               - Services:
                   - __init__: doc_src_files/git_commit_release_notes_generator/service/__init__.md
                   - core: doc_src_files/git_commit_release_notes_generator/service/core.md
@@ -31,6 +32,7 @@ nav:
           - Présentation: doc_test_files/README.md
           - Git wrapper: doc_test_files/test_git_wrapper.md
           - Ollama LLM: doc_test_files/test_ollama_llm.md
+          - Mock IA: doc_test_files/test_mock_ai.md
           - Golden diffs: doc_test_files/fixtures/golden_diffs.md
           - Tests de situation:
               - Initialisation: doc_test_files/situation_test/init_test.md

@@ -14,7 +14,7 @@ Ce module gère l'affichage de la page d'accueil et la capture du premier niveau
   - `[2]` Générer les Release Notes (Synthèse entre tags) ;
   - `[3]` Configuration (Modèle, URL Ollama, Langue) ;
   - `[4]` Quitter ;
-- signaler si le mode simulation/démo est actif ;
+- signaler distinctement si le mode simulation de l'interface (`Mock Interface actif`) et/ou la simulation de l'IA (`Mock IA actif`) sont actifs (les deux s'affichent si les deux options sont activées) ;
 - capturer la saisie utilisateur et gérer les signaux de fin de flux (EOF).
 
 ## Points clés

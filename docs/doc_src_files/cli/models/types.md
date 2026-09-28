@@ -33,7 +33,8 @@ Proposition de commit générée par le modèle LLM au format Conventional Commi
 - `RawFormatted` (`string`) : message assemblé prêt pour `git commit`.
 
 ### ConfigResponse & PingResponse
-Paramètres de configuration lus dans le `.env` et diagnostic réseau vers le serveur Ollama de l'IUT (latence et liste des modèles disponibles).
+- `ConfigResponse` : paramètres de configuration lus dans le `.env` applicatif (`OllamaBaseURL`, `OllamaModel`, `TimeoutS`, `Language`, `MockInterface`, `MockAI`).
+- `PingResponse` : diagnostic réseau vers le serveur Ollama de l'IUT (latence en millisecondes et liste des modèles disponibles).
 
 ## Rôle dans l’architecture
 

@@ -19,6 +19,7 @@ import time
 import urllib.error
 import urllib.request
 
+from git_commit_release_notes_generator import config
 from git_commit_release_notes_generator.config import (
     OLLAMA_BASE_URL,
     OLLAMA_MODEL,
@@ -29,6 +30,10 @@ from git_commit_release_notes_generator.ollama_client.exceptions import (
     OllamaCallError,
 )
 from git_commit_release_notes_generator.ollama_client.llm import generate_commit_message
+from git_commit_release_notes_generator.ollama_client.mock_llm import (
+    mock_ping,
+    mock_release_notes,
+)
 from git_commit_release_notes_generator.service.git_wrapper import GitWrapper
 
 logger = logging.getLogger(__name__)
@@ -147,7 +152,7 @@ def action_stage_all(repo_path: str = ".") -> dict:
         }
 
 
-def action_generate_commit(repo_path: str = ".") -> dict:
+def action_generate_commit(repo_path: str = ".", feedback: str = "") -> dict:
     """Génère une proposition de message de commit via le LLM.
 
     Format attendu côté Go :
@@ -167,7 +172,7 @@ def action_generate_commit(repo_path: str = ".") -> dict:
         }
 
     try:
-        msg = generate_commit_message(diff_files)
+        msg = generate_commit_message(diff_files, feedback=feedback)
     except (OllamaCallError, CommitMessageValidationError, ValueError) as e:
         logger.warning(f"Génération commit échouée : {e}")
         return {"success": False, "error": str(e)}
@@ -341,6 +346,15 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
             "commit_count": 0,
         }
 
+    if config.MOCK_AI:
+        return {
+            "success": True,
+            "from_tag": from_tag,
+            "to_tag": to_tag,
+            "markdown": mock_release_notes(commits, from_tag, to_tag),
+            "commit_count": len(commits),
+        }
+
     # Tentative d'inférence LLM si Ollama est joignable
     md_content: str | None = None
     try:
@@ -412,6 +426,9 @@ def action_ping_ollama() -> dict:
     Format attendu côté Go :
     {"success": bool, "reachable": bool, "latency_ms": int, "installed_models": [str]}
     """
+    if config.MOCK_AI:
+        return mock_ping()
+
     start_time = time.perf_counter()
     installed_models: list[str] = []
 
@@ -468,7 +485,7 @@ def main() -> None:
         "status": lambda: action_status(args.repo),
         "diff": lambda: action_diff(args.repo),
         "stage-all": lambda: action_stage_all(args.repo),
-        "generate-commit": lambda: action_generate_commit(args.repo),
+        "generate-commit": lambda: action_generate_commit(args.repo, feedback=args.feedback),
         "apply-commit": lambda: action_apply_commit(args.repo, message=args.message),
         "push": lambda: action_push(args.repo),
         "release-notes": lambda: action_release_notes(args.repo, from_tag=args.from_tag, to_tag=args.to_tag),

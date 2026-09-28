@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"sae-git-cli/models"
@@ -18,7 +19,7 @@ type BackendClient interface {
 	Push() (*models.ActionResult, error)
 	GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNotesResponse, error)
 	GetConfig() (*models.ConfigResponse, error)
-	SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool) (*models.ActionResult, error)
+	SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool, mockAI ...bool) (*models.ActionResult, error)
 	PingOllama() (*models.PingResponse, error)
 	SaveMarkdownFile(filename, content string) error
 	IsMock() bool
@@ -26,25 +27,26 @@ type BackendClient interface {
 
 // BridgeClient coordonne l'accès au backend en déléguant à PythonClient ou MockClient.
 type BridgeClient struct {
-	repoRoot   string
-	appRoot    string
-	forceDemo  bool
-	isMock     bool
-	realClient *PythonClient
-	mockClient *MockClient
+	repoRoot           string
+	appRoot            string
+	forceMockInterface bool
+	forceMockIA        bool
+	isMock             bool
+	realClient         *PythonClient
+	mockClient         *MockClient
 }
 
 // NewBackendClient instancie le client de pontage vers le backend.
-func NewBackendClient(repoRoot string, forceDemo bool) BackendClient {
+func NewBackendClient(repoRoot string, forceMockInterface bool, forceMockIA ...bool) BackendClient {
 	appRoot := FindAppRoot(repoRoot)
 	if isTestDir(repoRoot) {
 		appRoot = repoRoot
 	}
-	return NewBackendClientWithAppRoot(repoRoot, appRoot, forceDemo)
+	return NewBackendClientWithAppRoot(repoRoot, appRoot, forceMockInterface, forceMockIA...)
 }
 
 // NewBackendClientWithAppRoot instancie le client en séparant le dépôt cible et la racine de l'application.
-func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceDemo bool) BackendClient {
+func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceMockInterface bool, forceMockIA ...bool) BackendClient {
 	if appRoot == "" {
 		if isTestDir(repoRoot) {
 			appRoot = repoRoot
@@ -52,15 +54,21 @@ func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceDemo bool) Backe
 			appRoot = FindAppRoot(repoRoot)
 		}
 	}
-	mockActive := forceDemo || ReadMockSettingFromEnv(appRoot)
+	mockActive := forceMockInterface || ReadMockSettingFromEnv(appRoot)
+	mockIAActive := false
+	if len(forceMockIA) > 0 && forceMockIA[0] {
+		mockIAActive = true
+		_ = os.Setenv("MOCK_AI", "true")
+	}
 
 	return &BridgeClient{
-		repoRoot:   repoRoot,
-		appRoot:    appRoot,
-		forceDemo:  forceDemo,
-		isMock:     mockActive,
-		realClient: NewPythonClientWithAppRoot(repoRoot, appRoot),
-		mockClient: NewMockClientWithAppRoot(repoRoot, appRoot),
+		repoRoot:           repoRoot,
+		appRoot:            appRoot,
+		forceMockInterface: forceMockInterface,
+		forceMockIA:        mockIAActive,
+		isMock:             mockActive,
+		realClient:         NewPythonClientWithAppRoot(repoRoot, appRoot),
+		mockClient:         NewMockClientWithAppRoot(repoRoot, appRoot),
 	}
 }
 
@@ -72,9 +80,9 @@ func (b *BridgeClient) activeDelegate() BackendClient {
 	return b.realClient
 }
 
-// IsMock indique si le mode démo / simulation est actif.
+// IsMock indique si le mode simulation de l'interface est actif.
 func (b *BridgeClient) IsMock() bool {
-	if b.forceDemo {
+	if b.forceMockInterface {
 		return true
 	}
 	return ReadMockSettingFromEnv(b.appRoot)
@@ -127,18 +135,22 @@ func (b *BridgeClient) SaveMarkdownFile(filename, content string) error {
 
 // GetConfig lit la configuration depuis le fichier .env de l'application
 func (b *BridgeClient) GetConfig() (*models.ConfigResponse, error) {
-	return LoadConfigFromEnv(b.appRoot, b.IsMock()), nil
+	cfg := LoadConfigFromEnv(b.appRoot, b.IsMock())
+	if b.forceMockIA {
+		cfg.MockAI = true
+	}
+	return cfg, nil
 }
 
 // SaveConfig persiste la nouvelle configuration dans le .env applicatif et actualise l'état du client.
-func (b *BridgeClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool) (*models.ActionResult, error) {
+func (b *BridgeClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool, mockAI ...bool) (*models.ActionResult, error) {
 	envPath := FindAppEnvPath(b.appRoot)
-	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface); err != nil {
+	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface, mockAI...); err != nil {
 		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
 	}
 
-	// Met à jour dynamiquement le mode si pas forcé par le flag --demo
-	if !b.forceDemo {
+	// Met à jour dynamiquement le mode si pas forcé par le flag --mockInterface
+	if !b.forceMockInterface {
 		b.isMock = mockInterface
 	}
 
@@ -153,8 +165,13 @@ func (b *BridgeClient) SaveConfig(baseURL, model string, timeout float64, lang s
 		)
 	}
 
+	mockAIVal := ReadMockAISettingFromEnv(b.appRoot)
+	if len(mockAI) > 0 {
+		mockAIVal = mockAI[0]
+	}
+
 	return &models.ActionResult{
 		Success: true,
-		Message: fmt.Sprintf("Configuration sauvegardée dans %s (MOCK_INTERFACE=%t).", filepath.Base(envPath), mockInterface),
+		Message: fmt.Sprintf("Configuration sauvegardée dans %s (MOCK_INTERFACE=%t, MOCK_AI=%t).", filepath.Base(envPath), mockInterface, mockAIVal),
 	}, nil
 }

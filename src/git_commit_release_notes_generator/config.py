@@ -3,6 +3,15 @@ import os
 from pathlib import Path
 
 
+def parse_bool(val: str | bool | None) -> bool:
+    """Convertit une chaîne ou booléen en bool (ex: 'true', 'TRUE', '1', 'yes', 'oui')."""
+    if isinstance(val, bool):
+        return val
+    if not val:
+        return False
+    return str(val).strip().lower() in ("true", "1", "yes", "oui")
+
+
 def load_env() -> dict[str, str]:
     """Charge les paramètres de configuration depuis le fichier .env de l'application."""
     base_dir = Path(__file__).resolve().parent  # src/git_commit_release_notes_generator
@@ -44,7 +53,15 @@ def load_env() -> dict[str, str]:
                 pass
 
     # Surcharge optionnelle par l'environnement système direct (si défini explicitement)
-    for k in ("OLLAMA_BASE_URL", "OLLAMA_MODEL", "OLLAMA_TIMEOUT_S", "OLLAMA_NUM_CTX", "APP_LANGUAGE", "MOCK_INTERFACE"):
+    for k in (
+        "OLLAMA_BASE_URL",
+        "OLLAMA_MODEL",
+        "OLLAMA_TIMEOUT_S",
+        "OLLAMA_NUM_CTX",
+        "APP_LANGUAGE",
+        "MOCK_INTERFACE",
+        "MOCK_AI",
+    ):
         if k in os.environ and os.environ[k]:
             env_data[k] = os.environ[k]
 
@@ -67,11 +84,15 @@ if "OLLAMA_NUM_CTX" not in ENV:
     ENV["OLLAMA_NUM_CTX"] = "32768"
 if "APP_LANGUAGE" not in ENV:
     ENV["APP_LANGUAGE"] = "fr"
+if "MOCK_AI" not in ENV:
+    ENV["MOCK_AI"] = "false"
 
 OLLAMA_BASE_URL = ENV["OLLAMA_BASE_URL"]
 OLLAMA_MODEL = ENV["OLLAMA_MODEL"]
 OLLAMA_TIMEOUT_S = float(ENV["OLLAMA_TIMEOUT_S"])
 OLLAMA_NUM_CTX = int(ENV["OLLAMA_NUM_CTX"])
 APP_LANGUAGE = ENV["APP_LANGUAGE"]
+MOCK_AI = parse_bool(ENV.get("MOCK_AI", "false"))
+
 
 

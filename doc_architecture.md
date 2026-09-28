@@ -77,6 +77,7 @@ Exemples :
 │     │  ├─ embedding.py
 │     │  ├─ exceptions.py
 │     │  ├─ llm.py
+│     │  ├─ mock_llm.py
 │     │  └─ prompts/
 │     │     └─ commit_message_system.txt
 │     └─ service/
@@ -122,6 +123,7 @@ Exemples :
 │  │     │  ├─ embedding.md
 │  │     │  ├─ exceptions.md
 │  │     │  ├─ llm.md
+│  │     │  ├─ mock_llm.md
 │  │     │  └─ prompts/
 │  │     │     └─ commit_message_system.md
 │  │     └─ service/
@@ -136,6 +138,7 @@ Exemples :
 │     ├─ test_core.md
 │     ├─ test_git_wrapper.md
 │     ├─ test_ollama_llm.md
+│     ├─ test_mock_ai.md
 │     ├─ test_golden_diffs_slow.md
 │     ├─ test_integration_git_wrapper_slow.md
 │     ├─ test_ollama_llm_slow.md
@@ -146,6 +149,7 @@ Exemples :
 │        └─ deinit_test.md
 ├─ test/
 │  ├─ __init__.py
+│  ├─ conftest.py
 │  ├─ README_situation_test.md
 │  ├─ cli/
 │  │  ├─ go.mod
@@ -153,6 +157,7 @@ Exemples :
 │  ├─ test_core.py
 │  ├─ test_git_wrapper.py
 │  ├─ test_ollama_llm.py
+│  ├─ test_mock_ai.py
 │  ├─ test_golden_diffs_slow.py
 │  ├─ test_integration_git_wrapper_slow.py
 │  ├─ test_ollama_llm_slow.py

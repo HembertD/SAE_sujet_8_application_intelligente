@@ -16,7 +16,8 @@ import (
 
 func main() {
 	// Options de la ligne de commande
-	demoFlag := flag.Bool("demo", false, "Force le mode simulation/démo pour tester le TUI de manière autonome")
+	mockInterfaceFlag := flag.Bool("mockInterface", false, "Force la simulation complète de l'interface (mode démo sans Git ni Python)")
+	mockIAFlag := flag.Bool("mockIA", false, "Force la simulation de l'IA hors-ligne sans serveur Ollama")
 	repoFlag := flag.String("repo", ".", "Chemin du dépôt Git à analyser")
 	appFlag := flag.String("app-dir", "", "Chemin vers l'application Smart Commit (dossier contenant le .env applicatif)")
 	flag.Parse()
@@ -41,7 +42,7 @@ func main() {
 	appRoot := bridge.FindAppRoot(*appFlag)
 
 	// Initialisation du client de pont (aucune logique métier en Go)
-	client := bridge.NewBackendClientWithAppRoot(absRepoPath, appRoot, *demoFlag)
+	client := bridge.NewBackendClientWithAppRoot(absRepoPath, appRoot, *mockInterfaceFlag, *mockIAFlag)
 	reader := bufio.NewReader(os.Stdin)
 
 	// Boucle principale du TUI

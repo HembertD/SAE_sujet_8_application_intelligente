@@ -49,8 +49,11 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
    # Lancement standard (utilise les paramètres du .env à la racine) :
    ./git-generator
 
-   # Lancement forcé en mode démo / test (autonome, sans serveur Ollama requis) :
-   ./git-generator --demo
+   # Lancement en forçant la simulation de l'interface (autonome, sans Git ni Python) :
+   ./git-generator --mockInterface
+
+   # Lancement en forçant la simulation de l'IA (Git réel, hors-ligne sans Ollama) :
+   ./git-generator --mockIA
 
    # Lancement en ciblant un autre dépôt Git :
    ./git-generator --repo /chemin/vers/un/autre/projet
@@ -58,7 +61,8 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
 
    **Options disponibles :**
    - `--repo <chemin>` : dépôt Git à analyser (par défaut `.`).
-   - `--demo` : force le mode démo / simulation autonome.
+   - `--mockInterface` : force la simulation complète de l'interface (mode démo sans Git ni Python).
+   - `--mockIA` : force la simulation de l'IA hors-ligne sans serveur Ollama (Git réel conservé).
    - `--app-dir <chemin>` : racine de l'application Smart Commit (contenant le code et le `.env`). Détectée automatiquement dans 99% des cas pour garantir l'isolation complète du `.env`.
 
 4. **Exécution des tests :**

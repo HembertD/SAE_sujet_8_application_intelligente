@@ -26,8 +26,8 @@ Ce module implémente le pont de communication entre l'interface TUI Go et le ba
    - Permet l'injection d'erreurs ou de réponses sur mesure (`CustomError`, `CustomDiff`, `SimulateDelay=false`) pour les tests unitaires automatisés.
 
 4. **`BridgeClient` (Coordinateur Adaptateur)** :
-   - Instancié par `NewBackendClient(repoRoot, forceDemo)` ;
-   - Achemine dynamiquement les appels vers `MockClient` ou `PythonClient` selon la variable `MOCK_INTERFACE` du `.env` ou le drapeau `--demo` sans recompilation.
+   - Instancié par `NewBackendClientWithAppRoot(repoRoot, appRoot, forceMockInterface, forceMockIA)` ;
+   - Achemine dynamiquement les appels vers `MockClient` ou `PythonClient` selon la variable `MOCK_INTERFACE` du `.env` ou le drapeau `--mockInterface` sans recompilation.
 
 5. **`env.go` (Gestionnaire .env)** :
    - Localisation automatique de la racine de l'application (`FindAppRoot`) par exploration ascendante via `runtime.Caller`, l'exécutable Go (`os.Executable`) et le répertoire courant (`os.Getwd`) ;

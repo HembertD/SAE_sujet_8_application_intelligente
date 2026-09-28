@@ -16,7 +16,8 @@ Le binaire propose trois options pour s'adapter à tous les contextes d'utilisat
 | Option | Valeur par défaut | Description |
 |---|---|---|
 | `--repo <chemin>` | `.` (répertoire courant) | **Dépôt Git cible à analyser** : chemin du projet sur lequel vous travaillez (pour extraire le `git diff`, générer un message de commit ou créer les release notes). |
-| `--demo` | `false` | **Mode simulation autonome** : force le `MockClient` pour manipuler et tester l'interface TUI hors-ligne sans serveur Ollama ni sous-processus Python. |
+| `--mockInterface` | `false` | **Mock de l'interface** : force le `MockClient` pour manipuler et tester l'interface TUI hors-ligne sans sous-processus Python. |
+| `--mockIA` | `false` | **Mock de l'IA** : active la simulation des réponses Ollama (commits et release notes déterministes hors-ligne). |
 | `--app-dir <chemin>` | Auto-détecté | **Racine de l'application Smart Commit** : chemin vers le dossier de notre outil (`SAE_sujet_8_application_intelligente`), où résident le fichier `.env` applicatif et le code Python. |
 
 > [!NOTE]
@@ -32,13 +33,16 @@ Le binaire propose trois options pour s'adapter à tous les contextes d'utilisat
 # 1. Lancement standard dans le dépôt courant (mode réel ou mock selon le .env) :
 ./git-generator
 
-# 2. Lancement forcé en mode démo (autonome, sans backend Python requis) :
-./git-generator --demo
+# 2. Lancement avec mock de l'interface (autonome, sans backend Python requis) :
+./git-generator --mockInterface
 
-# 3. Lancement en ciblant un autre dépôt Git :
+# 3. Lancement avec mock de l'IA (passe par Python, mais simule les réponses Ollama sans serveur IA) :
+./git-generator --mockIA
+
+# 4. Lancement en ciblant un autre dépôt Git :
 ./git-generator --repo /chemin/vers/un/autre/projet
 
-# 4. Lancement avec indication explicite de la racine de l'application :
+# 5. Lancement avec indication explicite de la racine de l'application :
 ./git-generator --repo /chemin/vers/projet --app-dir /chemin/vers/SAE_sujet_8_application_intelligente
 ```
 
@@ -138,23 +142,23 @@ classDiagram
     BridgeClient --> MockClient : délègue si simulation
 ```
 
-#### Configuration via le fichier `.env` (`MOCK_INTERFACE`)
-L'activation du mode démo / test est pilotée par la variable `MOCK_INTERFACE` dans le fichier `.env` ou par le drapeau `--demo` en ligne de commande :
+#### Configuration via le fichier `.env` (`MOCK_INTERFACE` et `MOCK_AI`)
+L'activation des mocks est pilotée par les variables `MOCK_INTERFACE` et `MOCK_AI` dans le fichier `.env` ou par les drapeaux `--mockInterface` et `--mockIA` en ligne de commande :
 
 ```dotenv
 # Dans le .env à la racine de l'application (et .env.exemple)
-MOCK_INTERFACE=true   # -> Active le mode démo / test hors-ligne
-MOCK_INTERFACE=false  # -> Mode standard : délègue au backend Python
+MOCK_INTERFACE=false  # -> Mode standard : délègue au backend Python (true pour simulation TUI autonome)
+MOCK_AI=true          # -> Active le mock Ollama (commits et notes déterministes sans serveur IA)
 ```
 
 Lorsque `MOCK_INTERFACE=false`, le client communique avec le sous-processus Python et remonte fidèlement les données ou erreurs réelles.
 
-#### Implémentation du mode démo (`mock_client.go`)
+#### Implémentation du mode mock interface (`mock_client.go`)
 Le `MockClient` implémente `BackendClient` en fournissant des réponses cohérentes avec les cas de test du projet (secrets masqués, détection binaire, latence de traitement).  
 Pour les tests unitaires automatisés situés dans le dossier `test/` (`test/cli/bridge_test.go`), il permet de désactiver les délais (`SimulateDelay = false`) et de surcharger les retours ou erreurs (`CustomError`, `CustomDiff`).
 
 #### La bascule dynamique sans recompilation
-La fonction factory `NewBackendClientWithAppRoot(repoRoot, appRoot, forceDemo)` instancie le coordinateur `BridgeClient`.  
+La fonction factory `NewBackendClientWithAppRoot(repoRoot, appRoot, forceMockInterface, forceMockIA)` instancie le coordinateur `BridgeClient`.  
 Lorsque l'utilisateur modifie la configuration depuis l'écran `[3]` de la CLI :
 1. `SaveConfig` met à jour le fichier `.env` à la racine de l'application via le module dédié `env.go`.
 2. Le `BridgeClient` bascule instantanément son délégué actif entre `MockClient` et `PythonClient` sans nécessiter **la moindre modification ni recompilation de code côté Go**.

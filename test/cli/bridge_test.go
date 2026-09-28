@@ -231,6 +231,19 @@ func TestBridgeClientSwitching(t *testing.T) {
 	if bridgeNormal.IsMock() {
 		t.Errorf("attendu bridgeNormal.IsMock() == false après SaveConfig(mockInterface=false)")
 	}
+
+	// Test de sauvegarde conjointe de MockInterface et MockAI
+	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, "fr", false, true)
+	if err != nil {
+		t.Fatalf("SaveConfig échoué avec MockAI : %v", err)
+	}
+	cfgAfter, errCfg := bridgeNormal.GetConfig()
+	if errCfg != nil {
+		t.Fatalf("GetConfig a échoué : %v", errCfg)
+	}
+	if cfgAfter.MockInterface != false || cfgAfter.MockAI != true {
+		t.Errorf("attendu MockInterface=false et MockAI=true, obtenu %+v", cfgAfter)
+	}
 }
 
 func TestPythonClientRealIntegration(t *testing.T) {

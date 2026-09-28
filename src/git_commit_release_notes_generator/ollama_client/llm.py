@@ -14,6 +14,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from git_commit_release_notes_generator import config
 from git_commit_release_notes_generator.config import (
     OLLAMA_BASE_URL,
     OLLAMA_MODEL,
@@ -24,6 +25,10 @@ from git_commit_release_notes_generator.models import CommitMessage, DiffFile
 from git_commit_release_notes_generator.ollama_client.exceptions import (
     CommitMessageValidationError,
     OllamaCallError,
+)
+from git_commit_release_notes_generator.ollama_client.mock_llm import (
+    mock_call_chat,
+    mock_generate_commit_message,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,6 +65,9 @@ def check_ollama_reachable() -> tuple[bool, str | None]:
     Ne lève jamais d'exception : retourne (True, None) si joignable, sinon
     (False, message d'erreur explicite).
     """
+    if config.MOCK_AI:
+        return True, None
+
     try:
         urllib.request.urlopen(f"{OLLAMA_BASE_URL}/api/version", timeout=_PING_TIMEOUT_S)
         return True, None
@@ -70,7 +78,7 @@ def check_ollama_reachable() -> tuple[bool, str | None]:
         )
 
 
-def generate_commit_message(diff_files: list[DiffFile]) -> CommitMessage:
+def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> CommitMessage:
     """Génère un CommitMessage validé à partir d'une liste de DiffFile.
 
     Un seul retry est tenté en cas d'échec de validation, en réinjectant
@@ -81,11 +89,19 @@ def generate_commit_message(diff_files: list[DiffFile]) -> CommitMessage:
     if not diff_files:
         raise ValueError("generate_commit_message() nécessite au moins un DiffFile.")
 
+    if config.MOCK_AI:
+        return mock_generate_commit_message(diff_files, feedback=feedback)
+
     system_prompt = _PROMPT_PATH.read_text(encoding="utf-8")
     messages: list[dict] = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": _build_diff_summary(diff_files)},
     ]
+    if feedback and feedback.strip():
+        messages.append({
+            "role": "user",
+            "content": f"Consigne additionnelle de révision : {feedback.strip()}",
+        })
 
     raw = _call_chat(messages)
     error = _validate(raw)
@@ -120,6 +136,9 @@ def _build_diff_summary(diff_files: list[DiffFile]) -> str:
 
 
 def _call_chat(messages: list[dict]) -> dict:
+    if config.MOCK_AI:
+        return mock_call_chat(messages)
+
     body = {
         "model": OLLAMA_MODEL,
         "messages": messages,

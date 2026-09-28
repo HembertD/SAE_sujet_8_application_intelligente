@@ -24,8 +24,15 @@ func ShowMainMenu(reader *bufio.Reader, client bridge.BackendClient, status *mod
 	menuLines = append(menuLines, fmt.Sprintf("  %s[4]%s 🚪 %sQuitter%s", ui.Yellow+ui.Bold, ui.Reset, ui.Bold, ui.Reset))
 	menuLines = append(menuLines, "")
 
-	if client.IsMock() {
-		menuLines = append(menuLines, ui.Dim+"  ℹ Mode simulation actif (MOCK_INTERFACE=true dans le .env)"+ui.Reset)
+	cfg, err := client.GetConfig()
+	isMockInterface := client.IsMock() || (err == nil && cfg.MockInterface)
+	isMockAI := err == nil && cfg.MockAI
+
+	if isMockInterface {
+		menuLines = append(menuLines, ui.Dim+"  ℹ Mock Interface actif (MOCK_INTERFACE=true dans le .env)"+ui.Reset)
+	}
+	if isMockAI {
+		menuLines = append(menuLines, ui.Dim+"  ℹ Mock IA actif (MOCK_AI=true dans le .env)"+ui.Reset)
 	}
 
 	ui.PrintCard("Menu Principal", menuLines, width, ui.Cyan)

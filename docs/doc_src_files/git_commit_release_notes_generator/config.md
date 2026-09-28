@@ -12,7 +12,8 @@ Ce module contient les paramètres globaux utilisés par le client Ollama et le 
 - `OLLAMA_MODEL` : modèle utilisé pour la génération des messages de commit (ex: `gemma4:26b`, `gemma4:12b`).
 - `OLLAMA_TIMEOUT_S` : délai de requête avant timeout en secondes.
 - `APP_LANGUAGE` : langue de l'application et des messages générés (`fr` ou `en`).
-- `MOCK_INTERFACE` : activation du mode simulation/démo hors-ligne (`true` ou `false`).
+- `MOCK_INTERFACE` : activation du mode simulation complète de l'interface en Go (`true` ou `false`).
+- `MOCK_AI` : activation de la simulation des réponses de l'IA Ollama hors-ligne (`true` ou `false`).
 
 ## Emplacement et chargement du fichier `.env`
 

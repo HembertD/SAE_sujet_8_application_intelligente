@@ -35,6 +35,6 @@ Ce module constitue le point d'entrée exécutable sous forme de sous-processus 
 
 - `action_status(repo_path)` : vérifie la validité du dépôt, gère les branches orphelines (detached HEAD) et dénombre les modifications.
 - `action_diff(repo_path)` : expose chaque fichier avec son patch, ses compteurs `added`/`removed`, le drapeau `binary` et la détection `has_secrets_masked`.
-- `action_generate_commit(repo_path, feedback)` : extrait le diff staged textuel et le transmet au module LLM avec la consigne optionnelle utilisateur.
-- `action_release_notes(repo_path, from_tag, to_tag)` : extrait l'historique et génère une synthèse catégorisée (Features, Fixes, Refactoring, Docs) avec repli déterministe en cas de déconnexion d'Ollama.
-- `action_ping_ollama()` : teste `/api/version` et `/api/tags` avec mesure précise de la latence réseau en millisecondes.
+- `action_generate_commit(repo_path, feedback)` : extrait le diff staged textuel et le transmet au module LLM avec la consigne optionnelle utilisateur (ou renvoie le commit statique si `MOCK_AI=True`).
+- `action_release_notes(repo_path, from_tag, to_tag)` : extrait l'historique et génère une synthèse catégorisée (Features, Fixes, Refactoring, Docs) avec repli déterministe en cas de déconnexion d'Ollama (ou renvoie la synthèse statique si `MOCK_AI=True`).
+- `action_ping_ollama()` : teste `/api/version` et `/api/tags` avec mesure précise de la latence réseau en millisecondes (ou simule une réponse immédiate si `MOCK_AI=True`).

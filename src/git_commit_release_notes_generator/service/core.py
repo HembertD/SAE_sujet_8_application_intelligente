@@ -29,10 +29,7 @@ from git_commit_release_notes_generator.ollama_client.exceptions import (
     OllamaCallError,
 )
 from git_commit_release_notes_generator.ollama_client.llm import generate_commit_message
-from git_commit_release_notes_generator.service.git_wrapper import (
-    GitWrapper,
-    GitWrapperError,
-)
+from git_commit_release_notes_generator.service.git_wrapper import GitWrapper
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(levelname)s: %(message)s")
@@ -79,7 +76,7 @@ def action_status(repo_path: str = ".") -> dict:
             "staged_count": staged_count,
             "unstaged_count": unstaged_count,
         }
-    except (GitWrapperError, Exception) as e:
+    except Exception as e:
         logger.debug(f"action_status non git repo: {e}")
         return {
             "is_git_repo": False,
@@ -99,38 +96,27 @@ def action_diff(repo_path: str = ".") -> dict:
     """
     try:
         wrapper = GitWrapper(repo_path)
-        raw_diff = wrapper.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTUXB")
-        if not raw_diff.strip():
-            return {
-                "success": True,
-                "files": [],
-                "staged_count": 0,
-            }
+        parsed_files = wrapper.get_staged_diff()
 
-        parsed_files = wrapper._parse_diff(raw_diff)
-        files = []
-        for df in parsed_files:
-            patch = df.patch
-            # Tronquer le patch textuel volumineux pour éviter d'engorger la mémoire
-            if not df.is_binary and len(patch) > 8000:
-                patch = patch[:8000] + "\n\n... [DIFF TRUNCATED: TROP VOLUMINEUX] ..."
-
-            files.append({
+        files = [
+            {
                 "path": df.path,
                 "status": df.status,
                 "added": df.added,
                 "removed": df.removed,
                 "binary": bool(df.is_binary),
-                "patch": patch,
-                "has_secrets_masked": "[REDACTED_SECRET]" in patch,
-            })
+                "patch": df.patch,
+                "has_secrets_masked": "[REDACTED_SECRET]" in df.patch,
+            }
+            for df in parsed_files
+        ]
 
         return {
             "success": True,
             "files": files,
             "staged_count": len(files),
         }
-    except (GitWrapperError, Exception) as e:
+    except Exception as e:
         logger.error(f"action_diff error: {e}")
         return {
             "success": False,
@@ -153,7 +139,7 @@ def action_stage_all(repo_path: str = ".") -> dict:
             "success": True,
             "message": "Tous les fichiers ont été indexés (git add -A)",
         }
-    except (GitWrapperError, Exception) as e:
+    except Exception as e:
         logger.error(f"action_stage_all error: {e}")
         return {
             "success": False,
@@ -170,7 +156,7 @@ def action_generate_commit(repo_path: str = ".") -> dict:
     try:
         wrapper = GitWrapper(repo_path)
         diff_files = wrapper.get_staged_diff()
-    except (GitWrapperError, Exception) as e:
+    except Exception as e:
         logger.error(f"action_generate_commit git error: {e}")
         return {"success": False, "error": str(e)}
 
@@ -223,7 +209,7 @@ def action_apply_commit(repo_path: str = ".", message: str = "") -> dict:
             "sha": sha,
             "message": f"Commit appliqué avec succès ({sha}).",
         }
-    except (GitWrapperError, Exception) as e:
+    except Exception as e:
         logger.error(f"action_apply_commit error: {e}")
         return {
             "success": False,
@@ -250,7 +236,7 @@ def action_push(repo_path: str = ".") -> dict:
             "success": True,
             "message": "Modifications poussées avec succès vers le dépôt distant.",
         }
-    except (GitWrapperError, Exception) as e:
+    except Exception as e:
         logger.error(f"action_push error: {e}")
         return {
             "success": False,
@@ -335,7 +321,7 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
     try:
         wrapper = GitWrapper(repo_path)
         commits = wrapper.get_commits_between_tags(from_tag, to_tag)
-    except (GitWrapperError, Exception) as e:
+    except Exception as e:
         logger.error(f"action_release_notes git error: {e}")
         return {
             "success": False,
@@ -492,9 +478,12 @@ def main() -> None:
 
     handler = handlers.get(args.action)
     if handler is None:
+        # Toujours sortir avec le code 0 : le Go (python_client.go) ignore
+        # entierement stdout si le process sort en code != 0, donc ce
+        # message d'erreur n'atteindrait jamais l'utilisateur.
         result = {"success": False, "error": f"action inconnue: {args.action}"}
         print(json.dumps(result, ensure_ascii=False))
-        sys.exit(1)
+        return
 
     try:
         result = handler()

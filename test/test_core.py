@@ -6,6 +6,8 @@ correctement et retournent du JSON strict.
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -157,6 +159,22 @@ def test_action_release_notes_empty():
         assert result["success"] is True
         assert result["commit_count"] == 0
         assert "Aucun commit trouvé" in result["markdown"]
+
+
+def test_unknown_action_exits_zero_with_error_json():
+    """Le process doit sortir en code 0 : le Go ignore stdout si le code != 0,
+    donc l'erreur "action inconnue" ne doit jamais faire echouer le process."""
+    result = subprocess.run(
+        [sys.executable, "-m", "git_commit_release_notes_generator.service.core", "--action", "bogus"],
+        cwd=str(ROOT / "src"),
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    assert payload["success"] is False
+    assert "bogus" in payload["error"]
 
 
 def test_action_save_config():

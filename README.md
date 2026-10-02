@@ -86,6 +86,21 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
 
 - [Documentation PDF complète](documentation.pdf)
 
+### Génération du PDF avant commit
+
+Le PDF est régénéré lors d'un commit qui modifie la documentation MkDocs, puis ajouté au même commit. Pour activer le hook dans votre clone :
+
+```bash
+python3 -m pip install -r requirements.txt
+./scripts/install_git_hooks.sh
+```
+
+Pandoc et XeLaTeX doivent également être installés. Sur Ubuntu/Debian :
+
+```bash
+sudo apt-get install pandoc texlive-xetex texlive-latex-recommended texlive-fonts-recommended lmodern
+```
+
 Le projet contient plusieurs niveaux de documentation, répartis selon leur objectif.
 
 ### 1. Documentation générale et architecture

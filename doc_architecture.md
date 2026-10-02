@@ -46,7 +46,11 @@ Exemples :
 ├─ contributing.md
 ├─ doc_architecture.md
 ├─ .githooks/
+│  ├─ pre-commit
 │  └─ prepare-commit-msg
+├─ scripts/
+│  ├─ generate_documentation_pdf.py
+│  └─ install_git_hooks.sh
 ├─ src/
 │  ├─ cli/
 │  │  ├─ go.mod

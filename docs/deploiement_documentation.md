@@ -23,6 +23,15 @@ Le fichier `mkdocs.yml` définit :
 
 Le build MkDocs transforme les fichiers Markdown en un site statique dans le dossier `site/`.
 
+## Prérequis du PDF versionné
+
+!!! warning "Important"
+	Le hook `pre-commit` régénère `documentation.pdf` lorsqu'une page de documentation change. Pandoc et XeLaTeX doivent être installés, sinon le commit est bloqué.
+
+	```bash
+	sudo apt-get update && sudo apt-get install -y pandoc texlive-xetex texlive-latex-recommended texlive-fonts-recommended lmodern
+	```
+
 ## Workflow de déploiement
 
 Le workflow GitHub Actions est défini dans `.github/workflows/documentation.yml`.

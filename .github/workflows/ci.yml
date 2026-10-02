@@ -1,17 +1,15 @@
 name: CI
 
 on:
-  pull_request:
-    branches:
-      - main
-      - Dev
   push:
     branches:
       - main
       - Dev
+      - '**'
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
 
 jobs:
   go-tests:
@@ -31,140 +29,85 @@ jobs:
         working-directory: src/cli
         run: go test ./...
 
-  documentation-pdf:
-    name: Documentation PDF
+  documentation-build:
+    needs: go-tests
+    name: Build documentation site
     runs-on: ubuntu-latest
-    if: github.event_name != 'push' || github.actor != 'github-actions[bot]'
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          fetch-depth: 0
+          python-version: "3.12"
 
-      - name: Install Pandoc, LaTeX and Python dependencies
+      - name: Install MkDocs
         run: |
-          sudo apt-get update
-          sudo apt-get install -y pandoc texlive-xetex texlive-latex-recommended texlive-fonts-recommended lmodern
-          python3 -m pip install --upgrade pip pyyaml
+          python -m pip install --upgrade pip
+          pip install mkdocs-material
 
-      - name: Build combined markdown source from MkDocs navigation
+      - name: Set documentation metadata
+        id: meta
+        shell: bash
         run: |
-          mkdir -p .tmp-doc
+          branch_name="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          branch_slug="${branch_name//\//-}"
+
+          if [[ "${branch_name}" == "main" ]]; then
+            echo "is_main=true" >> "$GITHUB_OUTPUT"
+            echo "suffix=" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_main=false" >> "$GITHUB_OUTPUT"
+            echo "suffix= *" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "artifact_name=documentation-${branch_slug}" >> "$GITHUB_OUTPUT"
+
+      - name: Apply development marker to docs title
+        shell: bash
+        run: |
           python - <<'PY'
-          import yaml
           from pathlib import Path
+          import yaml
 
-          root = Path('.')
-          mkdocs_path = root / 'mkdocs.yml'
-          data = yaml.safe_load(mkdocs_path.read_text(encoding='utf-8'))
-          nav = data.get('nav', [])
+          path = Path('mkdocs.yml')
+          data = yaml.safe_load(path.read_text(encoding='utf-8'))
+          site_name = data.get('site_name', 'SAE - Application intelligente')
+          suffix = "${{ steps.meta.outputs.suffix }}"
 
-          pages = []
-          seen = set()
+          if suffix.strip():
+              data['site_name'] = f"{site_name}{suffix}"
 
-          def walk(entry):
-              if isinstance(entry, dict):
-                  for key, value in entry.items():
-                      if isinstance(value, str):
-                          rel = value.strip()
-                          if rel not in seen:
-                              pages.append((key, rel))
-                              seen.add(rel)
-                      elif isinstance(value, list):
-                          walk(value)
-                      elif isinstance(value, dict):
-                          walk(value)
-              elif isinstance(entry, list):
-                  for item in entry:
-                      walk(item)
+          path.write_text(
+              yaml.safe_dump(
+                  data,
+                  sort_keys=False,
+                  allow_unicode=True
+              ),
+              encoding='utf-8'
+          )
 
-          walk(nav)
-
-          out = root / '.tmp-doc/documentation.md'
-          content = [
-              '# Documentation technique - SAE Application intelligente',
-              '',
-              '---',
-              '',
-              '## Table des matières',
-              '',
-              '\\tableofcontents',
-              '',
-              '---',
-              ''
-          ]
-
-          for title, rel in pages:
-              file_path = root / rel
-              if not file_path.exists():
-                  file_path = root / 'docs' / rel
-              if not file_path.exists():
-                  raise FileNotFoundError(f'Missing Markdown file referenced in mkdocs.yml: {rel}')
-
-              text = file_path.read_text(encoding='utf-8')
-              clean_title = title.strip() if title else file_path.stem.replace('_', ' ').title()
-              content.append(f"# {clean_title}")
-              content.append('')
-              content.append(text.strip())
-              content.append('')
-              content.append('---')
-              content.append('')
-
-          out.write_text('\n'.join(content).strip() + '\n', encoding='utf-8')
-          print(f'Generated {out} with {len(pages)} documentation pages.')
+          print(f"site_name={data['site_name']}")
           PY
 
-      - name: Generate PDF
-        run: |
-          pandoc .tmp-doc/documentation.md \
-            --from=markdown+raw_tex \
-            --standalone \
-            --toc \
-            --number-sections \
-            --pdf-engine=xelatex \
-            -V geometry:margin=1in \
-            -V colorlinks=true \
-            -V linkcolor=blue \
-            -V urlcolor=blue \
-            -V mainfont="DejaVu Sans" \
-            -V monofont="DejaVu Sans Mono" \
-            -o documentation.pdf
+      - name: Build documentation
+        run: mkdocs build
 
-      - name: Upload PDF artifact
+      - name: Upload documentation preview artifact
         uses: actions/upload-artifact@v4
         with:
-          name: documentation-pdf
-          path: documentation.pdf
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: site
+          if-no-files-found: error
 
-      - name: Determine target branch
-        id: target
-        run: |
-          if [[ "${GITHUB_REF}" == "refs/heads/main" || "${GITHUB_REF}" == "refs/heads/Dev" ]]; then
-            echo "should_update=true" >> "$GITHUB_OUTPUT"
-            echo "target_branch=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_update=false" >> "$GITHUB_OUTPUT"
-            echo "target_branch=skip" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Setup GitHub Pages
+        if: steps.meta.outputs.is_main == 'true'
+        uses: actions/configure-pages@v5
 
-      - name: Commit PDF on target protected branch
-        if: steps.target.outputs.should_update == 'true'
-        env:
-          TARGET_BRANCH: ${{ steps.target.outputs.target_branch }}
-          DOCS_BOT_TOKEN: ${{ secrets.DOCS_BOT_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add documentation.pdf
-          if git diff --cached --quiet; then
-            echo "No documentation PDF changes to push."
-            exit 0
-          fi
-          git commit -m "docs: update generated documentation PDF [skip ci]"
-
-          if [ -n "${DOCS_BOT_TOKEN}" ]; then
-            git push "https://x-access-token:${DOCS_BOT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:"${TARGET_BRANCH}"
-          else
-            git push origin HEAD:"${TARGET_BRANCH}"
-          fi
+      - name: Upload documentation for GitHub Pages
+        if: steps.meta.outputs.is_main == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site

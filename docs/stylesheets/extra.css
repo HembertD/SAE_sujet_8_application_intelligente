@@ -1,0 +1,39 @@
+.dev-marker {
+  display: inline-block;
+  font-weight: 700;
+  color: #ff8c42;
+  text-decoration: none;
+  cursor: help;
+  position: relative;
+  margin-left: 0.15em;
+}
+
+.dev-marker::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: 125%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 400;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.dev-marker:hover::after,
+.dev-marker:focus-visible::after {
+  opacity: 1;
+}
+
+.dev-marker:focus-visible {
+  outline: 2px solid rgba(255, 140, 66, 0.7);
+  outline-offset: 0.15rem;
+  border-radius: 0.2rem;
+}

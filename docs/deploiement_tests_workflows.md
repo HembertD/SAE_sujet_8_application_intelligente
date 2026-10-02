@@ -21,7 +21,16 @@ Le fichier `.github/workflows/ci.yml` est déclenché sur les pull requests cibl
 
 #### `python-tests`
 
-Ce job a été retirer car les tests pythons ont besoin de la connection à l'IUT pour questionner l'IA local à cet connection, il est donc impossible que le workflows vérifie les tests
+Ce job exécute la suite de tests Python (module C) :
+
+1. installation des dépendances depuis `requirements.txt` (dont `pytest`)
+2. exécution de :
+
+```bash
+python -m pytest -q
+```
+
+`pytest.ini` exclut par défaut les tests marqués `slow` (ceux qui appellent le vrai serveur Ollama de l'IUT), via `addopts = -m "not slow"`. Le job CI ne lance donc que les tests mockés, qui ne dépendent d'aucune connexion réseau — c'est précisément pour ça que la distinction `slow` / non-`slow` existe.
 
 #### `go-tests`
 

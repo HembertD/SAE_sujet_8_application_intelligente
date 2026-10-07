@@ -28,7 +28,7 @@ Ce module gère la génération du message de commit via Ollama. Il construit le
 ## Fonctions exposées
 
 - `generate_commit_message(diff_files, feedback="")` : fonction principale, décrite ci-dessus.
-- `check_ollama_reachable()` : ping rapide du serveur (timeout court), retourne `(True, None)` ou `(False, message d'erreur)` sans jamais lever d'exception. Pensée pour être appelée par le CLI avant `generate_commit_message`, pour distinguer un problème réseau (hors réseau de l'IUT) d'une vraie erreur de génération.
+- `check_ollama_reachable(timeout=3.0, fetch_models=False)` (alias `ping_ollama`) : fonction unique et centralisée de diagnostic Ollama. Vérifie la joignabilité (`/api/version`), mesure la latence réseau en millisecondes et extrait optionnellement les modèles installés (`/api/tags` si `fetch_models=True`). Retourne un objet `PingResult(reachable, error, latency_ms, installed_models)` déballable directement en tuple `(reachable, error)` ou sérialisable via `.to_dict()`. Utilisée de manière transverse par `action_generate_commit`, `action_release_notes` et `action_ping_ollama` (écran de configuration Go).
 
 ## Dépendances
 

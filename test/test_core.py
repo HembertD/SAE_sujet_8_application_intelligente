@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
@@ -98,15 +99,51 @@ def test_action_generate_commit_success():
     )
 
     with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_diff", return_value=fake_diff):
-        with patch("git_commit_release_notes_generator.service.core.generate_commit_message", return_value=fake_commit):
-            result = core.action_generate_commit(str(ROOT))
+        with patch("git_commit_release_notes_generator.service.core.check_ollama_reachable", return_value=(True, None)):
+            with patch("git_commit_release_notes_generator.service.core.generate_commit_message", return_value=fake_commit):
+                result = core.action_generate_commit(str(ROOT))
 
-            assert result["success"] is True
-            assert result["type"] == "feat"
-            assert result["scope"] == "calc"
-            assert result["subject"] == "ajout de la fonction addition"
-            assert "raw_formatted" in result
-            assert "feat(calc): ajout de la fonction addition" in result["raw_formatted"]
+                assert result["success"] is True
+                assert result["type"] == "feat"
+                assert result["scope"] == "calc"
+                assert result["subject"] == "ajout de la fonction addition"
+                assert "raw_formatted" in result
+                assert "feat(calc): ajout de la fonction addition" in result["raw_formatted"]
+
+
+def test_action_generate_commit_ollama_unreachable():
+    """Vérifie que la génération échoue immédiatement si le serveur Ollama est injoignable."""
+    fake_diff = [
+        DiffFile(path="calc.py", status="M", added=5, removed=1, is_binary=False, patch="+def add(a, b): return a + b")
+    ]
+    unreachable_msg = "Serveur Ollama non joignable à http://localhost:11434 : connection refused"
+
+    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_diff", return_value=fake_diff):
+        with patch("git_commit_release_notes_generator.service.core.check_ollama_reachable", return_value=(False, unreachable_msg)):
+            with patch("git_commit_release_notes_generator.service.core.generate_commit_message") as mock_generate:
+                result = core.action_generate_commit(str(ROOT))
+
+                assert result["success"] is False
+                assert "error" in result
+                assert "non joignable" in result["error"]
+                mock_generate.assert_not_called()
+
+
+def test_action_generate_commit_network_error_fails_fast():
+    """Vérifie le comportement quand le ping Ollama échoue au niveau réseau (urllib)."""
+    fake_diff = [
+        DiffFile(path="calc.py", status="M", added=5, removed=1, is_binary=False, patch="+def add(a, b): return a + b")
+    ]
+    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_diff", return_value=fake_diff):
+        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("connection refused")):
+            with patch("git_commit_release_notes_generator.service.core.generate_commit_message") as mock_generate:
+                result = core.action_generate_commit(str(ROOT))
+
+                assert result["success"] is False
+                assert "error" in result
+                assert "non joignable" in result["error"]
+                mock_generate.assert_not_called()
+
 
 
 def test_action_apply_commit_validation():
@@ -139,18 +176,36 @@ def test_action_release_notes_formatting():
     ]
 
     with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_commits_between_tags", return_value=mock_commits):
-        # Force le fallback déterministe pour tester le formateur
-        with patch("urllib.request.urlopen", side_effect=Exception("Ollama offline")):
+        with patch("git_commit_release_notes_generator.service.core.check_ollama_reachable", return_value=(True, None)):
+            # Force le fallback déterministe lors de l'appel chat
+            with patch("urllib.request.urlopen", side_effect=Exception("Ollama chat error")):
+                result = core.action_release_notes(str(ROOT), from_tag="v0.1.0", to_tag="v1.0.0")
+
+                assert result["success"] is True
+                assert result["from_tag"] == "v0.1.0"
+                assert result["to_tag"] == "v1.0.0"
+                assert result["commit_count"] == 3
+                assert "### 🚀 Nouveautés (Features)" in result["markdown"]
+                assert "feat(auth)" in result["markdown"]
+                assert "### 🐛 Corrections de bogues (Fixes)" in result["markdown"]
+                assert "### 📚 Documentation" in result["markdown"]
+
+
+def test_action_release_notes_ollama_unreachable():
+    """Vérifie que la génération des release notes échoue immédiatement si Ollama est injoignable."""
+    mock_commits = [
+        CommitInfo(sha="1a2b3c4", message="feat(auth): ajout du login OAuth2", author="Maxence", date="2026-09-22"),
+    ]
+    unreachable_msg = "Serveur Ollama non joignable à http://localhost:11434 : connection refused"
+
+    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_commits_between_tags", return_value=mock_commits):
+        with patch("git_commit_release_notes_generator.service.core.check_ollama_reachable", return_value=(False, unreachable_msg)):
             result = core.action_release_notes(str(ROOT), from_tag="v0.1.0", to_tag="v1.0.0")
 
-            assert result["success"] is True
-            assert result["from_tag"] == "v0.1.0"
-            assert result["to_tag"] == "v1.0.0"
-            assert result["commit_count"] == 3
-            assert "### 🚀 Nouveautés (Features)" in result["markdown"]
-            assert "feat(auth)" in result["markdown"]
-            assert "### 🐛 Corrections de bogues (Fixes)" in result["markdown"]
-            assert "### 📚 Documentation" in result["markdown"]
+            assert result["success"] is False
+            assert "error" in result
+            assert "non joignable" in result["error"]
+            assert result["markdown"] == ""
 
 
 def test_action_release_notes_empty():

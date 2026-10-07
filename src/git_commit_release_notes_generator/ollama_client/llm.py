@@ -8,8 +8,10 @@ la bonne volonté du LLM.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import json
 import logging
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -29,6 +31,7 @@ from git_commit_release_notes_generator.ollama_client.exceptions import (
 from git_commit_release_notes_generator.ollama_client.mock_llm import (
     mock_call_chat,
     mock_generate_commit_message,
+    mock_ping,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,28 +57,98 @@ _JSON_SCHEMA = {
 }
 
 
-def check_ollama_reachable() -> tuple[bool, str | None]:
-    """Vérifie rapidement si le serveur Ollama est joignable.
+@dataclass
+class PingResult:
+    """Résultat de la vérification de joignabilité d'Ollama.
 
-    À appeler avant generate_commit_message() pour échouer vite (quelques
-    secondes) plutôt que d'attendre le timeout complet (OLLAMA_TIMEOUT_S,
-    jusqu'à plusieurs minutes) quand le vrai problème est réseau — typiquement
-    ne pas être sur le réseau de l'IUT — et pas un souci côté Ollama lui-même.
+    Permet à la fois l'accès par attributs (.reachable, .latency_ms, .error, .installed_models)
+    et le déballage direct en tuple (reachable, error) pour une compatibilité totale.
+    """
+    reachable: bool
+    error: str | None = None
+    latency_ms: int = 0
+    installed_models: list[str] = field(default_factory=list)
 
-    Ne lève jamais d'exception : retourne (True, None) si joignable, sinon
-    (False, message d'erreur explicite).
+    def __iter__(self):
+        return iter((self.reachable, self.error))
+
+    def __getitem__(self, index):
+        return (self.reachable, self.error)[index]
+
+    def __eq__(self, other):
+        if isinstance(other, tuple) and len(other) == 2:
+            return (self.reachable, self.error) == other
+        return super().__eq__(other)
+
+    def to_dict(self) -> dict:
+        """Formate le résultat en dictionnaire pour le CLI Go."""
+        data = {
+            "success": True,
+            "reachable": self.reachable,
+            "latency_ms": self.latency_ms,
+            "installed_models": self.installed_models,
+        }
+        if self.error:
+            data["error"] = self.error
+        return data
+
+
+def check_ollama_reachable(timeout: float = _PING_TIMEOUT_S, fetch_models: bool = False) -> PingResult:
+    """Vérifie la joignabilité du serveur Ollama et optionnellement les modèles installés.
+
+    Mesure la latence en millisecondes et retourne un PingResult.
+    Peut être déballé comme un tuple `reachable, error = check_ollama_reachable()`
+    ou manipulé avec ses attributs (`res.reachable`, `res.latency_ms`, `res.error`, `res.installed_models`).
+    Ne lève jamais d'exception.
     """
     if config.MOCK_AI:
-        return True, None
+        mock_data = mock_ping()
+        models = mock_data.get("installed_models", []) if fetch_models else []
+        return PingResult(reachable=True, latency_ms=10, installed_models=models)
 
+    start = time.perf_counter()
     try:
-        urllib.request.urlopen(f"{OLLAMA_BASE_URL}/api/version", timeout=_PING_TIMEOUT_S)
-        return True, None
-    except urllib.error.URLError as e:
-        return False, (
-            f"Serveur Ollama non joignable à {OLLAMA_BASE_URL} "
-            f"(es-tu sur le réseau de l'IUT ?) : {e}"
+        req = urllib.request.Request(
+            f"{OLLAMA_BASE_URL.rstrip('/')}/api/version",
+            headers={"User-Agent": "SmartCommit/1.0"},
         )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            _ = resp.read()
+        latency_ms = int((time.perf_counter() - start) * 1000)
+
+        installed_models: list[str] = []
+        if fetch_models:
+            try:
+                tags_url = f"{OLLAMA_BASE_URL.rstrip('/')}/api/tags"
+                req_t = urllib.request.Request(tags_url, headers={"User-Agent": "SmartCommit/1.0"})
+                with urllib.request.urlopen(req_t, timeout=timeout) as resp_t:
+                    data = json.loads(resp_t.read().decode("utf-8"))
+                    raw_models = data.get("models", [])
+                    for m in raw_models:
+                        if isinstance(m, dict) and "name" in m:
+                            installed_models.append(str(m["name"]))
+            except Exception as e:
+                logger.debug(f"Impossible de récupérer les modèles Ollama : {e}")
+
+        return PingResult(reachable=True, latency_ms=latency_ms, installed_models=installed_models)
+    except urllib.error.URLError as e:
+        return PingResult(
+            reachable=False,
+            error=f"Serveur Ollama non joignable à {OLLAMA_BASE_URL} : {e}",
+            latency_ms=0,
+            installed_models=[],
+        )
+    except Exception as e:
+        return PingResult(
+            reachable=False,
+            error=f"Serveur Ollama non joignable à {OLLAMA_BASE_URL} : {e}",
+            latency_ms=0,
+            installed_models=[],
+        )
+
+
+# Alias sémantique
+ping_ollama = check_ollama_reachable
 
 
 def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> CommitMessage:

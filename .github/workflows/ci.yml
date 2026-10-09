@@ -131,6 +131,8 @@ jobs:
       - name: Setup GitHub Pages
         if: steps.meta.outputs.is_main == 'true'
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Upload documentation for GitHub Pages
         if: steps.meta.outputs.is_main == 'true'

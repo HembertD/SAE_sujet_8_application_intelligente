@@ -1,0 +1,6 @@
+0000000000000000000000000000000000000000 894d19b7d6d38ea74dab9df277a86d965242b066 Test Dev <dev@test.local> 1788783022 +0200	commit (initial): feat: initialisation de la calculatrice
+894d19b7d6d38ea74dab9df277a86d965242b066 21093070102020025a6798afdcfea9ffaa7a2773 Test Dev <dev@test.local> 1788783022 +0200	commit: docs: ajout du guide d'utilisation
+21093070102020025a6798afdcfea9ffaa7a2773 5853a7b21d7f20cd2b71b7db144451418c4d74db Test Dev <dev@test.local> 1788783022 +0200	commit: ci: ajout du workflow github actions et dependances
+5853a7b21d7f20cd2b71b7db144451418c4d74db 02de92e3182ed75c0c1bfdc6c17ee9cbd0e9d2e7 Test Dev <dev@test.local> 1788783022 +0200	commit: test: ajout des tests unitaires unittest
+02de92e3182ed75c0c1bfdc6c17ee9cbd0e9d2e7 dddb86d26529a86552b0b872038719e505c0b301 Test Dev <dev@test.local> 1789388798 +0200	commit (amend): test: ajout des tests unitaires unittest
+dddb86d26529a86552b0b872038719e505c0b301 a7c8685a63c99bcb7195bb0fd3044622f925cccd Test Dev <dev@test.local> 1789388996 +0200	commit (amend): test: ajout des tests unitaires unittest

@@ -1,54 +1,223 @@
-# Projet SAE application intélligente, sujet 8 
+# SAE - Application intelligente
 
-## Descriptif du projet :
+## Présentation
 
 ```
 L'objectif de cette SAÉ est de développer un outil en ligne de commande (CLI) ou une interface graphique locale capable d'automatiser la rédaction des messages de commit et la génération de notes de version (release notes).
 Les développeurs négligent souvent la qualité des messages de commit, ce qui rend l'historique du projet difficile à lire et la génération de changelogs fastidieuse. Le logiciel analysera les différences de code (git diff) pour déléguer cette tâche sémantique à un LLM.
+```
 
-Fonctionnalités principales :
+## Fonctionnalités principales :
+```
 Analyse de code : exécution et parsing de la commande git diff pour extraire les modifications locales avant le commit.
 Génération structurée : utilisation de gemma4:12b avec un prompt strict pour générer un message respectant la norme Conventional Commits (ex. feat: ajout du bouton de connexion).
 Synthèse de version : extraction de l'historique entre deux tags Git et génération d'un changelog organisé par catégories (Corrections, Nouveautés, Régressions) au format Markdown.
 Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibles (clés d'API) avant l'envoi au modèle.
 ```
-#### Auteurs du sujet :
-- ***Rémi Cozot***
-- ***Rémi Synave***
+## Auteurs du sujet
 
-## Lien du Trello :
-*https://trello.com/invite/b/6a9e6bc6e505a585bbe40bf8/ATTIa7cd65089f34fb9e4d5b7e8d388a9f602737B962/saesujet8applicationintelligente*
+- Rémi Cozot
+- Rémi Synave
 
-## Langages utilisés :
-- **GO en front-end**
-- **Python en back-end**
+## Membres du projet
 
-## Répartition des tâches
+- Dorian HEMBERT
+- Enzo CIUFFA
+- Maxence LAURENCE
 
-- **Dorian HEMBERT**
+## Documentation utilisateur & prise en main
 
-  * Mise en place et gestion du dépôt Git
-  * Mise en place et configuration du système de Git Hooks
-  * Détection et récupération des modifications avec `git diff`
-  * Analyse et structuration des informations issues des modifications
-  * Filtrage des fichiers binaires et des données sensibles
+- Guide complet d'utilisation et de présentation du CLI : **[docs/explication_go_cli.md](docs/explication_go_cli.md)**
 
-- **Enzo CIUFFA**
 
-  * Conception et mise en place des prompts destinés au LLM
-  * Encadrement des réponses de l'IA
-  * Génération des messages de commit selon la norme Conventional Commits
-  * Traitement et validation des réponses générées par le LLM
+### Démarrage rapide :
 
-- **Maxence LAURENCE**
+1. **Configuration d'environnement :**
+   Copiez le fichier modèle à la racine du projet :
+   ```bash
+   cp .env.exemple .env
+   ```
+   Ajustez au besoin l'URL du serveur Ollama (`OLLAMA_BASE_URL`), le modèle (`OLLAMA_MODEL`) ou la langue (`APP_LANGUAGE`).
 
-  * Développement du CLI
-  * Intégration des différentes parties de l'application
-  * Génération et affichage des notes de version (Release Notes)
-  * Gestion du Trello
-  * Tests du langage "Go"
+2. **Compilation du CLI :**
+   ```bash
+   cd src/cli && go build -o git-generator .
+   ```
 
-### Auteurs : 
-- **Dorian HEMBERT**
-- **Maxence LAURENCE**
-- **Enzo CIUFFA**
+3. **Exécution :**
+   ```bash
+   # Lancement standard (utilise les paramètres du .env à la racine) :
+   ./git-generator
+
+   # Lancement en forçant la simulation de l'interface (autonome, sans Git ni Python) :
+   ./git-generator --mockInterface
+
+   # Lancement en forçant la simulation de l'IA (Git réel, hors-ligne sans Ollama) :
+   ./git-generator --mockIA
+
+   # Lancement en ciblant un autre dépôt Git :
+   ./git-generator --repo /chemin/vers/un/autre/projet
+   ```
+
+   **Options disponibles :**
+   - `--repo <chemin>` : dépôt Git à analyser (par défaut `.`).
+   - `--mockInterface` : force la simulation complète de l'interface (mode démo sans Git ni Python).
+   - `--mockIA` : force la simulation de l'IA hors-ligne sans serveur Ollama (Git réel conservé).
+   - `--app-dir <chemin>` : racine de l'application Smart Commit (contenant le code et le `.env`). Détectée automatiquement dans 99% des cas pour garantir l'isolation complète du `.env`.
+
+4. **Exécution des tests :**
+   Tous les tests sont centralisés dans le dossier `test/` :
+   - **Tests Python (backend & wrapper Git)** :
+     ```bash
+     pytest -m "not slow"
+     ```
+   - **Tests Go (CLI, bridge & mock)** :
+     ```bash
+     cd test/cli && go test -v ./...
+     ```
+
+
+## Technologies
+
+- Go pour le frontend / CLI
+- Python pour le backend et la logique métier
+- Git pour la gestion des changements
+- MkDocs pour la documentation web
+- Pandoc pour la génération du PDF de documentation
+- GitHub Actions pour la CI/CD
+
+## Documentation du dépôt
+
+- [Documentation PDF complète](documentation.pdf)
+
+### Génération du PDF avant commit
+
+Le PDF est régénéré lors d'un commit qui modifie la documentation MkDocs, puis ajouté au même commit. Pour activer le hook dans votre clone :
+
+```bash
+python3 -m pip install -r requirements.txt
+./scripts/install_git_hooks.sh
+```
+
+Pandoc et XeLaTeX doivent également être installés. Sur Ubuntu/Debian :
+
+```bash
+sudo apt-get install pandoc texlive-xetex texlive-latex-recommended texlive-fonts-recommended lmodern
+```
+
+Le projet contient plusieurs niveaux de documentation, répartis selon leur objectif.
+
+### 1. Documentation générale et architecture
+
+- [doc_architecture.md](doc_architecture.md) : architecture documentaire du projet et règle de correspondance entre le code et la documentation
+- [docs/index.md](docs/index.md) : page d’accueil de la documentation MkDocs
+
+### 2. Documentation technique du code source
+
+La documentation technique du code est dans le dossier :
+
+- [docs/doc_src_files](docs/doc_src_files)
+
+Elle suit la même arborescence que le dossier source :
+
+- [src](src)
+- [docs/doc_src_files](docs/doc_src_files)
+
+Exemples :
+
+- [src/git_commit_release_notes_generator/config.py](src/git_commit_release_notes_generator/config.py)
+- [docs/doc_src_files/git_commit_release_notes_generator/config.md](docs/doc_src_files/git_commit_release_notes_generator/config.md)
+
+### 3. Documentation des tests
+
+La documentation des tests et cas de validation est dans :
+
+- [docs/doc_test_files](docs/doc_test_files)
+
+Elle correspond aux fichiers du dossier tests :
+
+- [test](test)
+- [docs/doc_test_files](docs/doc_test_files)
+
+### 4. Suivi de projet et sprints
+
+La documentation de suivi est dans :
+
+- [docs/monitoring](docs/monitoring)
+
+Elle contient les comptes-rendus de sprint et le suivi d’avancement du projet.
+
+### 5. CI, déploiement et documentation opérationnelle
+
+- [docs/deploiement_documentation.md](docs/deploiement_documentation.md) : documentation du déploiement de la doc
+- [docs/deploiement_tests_workflows.md](docs/deploiement_tests_workflows.md) : documentation de la CI / tests GitHub Actions
+- [docs/explication_go_cli.md](docs/explication_go_cli.md) : explication du CLI Go
+
+### 6. Documentation générée en PDF
+
+Le PDF de documentation est produit automatiquement via GitHub Actions à partir de la structure MkDocs. Il est généré sur les branches principales lors des push et des pull requests.
+
+La sortie attendue est un document unique de documentation, avec table des matières, dans un ordre cohérent selon la navigation MkDocs.
+
+## Arborescence principale
+
+```text
+.
+├── README.md
+├── contributing.md
+├── doc_architecture.md
+├── mkdocs.yml
+├── pytest.ini
+├── requirements.txt
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── src/
+│   └── cli/
+│   └── git_commit_release_notes_generator/
+├── test/
+├── docs/
+│   ├── index.md
+│   ├── deploiement_documentation.md
+│   ├── deploiement_tests_workflows.md
+│   ├── explication_go_cli.md
+│   ├── monitoring/
+│   ├── doc_src_files/
+│   └── doc_test_files/
+├── scripts/
+│   └── run_metrics.py
+└── .gitignore
+```
+
+voir plus dans le fichier [doc_architecture.md](doc_architecture.md)
+
+## Règle de documentation
+
+La documentation suit cette convention :
+
+- le code applicatif est dans [src](src)
+- la documentation technique correspondante est dans [docs/doc_src_files](docs/doc_src_files)
+- les tests sont dans [test](test)
+- leur documentation correspondante est dans [docs/doc_test_files](docs/doc_test_files)
+- le suivi projet est dans [docs/monitoring](docs/monitoring)
+- la documentation de déploiement et CI est dans [docs](docs)
+
+## Liens utiles
+
+- [Documentation MkDocs](docs/index.md)
+- [Architecture de documentation](doc_architecture.md)
+- [Déploiement de la documentation](docs/deploiement_documentation.md)
+- [Tests automatisés](docs/deploiement_tests_workflows.md)
+- [Projet GitHub](https://github.com/hembertd/SAE_sujet_8_application_intelligente)
+
+## Trello
+
+- https://trello.com/invite/b/6a9e6bc6e505a585bbe40bf8/ATTIa7cd65089f34fb9e4d5b7e8d388a9f602737B962/saesujet8applicationintelligente
+
+## Note
+
+La documentation est mise à jour au fil du projet. Si vous ajoutez un module ou un test, pensez à :
+
+- ajouter la documentation correspondante dans le dossier adéquat
+- mettre à jour la navigation MkDocs si nécessaire
+- vérifier que le PDF de documentation se régénère correctement via GitHub Actions

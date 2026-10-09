@@ -3,13 +3,15 @@ name: CI
 on:
   push:
     branches:
-      - main
-      - Dev
       - '**'
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
 
 jobs:
   go-tests:
@@ -51,9 +53,12 @@ jobs:
         run: python -m pytest -q
 
   documentation-build:
-    needs: go-tests
+    needs: [go-tests, python-tests]
     name: Build documentation site
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
 
     steps:
       - name: Checkout repository
@@ -132,3 +137,19 @@ jobs:
         uses: actions/upload-pages-artifact@v4
         with:
           path: site
+
+  deploy-docs:
+    name: Deploy documentation to GitHub Pages
+    needs: documentation-build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

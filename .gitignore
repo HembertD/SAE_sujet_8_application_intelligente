@@ -29,7 +29,6 @@ htmlcov/
 
 .env
 !.env.exemple
-!.env.example
 
 # IDE
 

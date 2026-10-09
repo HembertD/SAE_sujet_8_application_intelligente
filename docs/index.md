@@ -2,7 +2,7 @@
 
 Documentation du projet d'application intelligente.
 
-    Cette documentation présente l'architecture technique, les tests, le suivi de projet et les mécanismes de CI/CD associés.
+Cette documentation présente l'architecture technique, les tests, le suivi de projet et les mécanismes de CI/CD associés.
 
 ## Documentation technique
 

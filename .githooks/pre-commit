@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+if ! git diff --cached --name-only --diff-filter=ACMR \
+  | grep -Eq '^(mkdocs\.yml|docs/.*\.md|scripts/generate_documentation_pdf\.py)$'; then
+    exit 0
+fi
+
+if ! git diff --quiet -- mkdocs.yml docs/ scripts/generate_documentation_pdf.py \
+  || [ -n "$(git ls-files --others --exclude-standard -- mkdocs.yml docs/ scripts/generate_documentation_pdf.py)" ]; then
+    printf 'Stage all documentation changes before generating documentation.pdf.\n' >&2
+    exit 1
+fi
+
+repository_root=$(git rev-parse --show-toplevel)
+cd "$repository_root"
+
+python3 scripts/generate_documentation_pdf.py
+git add -- documentation.pdf

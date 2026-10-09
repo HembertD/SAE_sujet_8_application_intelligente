@@ -43,6 +43,7 @@ htmlcov/
 
 *.tmp
 *.temp
+.tmp-doc/
 
 # Secrets / certificats
 

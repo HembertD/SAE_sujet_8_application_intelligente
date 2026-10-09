@@ -29,9 +29,12 @@ from git_commit_release_notes_generator.ollama_client.exceptions import (
     CommitMessageValidationError,
     OllamaCallError,
 )
-from git_commit_release_notes_generator.ollama_client.llm import generate_commit_message
+from git_commit_release_notes_generator.ollama_client.llm import (
+    check_ollama_reachable,
+    generate_commit_message,
+    ping_ollama,
+)
 from git_commit_release_notes_generator.ollama_client.mock_llm import (
-    mock_ping,
     mock_release_notes,
 )
 from git_commit_release_notes_generator.service.git_wrapper import GitWrapper
@@ -169,6 +172,14 @@ def action_generate_commit(repo_path: str = ".", feedback: str = "") -> dict:
         return {
             "success": False,
             "error": "Aucune modification indexée (staged) exploitable pour le modèle LLM.",
+        }
+
+    reachable, ping_error = check_ollama_reachable()
+    if not reachable:
+        logger.warning(f"Serveur Ollama non joignable : {ping_error}")
+        return {
+            "success": False,
+            "error": ping_error or "Serveur Ollama non joignable.",
         }
 
     try:
@@ -355,14 +366,22 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
             "commit_count": len(commits),
         }
 
-    # Tentative d'inférence LLM si Ollama est joignable
+    # Vérification stricte de joignabilité d'Ollama avant génération
+    reachable, ping_error = check_ollama_reachable(timeout=3.0)
+    if not reachable:
+        logger.warning(f"Serveur Ollama non joignable pour release-notes : {ping_error}")
+        return {
+            "success": False,
+            "error": ping_error or "Serveur Ollama non joignable.",
+            "from_tag": from_tag,
+            "to_tag": to_tag,
+            "markdown": "",
+            "commit_count": 0,
+        }
+
+    # Tentative d'inférence LLM
     md_content: str | None = None
     try:
-        # Test rapide de connectivité avant inférence
-        v_req = urllib.request.Request(f"{OLLAMA_BASE_URL.rstrip('/')}/api/version", headers={"User-Agent": "SmartCommit/1.0"})
-        with urllib.request.urlopen(v_req, timeout=1.5):
-            pass
-
         commits_summary = "\n".join([f"- [{c.sha}] {c.message.splitlines()[0]}" for c in commits])
         prompt = (
             f"Rédige des Release Notes professionnelles au format Markdown en français pour la version {from_tag} -> {to_tag}.\n"
@@ -421,49 +440,15 @@ def action_save_config(base_url: str = "", model: str = "", timeout: str = "", l
 
 
 def action_ping_ollama() -> dict:
-    """Teste la connexion avec le serveur Ollama de l'IUT.
+    """Teste la connexion avec le serveur Ollama.
+
+    Délègue l'intégralité du diagnostic (vérification, mesure de latence et
+    récupération des modèles installés) à la fonction de ping unifiée.
 
     Format attendu côté Go :
     {"success": bool, "reachable": bool, "latency_ms": int, "installed_models": [str]}
     """
-    if config.MOCK_AI:
-        return mock_ping()
-
-    start_time = time.perf_counter()
-    installed_models: list[str] = []
-
-    try:
-        version_url = f"{OLLAMA_BASE_URL.rstrip('/')}/api/version"
-        req_v = urllib.request.Request(version_url, headers={"User-Agent": "SmartCommit/1.0"})
-        with urllib.request.urlopen(req_v, timeout=3.0) as resp:
-            _ = resp.read()
-
-        latency_ms = int((time.perf_counter() - start_time) * 1000)
-
-        tags_url = f"{OLLAMA_BASE_URL.rstrip('/')}/api/tags"
-        req_t = urllib.request.Request(tags_url, headers={"User-Agent": "SmartCommit/1.0"})
-        with urllib.request.urlopen(req_t, timeout=3.0) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            raw_models = data.get("models", [])
-            for m in raw_models:
-                if isinstance(m, dict) and "name" in m:
-                    installed_models.append(str(m["name"]))
-
-        return {
-            "success": True,
-            "reachable": True,
-            "latency_ms": latency_ms,
-            "installed_models": installed_models,
-        }
-    except Exception as e:
-        logger.debug(f"ping-ollama failed: {e}")
-        return {
-            "success": True,
-            "reachable": False,
-            "latency_ms": 0,
-            "installed_models": [],
-            "error": str(e),
-        }
+    return check_ollama_reachable(timeout=3.0, fetch_models=True).to_dict()
 
 
 def main() -> None:

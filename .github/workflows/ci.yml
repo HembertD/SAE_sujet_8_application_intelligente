@@ -86,7 +86,7 @@ jobs:
             echo "suffix=" >> "$GITHUB_OUTPUT"
           else
             echo "is_main=false" >> "$GITHUB_OUTPUT"
-            echo "suffix= *" >> "$GITHUB_OUTPUT"
+            echo "su  x= *" >> "$GITHUB_OUTPUT"
           fi
 
           echo "artifact_name=documentation-${branch_slug}" >> "$GITHUB_OUTPUT"
@@ -146,9 +146,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    environment: github-pages
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

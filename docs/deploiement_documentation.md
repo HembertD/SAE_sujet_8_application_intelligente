@@ -9,7 +9,7 @@ Le projet utilise MkDocs Material pour générer un site de documentation statiq
 ## Fichiers concernés
 
 - `mkdocs.yml` : configuration du site MkDocs
-- `.github/workflows/documentation.yml` : workflow GitHub Actions de build et déploiement
+- `.github/workflows/ci.yml` (jobs `documentation-build` et `deploy-docs`) : workflow GitHub Actions de build et déploiement
 - `docs/` : contenu Markdown de la documentation
 
 ## Configuration MkDocs
@@ -34,17 +34,17 @@ Le build MkDocs transforme les fichiers Markdown en un site statique dans le dos
 
 ## Workflow de déploiement
 
-Le workflow GitHub Actions est défini dans `.github/workflows/documentation.yml`.
+Le workflow GitHub Actions est défini dans `.github/workflows/ci.yml` (jobs `documentation-build` puis `deploy-docs`).
 
 ### Déclenchement
 
 Le build de documentation est exécuté lors de :
 
-- un `push` sur les branches `main` et `Dev`
-- un `pull_request` ciblant `main` ou `Dev`
+- un `push` sur toute branche (`branches: ['**']`)
+- un `pull_request` ciblant `main` ou `dev`
 - un déclenchement manuel via `workflow_dispatch`
 
-Le déploiement officiel sur GitHub Pages reste réservé à la branche `main`.
+Le déploiement officiel sur GitHub Pages (`deploy-docs` via `actions/deploy-pages@v4`) reste réservé à la branche `main`.
 
 ### Marqueur de version de développement
 
@@ -73,7 +73,7 @@ Cela permet d’exposer la documentation officielle en ligne, selon l’URL déf
 
 ## Résultat attendu
 
-Après un push ou un pull request sur `main` ou `Dev`, GitHub Actions reconstruit la documentation. Les branches hors `main` affichent un suffixe `*` pour indiquer qu’il s’agit d’une version de développement. Seule la branche `main` est déployée publiquement sur GitHub Pages.
+Après un push ou un pull request sur `main` ou `dev`, GitHub Actions reconstruit la documentation. Les branches hors `main` affichent un suffixe `*` pour indiquer qu’il s’agit d’une version de développement. Seule la branche `main` est déployée publiquement sur GitHub Pages.
 
 ## Bonnes pratiques
 

@@ -8,14 +8,13 @@ Le projet utilise l’intégration continue pour vérifier automatiquement la qu
 
 ## Workflows disponibles
 
-Deux workflows principaux sont présents dans le dossier `.github/workflows/` :
+Un seul workflow est présent dans le dossier `.github/workflows/` :
 
-- `ci.yml` : exécution des tests automatisés
-- `documentation.yml` : build et publication de la documentation
+- `ci.yml` : tests Go, tests Python et build/déploiement de la documentation (jobs `go-tests`, `python-tests`, `documentation-build`, `deploy-docs`)
 
 ## Workflow CI
 
-Le fichier `.github/workflows/ci.yml` est déclenché sur les pull requests ciblant les branches `main` et `Dev`.
+Le fichier `.github/workflows/ci.yml` est déclenché sur les `push` (toutes branches), les `pull_request` ciblant `main` et `dev`, et manuellement via `workflow_dispatch`.
 
 ### Jobs
 

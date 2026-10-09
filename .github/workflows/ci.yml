@@ -3,13 +3,15 @@ name: CI
 on:
   push:
     branches:
-      - main
-      - Dev
       - '**'
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
 
 jobs:
   go-tests:
@@ -45,15 +47,18 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install GitPython "pytest>=7.0.0" "PyYAML>=6.0.3"
 
       - name: Run pytest (hors tests slow, nécessitent le serveur Ollama de l'IUT)
         run: python -m pytest -q
 
   documentation-build:
-    needs: go-tests
+    needs: [go-tests, python-tests]
     name: Build documentation site
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
 
     steps:
       - name: Checkout repository
@@ -67,7 +72,7 @@ jobs:
       - name: Install MkDocs
         run: |
           python -m pip install --upgrade pip
-          pip install mkdocs-material
+          pip install "mkdocs>=1.6.1" "mkdocs-material>=9.6.4" "PyYAML>=6.0.3"
 
       - name: Set documentation metadata
         id: meta
@@ -81,7 +86,7 @@ jobs:
             echo "suffix=" >> "$GITHUB_OUTPUT"
           else
             echo "is_main=false" >> "$GITHUB_OUTPUT"
-            echo "suffix= *" >> "$GITHUB_OUTPUT"
+            echo "su  x= *" >> "$GITHUB_OUTPUT"
           fi
 
           echo "artifact_name=documentation-${branch_slug}" >> "$GITHUB_OUTPUT"
@@ -132,3 +137,17 @@ jobs:
         uses: actions/upload-pages-artifact@v4
         with:
           path: site
+
+  deploy-docs:
+    name: Deploy documentation to GitHub Pages
+    needs: documentation-build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment: github-pages
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

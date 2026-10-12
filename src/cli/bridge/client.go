@@ -19,7 +19,7 @@ type BackendClient interface {
 	Push() (*models.ActionResult, error)
 	GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNotesResponse, error)
 	GetConfig() (*models.ConfigResponse, error)
-	SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool, mockAI ...bool) (*models.ActionResult, error)
+	SaveConfig(baseURL, model string, timeout float64, mockInterface bool, mockAI ...bool) (*models.ActionResult, error)
 	PingOllama() (*models.PingResponse, error)
 	SaveMarkdownFile(filename, content string) error
 	IsMock() bool
@@ -143,9 +143,9 @@ func (b *BridgeClient) GetConfig() (*models.ConfigResponse, error) {
 }
 
 // SaveConfig persiste la nouvelle configuration dans le .env applicatif et actualise l'état du client.
-func (b *BridgeClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool, mockAI ...bool) (*models.ActionResult, error) {
+func (b *BridgeClient) SaveConfig(baseURL, model string, timeout float64, mockInterface bool, mockAI ...bool) (*models.ActionResult, error) {
 	envPath := FindAppEnvPath(b.appRoot)
-	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface, mockAI...); err != nil {
+	if err := WriteEnvFile(envPath, baseURL, model, timeout, mockInterface, mockAI...); err != nil {
 		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
 	}
 
@@ -161,7 +161,6 @@ func (b *BridgeClient) SaveConfig(baseURL, model string, timeout float64, lang s
 			"--base-url", baseURL,
 			"--model", model,
 			"--timeout", fmt.Sprintf("%f", timeout),
-			"--language", lang,
 		)
 	}
 

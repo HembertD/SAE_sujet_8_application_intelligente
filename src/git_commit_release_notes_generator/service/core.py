@@ -474,7 +474,7 @@ def main() -> None:
         "apply-commit": lambda: action_apply_commit(args.repo, message=args.message),
         "push": lambda: action_push(args.repo),
         "release-notes": lambda: action_release_notes(args.repo, from_tag=args.from_tag, to_tag=args.to_tag),
-        "save-config": lambda: action_save_config(args.base_url, args.model, args.timeout, args.language),
+        "save-config": lambda: action_save_config(args.base_url, args.model, args.timeout),
         "ping-ollama": action_ping_ollama,
     }
 

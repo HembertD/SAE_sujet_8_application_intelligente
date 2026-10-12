@@ -233,7 +233,7 @@ def test_unknown_action_exits_zero_with_error_json():
 
 
 def test_action_save_config():
-    result = core.action_save_config("http://localhost:11434", "gemma4:12b", "60", "fr")
+    result = core.action_save_config("http://localhost:11434", "gemma4:12b", "60")
     assert result["success"] is True
     assert "message" in result
 

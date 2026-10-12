@@ -175,7 +175,7 @@ func TestEnvFileReadWrite(t *testing.T) {
 	envPath := filepath.Join(tempDir, ".env")
 
 	// Écriture du fichier .env
-	err := bridge.WriteEnvFile(envPath, "http://localhost:11434", "mistral:latest", 45.0, "fr", true)
+	err := bridge.WriteEnvFile(envPath, "http://localhost:11434", "mistral:latest", 45.0, true)
 	if err != nil {
 		t.Fatalf("WriteEnvFile échoué : %v", err)
 	}
@@ -213,7 +213,7 @@ func TestBridgeClientSwitching(t *testing.T) {
 	}
 
 	// Activation du mode démo
-	res, err := bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, "fr", true)
+	res, err := bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, true)
 	if err != nil || !res.Success {
 		t.Fatalf("SaveConfig échoué : %v", err)
 	}
@@ -224,7 +224,7 @@ func TestBridgeClientSwitching(t *testing.T) {
 	}
 
 	// Bascule inverse
-	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, "fr", false)
+	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, false)
 	if err != nil {
 		t.Fatalf("SaveConfig échoué : %v", err)
 	}
@@ -233,7 +233,7 @@ func TestBridgeClientSwitching(t *testing.T) {
 	}
 
 	// Test de sauvegarde conjointe de MockInterface et MockAI
-	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, "fr", false, true)
+	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, false, true)
 	if err != nil {
 		t.Fatalf("SaveConfig échoué avec MockAI : %v", err)
 	}
@@ -292,7 +292,7 @@ func TestAppEnvIsolationFromTargetRepo(t *testing.T) {
 	client := bridge.NewBackendClientWithAppRoot(targetRepo, appRoot, true)
 
 	// Sauvegarde d'une configuration
-	_, err := client.SaveConfig("http://10.22.28.190:11434", "qwen3.8:27b", 250.0, "fr", true)
+	_, err := client.SaveConfig("http://10.22.28.190:11434", "qwen3.8:27b", 250.0, true)
 	if err != nil {
 		t.Fatalf("SaveConfig a échoué : %v", err)
 	}
@@ -336,7 +336,7 @@ func TestAppEnvNeverInSrc(t *testing.T) {
 
 	// Tenter d'écrire en forçant un chemin contenant /src/.env
 	forcedSrcPath := filepath.Join(root, "src", ".env")
-	err := bridge.WriteEnvFile(forcedSrcPath, "http://localhost:11434", "gemma4:12b", 30.0, "fr", true)
+	err := bridge.WriteEnvFile(forcedSrcPath, "http://localhost:11434", "gemma4:12b", 30.0, true)
 	if err != nil {
 		t.Fatalf("WriteEnvFile a échoué: %v", err)
 	}

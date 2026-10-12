@@ -30,7 +30,6 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		lines = append(lines, fmt.Sprintf("  • %sURL Serveur Ollama%s : %s%s%s", ui.Bold, ui.Reset, ui.Cyan, cfg.OllamaBaseURL, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sModèle LLM%s        : %s%s%s", ui.Bold, ui.Reset, ui.Yellow, cfg.OllamaModel, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sTimeout requête%s   : %.0fs", ui.Bold, ui.Reset, cfg.TimeoutS))
-		lines = append(lines, fmt.Sprintf("  • %sLangue%s            : %s", ui.Bold, ui.Reset, cfg.Language))
 
 		mockInterfaceColor := ui.Green
 		mockInterfaceStatus := "Désactivé"
@@ -119,13 +118,6 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				}
 			}
 
-			fmt.Printf("  Langue (fr/en) [%s] : ", cfg.Language)
-			newLang, _ := reader.ReadString('\n')
-			newLang = strings.TrimSpace(newLang)
-			if newLang != "" {
-				cfg.Language = newLang
-			}
-
 			fmt.Printf("  Mock Interface (true/false) [%t] : ", cfg.MockInterface)
 			newMockInterfaceStr, _ := reader.ReadString('\n')
 			newMockInterfaceStr = strings.TrimSpace(newMockInterfaceStr)
@@ -144,7 +136,7 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 			spinnerSave := ui.NewSpinner("Sauvegarde des paramètres dans le .env...")
 			spinnerSave.Start()
-			res, saveErr := client.SaveConfig(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.Language, cfg.MockInterface, cfg.MockAI)
+			res, saveErr := client.SaveConfig(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.MockInterface, cfg.MockAI)
 			spinnerSave.Stop("")
 
 			if saveErr != nil {

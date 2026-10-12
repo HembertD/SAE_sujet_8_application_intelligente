@@ -212,7 +212,6 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 		OllamaBaseURL: "http://10.22.28.190:11434",
 		OllamaModel:   "gemma4:26b",
 		TimeoutS:      300.0,
-		Language:      "fr",
 		MockInterface: isMockActive,
 		MockAI:        ReadMockAISettingFromEnv(appRoot),
 	}
@@ -248,10 +247,6 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 					if _, errParse := fmt.Sscanf(v, "%f", &t); errParse == nil {
 						cfg.TimeoutS = t
 					}
-				case "APP_LANGUAGE":
-					if v != "" {
-						cfg.Language = v
-					}
 				case "MOCK_INTERFACE", "MOCKAGE_INTERFACE":
 					if os.Getenv("MOCK_INTERFACE") == "" && os.Getenv("MOCKAGE_INTERFACE") == "" {
 						cfg.MockInterface = ParseBoolFromString(v)
@@ -269,7 +264,7 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 }
 
 // WriteEnvFile réécrit le fichier .env STRICTEMENT à la racine du projet.
-func WriteEnvFile(envPath string, baseURL, model string, timeout float64, lang string, mockInterface bool, mockAIArgs ...bool) error {
+func WriteEnvFile(envPath string, baseURL, model string, timeout float64, mockInterface bool, mockAIArgs ...bool) error {
 	cleanPath := filepath.Clean(envPath)
 	dir := filepath.Dir(cleanPath)
 	for filepath.Base(dir) == "src" || filepath.Base(dir) == "cli" {
@@ -295,15 +290,12 @@ OLLAMA_BASE_URL=%s
 OLLAMA_MODEL=%s
 OLLAMA_TIMEOUT_S=%.0f
 
-# Langue de l'application (fr / en)
-APP_LANGUAGE=%s
-
 # Mode hors-ligne / démo interface (true / false)
 MOCK_INTERFACE=%t
 
 # Simulation de l'IA hors-ligne (true / false)
 MOCK_AI=%t
-`, baseURL, model, timeout, lang, mockInterface, mockAI)
+`, baseURL, model, timeout, mockInterface, mockAI)
 
 	if err := os.WriteFile(cleanPath, []byte(content), 0644); err != nil {
 		return err

@@ -23,6 +23,17 @@ Le fichier `mkdocs.yml` définit :
 
 Le build MkDocs transforme les fichiers Markdown en un site statique dans le dossier `site/`.
 
+## Prérequis : activation manuelle de GitHub Pages (une seule fois)
+
+!!! warning "À faire par un administrateur du dépôt"
+	Avant le premier déploiement, GitHub Pages doit être activé manuellement, car le `GITHUB_TOKEN` du workflow n'a pas le droit de créer le site lui-même (erreur `Resource not accessible by integration` dans `actions/configure-pages` sinon) :
+
+	1. Aller sur **Settings > Pages** du dépôt.
+	2. Dans **Build and deployment**, mettre **Source = `GitHub Actions`**.
+	3. Relancer le workflow `CI` (automatique au prochain push sur `main`, ou manuel via **Actions > CI > Run workflow** sur `main`).
+
+	Le site est ensuite disponible à l'adresse configurée dans `mkdocs.yml` (`site_url`), soit <https://hembertd.github.io/SAE_sujet_8_application_intelligente/>.
+
 ## Prérequis du PDF versionné
 
 !!! warning "Important"

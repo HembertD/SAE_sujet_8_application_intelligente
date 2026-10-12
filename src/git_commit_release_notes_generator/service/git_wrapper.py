@@ -86,9 +86,13 @@ class GitWrapper:
             if not file_path:
                 file_path = old_file
 
-            if "new file mode" in section:
+            # Les marqueurs "new/deleted file mode" sont des en-têtes Git en début
+            # de ligne : on ne doit pas matcher le contenu ajouté/supprimé
+            # (lignes préfixées par "+" / "-") qui citerait ces mêmes mots.
+            section_lines = section.splitlines()
+            if any(line.startswith("new file mode") for line in section_lines):
                 status = "A"
-            elif "deleted file mode" in section:
+            elif any(line.startswith("deleted file mode") for line in section_lines):
                 status = "D"
             elif old_path == "/dev/null":
                 status = "A"

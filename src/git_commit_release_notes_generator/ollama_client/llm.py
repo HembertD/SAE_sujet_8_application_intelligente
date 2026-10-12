@@ -8,21 +8,30 @@ la bonne volonté du LLM.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import json
 import logging
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
+from git_commit_release_notes_generator import config
 from git_commit_release_notes_generator.config import (
     OLLAMA_BASE_URL,
     OLLAMA_MODEL,
+    OLLAMA_NUM_CTX,
     OLLAMA_TIMEOUT_S,
 )
 from git_commit_release_notes_generator.models import CommitMessage, DiffFile
 from git_commit_release_notes_generator.ollama_client.exceptions import (
     CommitMessageValidationError,
     OllamaCallError,
+)
+from git_commit_release_notes_generator.ollama_client.mock_llm import (
+    mock_call_chat,
+    mock_generate_commit_message,
+    mock_ping,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,6 +42,7 @@ _ALLOWED_TYPES = {
     "feat", "fix", "chore", "docs", "refactor", "test", "perf", "build", "ci",
 }
 _MAX_SUBJECT_LENGTH = 72
+_PING_TIMEOUT_S = 3.0
 
 _JSON_SCHEMA = {
     "type": "object",
@@ -47,7 +57,101 @@ _JSON_SCHEMA = {
 }
 
 
-def generate_commit_message(diff_files: list[DiffFile]) -> CommitMessage:
+@dataclass
+class PingResult:
+    """Résultat de la vérification de joignabilité d'Ollama.
+
+    Permet à la fois l'accès par attributs (.reachable, .latency_ms, .error, .installed_models)
+    et le déballage direct en tuple (reachable, error) pour une compatibilité totale.
+    """
+    reachable: bool
+    error: str | None = None
+    latency_ms: int = 0
+    installed_models: list[str] = field(default_factory=list)
+
+    def __iter__(self):
+        return iter((self.reachable, self.error))
+
+    def __getitem__(self, index):
+        return (self.reachable, self.error)[index]
+
+    def __eq__(self, other):
+        if isinstance(other, tuple) and len(other) == 2:
+            return (self.reachable, self.error) == other
+        return super().__eq__(other)
+
+    def to_dict(self) -> dict:
+        """Formate le résultat en dictionnaire pour le CLI Go."""
+        data = {
+            "success": True,
+            "reachable": self.reachable,
+            "latency_ms": self.latency_ms,
+            "installed_models": self.installed_models,
+        }
+        if self.error:
+            data["error"] = self.error
+        return data
+
+
+def check_ollama_reachable(timeout: float = _PING_TIMEOUT_S, fetch_models: bool = False) -> PingResult:
+    """Vérifie la joignabilité du serveur Ollama et optionnellement les modèles installés.
+
+    Mesure la latence en millisecondes et retourne un PingResult.
+    Peut être déballé comme un tuple `reachable, error = check_ollama_reachable()`
+    ou manipulé avec ses attributs (`res.reachable`, `res.latency_ms`, `res.error`, `res.installed_models`).
+    Ne lève jamais d'exception.
+    """
+    if config.MOCK_AI:
+        mock_data = mock_ping()
+        models = mock_data.get("installed_models", []) if fetch_models else []
+        return PingResult(reachable=True, latency_ms=10, installed_models=models)
+
+    start = time.perf_counter()
+    try:
+        req = urllib.request.Request(
+            f"{OLLAMA_BASE_URL.rstrip('/')}/api/version",
+            headers={"User-Agent": "SmartCommit/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            _ = resp.read()
+        latency_ms = int((time.perf_counter() - start) * 1000)
+
+        installed_models: list[str] = []
+        if fetch_models:
+            try:
+                tags_url = f"{OLLAMA_BASE_URL.rstrip('/')}/api/tags"
+                req_t = urllib.request.Request(tags_url, headers={"User-Agent": "SmartCommit/1.0"})
+                with urllib.request.urlopen(req_t, timeout=timeout) as resp_t:
+                    data = json.loads(resp_t.read().decode("utf-8"))
+                    raw_models = data.get("models", [])
+                    for m in raw_models:
+                        if isinstance(m, dict) and "name" in m:
+                            installed_models.append(str(m["name"]))
+            except Exception as e:
+                logger.debug(f"Impossible de récupérer les modèles Ollama : {e}")
+
+        return PingResult(reachable=True, latency_ms=latency_ms, installed_models=installed_models)
+    except urllib.error.URLError as e:
+        return PingResult(
+            reachable=False,
+            error=f"Serveur Ollama non joignable à {OLLAMA_BASE_URL} : {e}",
+            latency_ms=0,
+            installed_models=[],
+        )
+    except Exception as e:
+        return PingResult(
+            reachable=False,
+            error=f"Serveur Ollama non joignable à {OLLAMA_BASE_URL} : {e}",
+            latency_ms=0,
+            installed_models=[],
+        )
+
+
+# Alias sémantique
+ping_ollama = check_ollama_reachable
+
+
+def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> CommitMessage:
     """Génère un CommitMessage validé à partir d'une liste de DiffFile.
 
     Un seul retry est tenté en cas d'échec de validation, en réinjectant
@@ -55,11 +159,22 @@ def generate_commit_message(diff_files: list[DiffFile]) -> CommitMessage:
     lève CommitMessageValidationError plutôt que de renvoyer un message
     bancal en silence.
     """
+    if not diff_files:
+        raise ValueError("generate_commit_message() nécessite au moins un DiffFile.")
+
+    if config.MOCK_AI:
+        return mock_generate_commit_message(diff_files, feedback=feedback)
+
     system_prompt = _PROMPT_PATH.read_text(encoding="utf-8")
     messages: list[dict] = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": _build_diff_summary(diff_files)},
     ]
+    if feedback and feedback.strip():
+        messages.append({
+            "role": "user",
+            "content": f"Consigne additionnelle de révision : {feedback.strip()}",
+        })
 
     raw = _call_chat(messages)
     error = _validate(raw)
@@ -94,11 +209,18 @@ def _build_diff_summary(diff_files: list[DiffFile]) -> str:
 
 
 def _call_chat(messages: list[dict]) -> dict:
+    if config.MOCK_AI:
+        return mock_call_chat(messages)
+
     body = {
         "model": OLLAMA_MODEL,
         "messages": messages,
         "stream": False,
         "format": _JSON_SCHEMA,
+        # Sans ça, Ollama utilise sa fenêtre de contexte par défaut (souvent
+        # bien plus petite que les 262K annoncés pour gemma4:26b) et tronque
+        # silencieusement le début du diff sur les cas volumineux.
+        "options": {"num_ctx": OLLAMA_NUM_CTX},
     }
     request = urllib.request.Request(
         url=f"{OLLAMA_BASE_URL}/api/chat",

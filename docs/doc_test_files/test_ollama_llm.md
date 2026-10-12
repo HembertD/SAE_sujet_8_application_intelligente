@@ -12,6 +12,7 @@ Ce module couvre la logique de validation et d’interaction avec le client Olla
 - le mécanisme de retry lorsqu’une réponse est invalide ;
 - l’échec après plusieurs réponses invalides ;
 - les règles de validation du message (`type`, `scope`, `subject`) ;
+- la vérification de joignabilité rapide et extraction des modèles via `check_ollama_reachable()` / `ping_ollama()` (succès, échec réseau, mesure de latence, récupération des modèles avec `fetch_models`, sérialisation `to_dict`, compatibilité tuple) ;
 - la compatibilité avec les anciennes structures de données binaires.
 
 ## Stratégie de test

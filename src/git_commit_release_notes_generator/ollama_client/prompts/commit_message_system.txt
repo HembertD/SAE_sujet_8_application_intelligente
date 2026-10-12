@@ -5,6 +5,15 @@ binaire ni donnée sensible).
 Réponds uniquement avec un objet JSON respectant strictement le schéma fourni :
 - "type" : le type de commit le plus pertinent parmi la liste autorisée
   (feat, fix, chore, docs, refactor, test, perf, build, ci).
+  Distinctions à respecter strictement :
+  - "fix" si le diff corrige un comportement incorrect ou un bug existant
+    (résultat faux, crash, cas limite mal géré), même si ça ajoute des
+    lignes de code. "feat" seulement si une capacité nouvelle est ajoutée,
+    pas une correction.
+  - "build" seulement pour les fichiers de packaging/dépendances
+    (requirements.txt, pyproject.toml, package.json, Dockerfile). Pour
+    tout autre outillage de maintenance (Makefile, scripts, configuration
+    de tâches), utilise "chore".
 - "scope" : le module ou composant principalement concerné, en un mot,
   ou null si aucun scope clair ne se dégage.
 - "subject" : une description courte et impérative du changement, en

@@ -6,6 +6,7 @@ Les tests contre le vrai serveur sont marqués `@pytest.mark.slow` ailleurs.
 """
 import json
 import sys
+import urllib.error
 from pathlib import Path
 
 import pytest
@@ -89,6 +90,65 @@ def test_validate_rejects_unknown_type():
 def test_validate_accepts_well_formed_message():
     error = llm._validate({"type": "docs", "subject": "met à jour le README"})
     assert error is None
+
+
+def test_check_ollama_reachable_true_when_server_responds(monkeypatch):
+    monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: _FakeResponse({}))
+
+    res = llm.check_ollama_reachable()
+
+    assert res.reachable is True
+    assert res.error is None
+    assert res.latency_ms >= 0
+    # Vérifie le déballage en tuple (compatible avec le code existant)
+    reachable, error = res
+    assert reachable is True
+    assert error is None
+    # Vérifie la comparaison directe avec tuple
+    assert res == (True, None)
+
+
+def test_check_ollama_reachable_false_on_network_error(monkeypatch):
+    def _raise(*a, **k):
+        raise urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", _raise)
+
+    res = llm.check_ollama_reachable()
+
+    assert res.reachable is False
+    assert "non joignable" in res.error
+    assert res.latency_ms == 0
+    # Déballage tuple
+    reachable, error = res
+    assert reachable is False
+    assert "non joignable" in error
+
+
+def test_check_ollama_reachable_with_models(monkeypatch):
+    responses = [
+        _FakeResponse({"version": "0.1.30"}),
+        _FakeResponse({"models": [{"name": "llama3:latest"}, {"name": "mistral:7b"}]}),
+    ]
+    monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: responses.pop(0))
+
+    res = llm.check_ollama_reachable(fetch_models=True)
+
+    assert res.reachable is True
+    assert res.installed_models == ["llama3:latest", "mistral:7b"]
+    d = res.to_dict()
+    assert d["success"] is True
+    assert d["reachable"] is True
+    assert d["installed_models"] == ["llama3:latest", "mistral:7b"]
+
+
+def test_ping_ollama_alias():
+    assert llm.ping_ollama is llm.check_ollama_reachable
+
+
+def test_generate_commit_message_rejects_empty_diff_list():
+    with pytest.raises(ValueError):
+        llm.generate_commit_message([])
 
 
 def test_diff_file_accepts_legacy_binary_keyword():

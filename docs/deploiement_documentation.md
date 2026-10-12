@@ -69,10 +69,11 @@ Quand la documentation est générée depuis une branche autre que `main`, le ti
 1. `actions/checkout` : récupération du code source
 2. `actions/setup-python` : installation de Python 3.12
 3. installation de MkDocs Material
-4. ajout du marqueur `*` pour les branches non principales
-5. exécution de `mkdocs build`
-6. publication d’un artefact de prévisualisation pour validation
-7. publication sur GitHub Pages uniquement sur `main`
+4. ajout du marqueur `*` pour les branches non principales et détection automatique des nouveaux suivis de sprint (`docs/monitoring/sprint-*.md` ajoutés à la navigation sans modifier `mkdocs.yml`)
+5. copie du PDF versionné (`documentation.pdf` à la racine) vers `docs/documentation.pdf` pour exposition sur le site
+6. exécution de `mkdocs build`
+7. publication d’un artefact de prévisualisation pour validation
+8. publication sur GitHub Pages uniquement sur `main`
 
 ### Étapes du job `deploy`
 
@@ -97,6 +98,7 @@ Après un push ou un pull request sur `main` ou `dev`, GitHub Actions reconstrui
 Pour construire le site en local :
 
 ```bash
+cp documentation.pdf docs/documentation.pdf # expose le lien PDF de l'accueil
 mkdocs build
 ```
 

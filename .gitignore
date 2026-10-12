@@ -44,6 +44,9 @@ htmlcov/
 *.temp
 .tmp-doc/
 
+# Copie du PDF versionné pour le site MkDocs (générée par la CI avant `mkdocs build`)
+docs/documentation.pdf
+
 # Secrets / certificats
 
 *.pem

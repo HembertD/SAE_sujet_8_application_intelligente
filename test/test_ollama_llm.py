@@ -151,6 +151,59 @@ def test_generate_commit_message_rejects_empty_diff_list():
         llm.generate_commit_message([])
 
 
+def test_feedback_with_explicit_type_overrides_model_choice(monkeypatch):
+    # Le modèle persiste sur "feat" malgré la consigne demandant un "fix".
+    model_answer = {"type": "feat", "scope": "auth", "subject": "ajout du login", "body": None}
+    monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: _FakeResponse(_ollama_payload(model_answer)))
+
+    result = llm.generate_commit_message(SAMPLE_DIFF, feedback="c'est un fix, je veux un fix")
+
+    assert result.type == "fix"
+
+
+def test_feedback_without_type_keyword_does_not_override(monkeypatch):
+    model_answer = {"type": "feat", "scope": "auth", "subject": "ajout du login", "body": None}
+    monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: _FakeResponse(_ollama_payload(model_answer)))
+
+    result = llm.generate_commit_message(SAMPLE_DIFF, feedback="améliore le message, il manque des détails")
+
+    assert result.type == "feat"
+
+
+def test_feedback_with_contradictory_types_does_not_override(monkeypatch):
+    model_answer = {"type": "feat", "scope": "auth", "subject": "ajout du login", "body": None}
+    monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: _FakeResponse(_ollama_payload(model_answer)))
+
+    result = llm.generate_commit_message(SAMPLE_DIFF, feedback="je sais pas, c'est un fix ou c'est un feat")
+
+    assert result.type == "feat"
+
+
+def test_feedback_mentioning_type_as_plain_word_does_not_override(monkeypatch):
+    # "test" est un mot français courant : sa simple présence (sans formulation
+    # d'intention du type "c'est un test"/"je veux un test") ne doit pas
+    # déclencher d'override, sinon toute mention anodine du mot casserait le type.
+    model_answer = {"type": "feat", "scope": "auth", "subject": "ajout du login", "body": None}
+    monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: _FakeResponse(_ollama_payload(model_answer)))
+
+    result = llm.generate_commit_message(SAMPLE_DIFF, feedback="Consigne de test")
+
+    assert result.type == "feat"
+
+
+def test_extract_forced_type_single_keyword():
+    assert llm._extract_forced_type("c'est un fix") == "fix"
+    assert llm._extract_forced_type("je veux un feat") == "feat"
+    assert llm._extract_forced_type("type: chore") == "chore"
+
+
+def test_extract_forced_type_none_when_absent_or_ambiguous():
+    assert llm._extract_forced_type("corrige le body") is None
+    assert llm._extract_forced_type("") is None
+    assert llm._extract_forced_type("Consigne de test") is None
+    assert llm._extract_forced_type("c'est un fix ou c'est un feat") is None
+
+
 def test_diff_file_accepts_legacy_binary_keyword():
     diff = DiffFile(path="image.png", status="A", added=0, removed=0, binary=True, patch="binary patch")
 

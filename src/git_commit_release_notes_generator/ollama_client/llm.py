@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 import logging
+import re
 import time
 import urllib.error
 import urllib.request
@@ -48,6 +49,33 @@ _JSON_SCHEMA = {
     "additionalProperties": False,
 }
 
+_TYPE_INTENT_PREFIX = (
+    r"(?:c'est|c'était|il faut que ce soit|je veux|je voudrais|"
+    r"mets(?: ça)?(?: en)?|type\s*[:=])\s*(?:un\s+|une\s+|du\s+|de\s+)?"
+)
+
+_TYPE_KEYWORD_PATTERNS = {
+    t: re.compile(_TYPE_INTENT_PREFIX + re.escape(t) + r"\b", re.IGNORECASE) for t in _ALLOWED_TYPES
+}
+
+
+def _extract_forced_type(feedback: str) -> str | None:
+    if not feedback:
+        return None
+    found = {t for t, pattern in _TYPE_KEYWORD_PATTERNS.items() if pattern.search(feedback)}
+    return found.pop() if len(found) == 1 else None
+
+
+def _apply_forced_type(msg: CommitMessage, forced_type: str | None) -> CommitMessage:
+    if forced_type and msg.type != forced_type:
+        logger.info(
+            "Type imposé par le feedback utilisateur : %s (le modèle avait proposé %s).",
+            forced_type, msg.type,
+        )
+        msg.type = forced_type
+    return msg
+
+
 @dataclass
 class PingResult:
     reachable: bool
@@ -76,6 +104,7 @@ class PingResult:
         if self.error:
             data["error"] = self.error
         return data
+
 
 def check_ollama_reachable(timeout: float = _PING_TIMEOUT_S, fetch_models: bool = False) -> PingResult:
     if config.MOCK_AI:
@@ -123,14 +152,19 @@ def check_ollama_reachable(timeout: float = _PING_TIMEOUT_S, fetch_models: bool 
             installed_models=[],
         )
 
+
 ping_ollama = check_ollama_reachable
+
 
 def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> CommitMessage:
     if not diff_files:
         raise ValueError("generate_commit_message() nécessite au moins un DiffFile.")
 
+    forced_type = _extract_forced_type(feedback)
+
     if config.MOCK_AI:
-        return mock_generate_commit_message(diff_files, feedback=feedback)
+        mock_msg = mock_generate_commit_message(diff_files, feedback=feedback)
+        return _apply_forced_type(mock_msg, forced_type)
 
     system_prompt = _PROMPT_PATH.read_text(encoding="utf-8")
     messages: list[dict] = [
@@ -146,7 +180,7 @@ def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> C
     raw = _call_chat(messages)
     error = _validate(raw)
     if error is None:
-        return _to_commit_message(raw)
+        return _apply_forced_type(_to_commit_message(raw), forced_type)
 
     logger.warning("Génération invalide (%s), tentative de retry.", error)
     messages.append({"role": "assistant", "content": json.dumps(raw, ensure_ascii=False)})
@@ -164,7 +198,8 @@ def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> C
         raise CommitMessageValidationError(
             f"Échec de validation après retry : {error}. Réponse brute : {raw!r}"
         )
-    return _to_commit_message(raw)
+    return _apply_forced_type(_to_commit_message(raw), forced_type)
+
 
 def _build_diff_summary(diff_files: list[DiffFile]) -> str:
     parts = [
@@ -172,6 +207,7 @@ def _build_diff_summary(diff_files: list[DiffFile]) -> str:
         for f in diff_files
     ]
     return "\n\n".join(parts)
+
 
 def _call_chat(messages: list[dict]) -> dict:
     if config.MOCK_AI:
@@ -211,6 +247,7 @@ def _call_chat(messages: list[dict]) -> dict:
     except json.JSONDecodeError as e:
         raise OllamaCallError(f"Contenu non-JSON malgré le format contraint : {content!r}") from e
 
+
 def _validate(raw: dict) -> str | None:
     commit_type = raw.get("type")
     if commit_type not in _ALLOWED_TYPES:
@@ -225,6 +262,7 @@ def _validate(raw: dict) -> str | None:
         return "subject ne doit pas se terminer par un point"
 
     return None
+
 
 def _to_commit_message(raw: dict) -> CommitMessage:
     return CommitMessage(

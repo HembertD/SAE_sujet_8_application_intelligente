@@ -40,3 +40,10 @@ Les objets de ce module servent de contrat entre :
 - l’assemblage final du message de commit.
 
 Ils évitent les chaînes non structurées et rendent le code plus robuste et testable.
+
+## Détails déplacés du code source
+
+- Contrat d'équipe : ne pas modifier ces structures sans en discuter avec l'équipe. `DiffFile` est produit par le module de parsing Git (module B) et `CommitMessage` est consommé par la couche d'affichage Go.
+- `DiffFile.status` : codes de statut Git (`A`, `M`, `D`, `R`, etc.). Le constructeur accepte `is_binary` ou l'alias `binary` (mot-clé uniquement) ; si les deux sont fournis avec des valeurs divergentes, il lève `TypeError`, sinon `is_binary` prime, défaut `False`.
+- Propriété `DiffFile.binary` : alias rétrocompatible avec l'ancien contrat historique, renvoie `is_binary`.
+- `CommitMessage.type` : types Conventional Commits (`feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `build`, `ci`).

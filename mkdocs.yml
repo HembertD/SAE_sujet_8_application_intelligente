@@ -56,6 +56,7 @@ nav:
                   - utils: doc_src_files/git_commit_release_notes_generator/service/utils.md
           - Scripts:
               - Métriques: doc_scripts_files/run_metrics.md
+              - PDF: doc_scripts_files/generate_documentation_pdf.md
       - CLI Go (guide): explication_go_cli.md
 
       - Tests:
@@ -84,3 +85,4 @@ nav:
       - Sprint 01: monitoring/sprint-01.md
       - Sprint 02: monitoring/sprint-02.md
       - Sprint 03: monitoring/sprint-03.md
+      - Sprint 04: monitoring/sprint-04.md

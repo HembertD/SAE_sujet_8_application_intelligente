@@ -1,31 +1,24 @@
-"""Configuration du module C (client Ollama), lue directement depuis le fichier .env."""
 import os
 from pathlib import Path
 
-
 def parse_bool(val: str | bool | None) -> bool:
-    """Convertit une chaîne ou booléen en bool (ex: 'true', 'TRUE', '1', 'yes', 'oui')."""
     if isinstance(val, bool):
         return val
     if not val:
         return False
     return str(val).strip().lower() in ("true", "1", "yes", "oui")
 
-
 def load_env() -> dict[str, str]:
-    """Charge les paramètres de configuration depuis le fichier .env de l'application."""
-    base_dir = Path(__file__).resolve().parent  # src/git_commit_release_notes_generator
-    app_root = base_dir.parent.parent  # racine du dépôt de l'application
+    base_dir = Path(__file__).resolve().parent
+    app_root = base_dir.parent.parent
 
     candidates: list[Path] = []
 
-    # 1. Chemin racine explicite transmis via l'environnement (ex: par le Go CLI)
     custom_root = os.environ.get("SMART_COMMIT_APP_ROOT")
     if custom_root:
         c_path = Path(custom_root)
         candidates.append(c_path / ".env")
 
-    # 2. Emplacement standard : strictement à la racine du dépôt du projet
     candidates.append(app_root / ".env")
 
     env_data: dict[str, str] = {}
@@ -52,7 +45,6 @@ def load_env() -> dict[str, str]:
             except Exception:
                 pass
 
-    # Surcharge optionnelle par l'environnement système direct (si défini explicitement)
     for k in (
         "OLLAMA_BASE_URL",
         "OLLAMA_MODEL",
@@ -67,7 +59,6 @@ def load_env() -> dict[str, str]:
 
     return env_data
 
-
 ENV = load_env()
 
 if "OLLAMA_BASE_URL" not in ENV:
@@ -77,10 +68,6 @@ if "OLLAMA_MODEL" not in ENV:
 if "OLLAMA_TIMEOUT_S" not in ENV:
     ENV["OLLAMA_TIMEOUT_S"] = "300"
 if "OLLAMA_NUM_CTX" not in ENV:
-    # Ollama utilise par défaut une fenêtre de contexte réduite (souvent 2048-4096
-    # tokens selon le Modelfile) même si le modèle en supporte 262K. Sans ce
-    # paramètre explicite, un diff un peu volumineux peut dépasser la limite
-    # silencieusement (le contexte le plus ancien est tronqué par le serveur).
     ENV["OLLAMA_NUM_CTX"] = "32768"
 if "APP_LANGUAGE" not in ENV:
     ENV["APP_LANGUAGE"] = "fr"
@@ -93,6 +80,3 @@ OLLAMA_TIMEOUT_S = float(ENV["OLLAMA_TIMEOUT_S"])
 OLLAMA_NUM_CTX = int(ENV["OLLAMA_NUM_CTX"])
 APP_LANGUAGE = ENV["APP_LANGUAGE"]
 MOCK_AI = parse_bool(ENV.get("MOCK_AI", "false"))
-
-
-

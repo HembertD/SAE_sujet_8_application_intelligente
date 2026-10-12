@@ -7,7 +7,6 @@ import (
 	"sae-git-cli/models"
 )
 
-// PrintBanner affiche la bannière stylisée principale en haut du TUI
 func PrintBanner(repoStatus *models.RepoStatus) {
 	width := 72
 	fmt.Println(Cyan + "╭" + strings.Repeat("─", width-2) + "╮" + Reset)
@@ -38,7 +37,6 @@ func PrintBanner(repoStatus *models.RepoStatus) {
 	fmt.Println()
 }
 
-// PrintCard affiche un panneau encadré avec titre et lignes de contenu
 func PrintCard(title string, lines []string, width int, borderColor string) {
 	if borderColor == "" {
 		borderColor = Cyan
@@ -59,7 +57,6 @@ func PrintCard(title string, lines []string, width int, borderColor string) {
 	fmt.Println(borderColor + "╰" + strings.Repeat("─", width-2) + "╯" + Reset)
 }
 
-// PrintDiffTable affiche les fichiers modifiés avec coloration de statut
 func PrintDiffTable(files []models.DiffFile, width int) {
 	if len(files) == 0 {
 		PrintWarning("Aucun fichier indexé (staged) pour le moment.")
@@ -103,7 +100,6 @@ func PrintDiffTable(files []models.DiffFile, width int) {
 	PrintCard("Modifications Staged", lines, width, Blue)
 }
 
-// PrintCommitCard affiche le message de commit structuré proposé par l'IA
 func PrintCommitCard(typeStr, scope, subject, body string, width int) {
 	var lines []string
 
@@ -145,22 +141,18 @@ func PrintCommitCard(typeStr, scope, subject, body string, width int) {
 	PrintCard(cardTitle, lines, width, borderColor)
 }
 
-// PrintSuccess affiche un message de succès
 func PrintSuccess(msg string) {
 	fmt.Printf("\n  %s✔%s %s%s%s\n\n", Green, Reset, Bold+Green, msg, Reset)
 }
 
-// PrintError affiche une alerte d'erreur
 func PrintError(msg string) {
 	fmt.Printf("\n  %s✖ Erreur :%s %s\n\n", Red+Bold, Reset, msg)
 }
 
-// PrintWarning affiche un avertissement
 func PrintWarning(msg string) {
 	fmt.Printf("\n  %s⚠️ Avertissement :%s %s\n\n", Yellow+Bold, Reset, msg)
 }
 
-// PrintInfo affiche une information
 func PrintInfo(msg string) {
 	fmt.Printf("  %sℹ%s %s\n", Cyan+Bold, Reset, msg)
 }

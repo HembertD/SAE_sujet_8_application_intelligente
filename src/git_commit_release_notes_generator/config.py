@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+# Convertit une valeur texte ou booléenne en booléen.
 def parse_bool(val: str | bool | None) -> bool:
     if isinstance(val, bool):
         return val
@@ -8,6 +9,7 @@ def parse_bool(val: str | bool | None) -> bool:
         return False
     return str(val).strip().lower() in ("true", "1", "yes", "oui")
 
+# Charge les variables depuis le fichier .env et l'environnement système.
 def load_env() -> dict[str, str]:
     base_dir = Path(__file__).resolve().parent
     app_root = base_dir.parent.parent

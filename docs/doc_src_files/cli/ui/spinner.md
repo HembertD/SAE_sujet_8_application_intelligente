@@ -23,3 +23,10 @@ Ce module gère un indicateur de chargement animé (spinner) non-bloquant basé 
 ## Rôle dans l’architecture
 
 Composant d'attente visuelle fournissant le feedback indispensable à l'utilisateur lors des requêtes d'inférence LLM vers le serveur distant d'Ollama.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `NewSpinner()` : Crée un nouveau spinner avec le libellé indiqué.
+- `Spinner.Start()` : Démarre l'animation du spinner dans une goroutine.
+- `Spinner.UpdateLabel()` : Met à jour le libellé affiché par le spinner.
+- `Spinner.Stop()` : Arrête le spinner et affiche éventuellement un message final.

@@ -33,6 +33,7 @@ type BridgeClient struct {
 	mockClient         *MockClient
 }
 
+// Instancie le client backend en résolvant automatiquement la racine applicative.
 func NewBackendClient(repoRoot string, forceMockInterface bool, forceMockIA ...bool) BackendClient {
 	appRoot := FindAppRoot(repoRoot)
 	if isTestDir(repoRoot) {
@@ -41,6 +42,7 @@ func NewBackendClient(repoRoot string, forceMockInterface bool, forceMockIA ...b
 	return NewBackendClientWithAppRoot(repoRoot, appRoot, forceMockInterface, forceMockIA...)
 }
 
+// Instancie le coordinateur avec dépôt cible et racine applicative explicites.
 func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceMockInterface bool, forceMockIA ...bool) BackendClient {
 	if appRoot == "" {
 		if isTestDir(repoRoot) {
@@ -67,6 +69,7 @@ func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceMockInterface bo
 	}
 }
 
+// Sélectionne le délégué actif selon le mode simulation.
 func (b *BridgeClient) activeDelegate() BackendClient {
 	if b.IsMock() {
 		return b.mockClient
@@ -74,6 +77,7 @@ func (b *BridgeClient) activeDelegate() BackendClient {
 	return b.realClient
 }
 
+// Indique si le mode simulation est actif.
 func (b *BridgeClient) IsMock() bool {
 	if b.forceMockInterface {
 		return true
@@ -81,42 +85,52 @@ func (b *BridgeClient) IsMock() bool {
 	return ReadMockSettingFromEnv(b.appRoot)
 }
 
+// Délègue la récupération du statut du dépôt.
 func (b *BridgeClient) GetRepoStatus() (*models.RepoStatus, error) {
 	return b.activeDelegate().GetRepoStatus()
 }
 
+// Délègue la récupération du diff.
 func (b *BridgeClient) GetDiff() (*models.DiffResponse, error) {
 	return b.activeDelegate().GetDiff()
 }
 
+// Délègue l'indexation de tous les fichiers.
 func (b *BridgeClient) StageAll() (*models.ActionResult, error) {
 	return b.activeDelegate().StageAll()
 }
 
+// Délègue la génération de la proposition de commit.
 func (b *BridgeClient) GenerateCommit(feedback string) (*models.CommitProposal, error) {
 	return b.activeDelegate().GenerateCommit(feedback)
 }
 
+// Délègue l'application du message de commit.
 func (b *BridgeClient) ApplyCommit(message string) (*models.ActionResult, error) {
 	return b.activeDelegate().ApplyCommit(message)
 }
 
+// Délègue la poussée vers le dépôt distant.
 func (b *BridgeClient) Push() (*models.ActionResult, error) {
 	return b.activeDelegate().Push()
 }
 
+// Délègue la génération des notes de version.
 func (b *BridgeClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNotesResponse, error) {
 	return b.activeDelegate().GetReleaseNotes(fromTag, toTag)
 }
 
+// Délègue la vérification de joignabilité d'Ollama.
 func (b *BridgeClient) PingOllama() (*models.PingResponse, error) {
 	return b.activeDelegate().PingOllama()
 }
 
+// Délègue la sauvegarde du fichier Markdown.
 func (b *BridgeClient) SaveMarkdownFile(filename, content string) error {
 	return b.activeDelegate().SaveMarkdownFile(filename, content)
 }
 
+// Charge la configuration depuis l'environnement applicatif.
 func (b *BridgeClient) GetConfig() (*models.ConfigResponse, error) {
 	cfg := LoadConfigFromEnv(b.appRoot, b.IsMock())
 	if b.forceMockIA {
@@ -125,6 +139,7 @@ func (b *BridgeClient) GetConfig() (*models.ConfigResponse, error) {
 	return cfg, nil
 }
 
+// Persiste la configuration et notifie le backend réel si nécessaire.
 func (b *BridgeClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool, mockAI ...bool) (*models.ActionResult, error) {
 	envPath := FindAppEnvPath(b.appRoot)
 	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface, mockAI...); err != nil {

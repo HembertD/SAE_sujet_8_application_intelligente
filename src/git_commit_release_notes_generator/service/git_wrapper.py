@@ -26,6 +26,7 @@ class GitWrapper:
         re.compile(r"ey[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*"),
     ]
 
+    # Ouvre le dépôt Git à partir du chemin donné.
     def __init__(self, repo_path: str | Path = ".") -> None:
         try:
             self.repo = Repo(repo_path, search_parent_directories=True)
@@ -33,6 +34,7 @@ class GitWrapper:
             raise GitWrapperError(f"Le dossier '{repo_path}' n'est pas un dépôt Git valide.") from exc
 
     @classmethod
+    # Masque les secrets détectés dans le texte du diff.
     def _sanitize_diff_text(cls, raw_diff: str) -> str:
         sanitized = raw_diff
         for pattern in cls.SECRET_PATTERNS:
@@ -42,10 +44,12 @@ class GitWrapper:
             )
         return sanitized
 
+    # Expose publiquement le masquage des secrets du diff.
     def sanitize_diff(self, raw_diff: str) -> str:
         return self._sanitize_diff_text(raw_diff)
 
     @staticmethod
+    # Découpe le diff brut en objets DiffFile par fichier.
     def _parse_diff(raw_diff: str) -> list[DiffFile]:
         if raw_diff is None or not raw_diff.strip():
             return []
@@ -128,6 +132,7 @@ class GitWrapper:
 
         return diff_files
 
+    # Récupère et filtre le diff stagé du dépôt.
     def get_staged_diff(self, max_chars: int = 8000) -> list[DiffFile]:
         try:
             diff_text = self.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTUXBD")
@@ -156,9 +161,11 @@ class GitWrapper:
         except Exception as exc:
             raise GitWrapperError(f"Erreur lors de la récupération du diff indexé : {exc}") from exc
 
+    # Expose le diff stagé sous forme de liste JSON.
     def get_staged_diff_as_json(self, max_chars: int = 8000) -> list[dict[str, str | int | bool]]:
         return [diff_file.to_dict() for diff_file in self.get_staged_diff(max_chars=max_chars)]
 
+    # Construit le payload résumé du diff stagé.
     def get_staged_diff_payload(self, max_chars: int = 8000) -> dict[str, object]:
         files = self.get_staged_diff(max_chars=max_chars)
         return {
@@ -170,9 +177,11 @@ class GitWrapper:
             "files": [diff.to_dict() for diff in files],
         }
 
+    # Fournit le payload du diff destiné au LLM.
     def get_llm_payload(self, max_chars: int = 8000) -> dict[str, object]:
         return self.get_staged_diff_payload(max_chars=max_chars)
 
+    # Liste les commits entre deux révisions Git.
     def get_commits_between_tags(self, tag_a: str, tag_b: str) -> list[CommitInfo]:
         try:
             rev_range = f"{tag_a}..{tag_b}"
@@ -189,6 +198,7 @@ class GitWrapper:
         except Exception as exc:
             raise GitWrapperError(f"Erreur d'extraction entre {tag_a} et {tag_b} : {exc}") from exc
 
+    # Crée un commit avec le message donné.
     def commit(self, message: str) -> str:
         if not self.repo.is_dirty(index=True):
             raise GitWrapperError("Aucune modification indexée (staged) à commiter.")

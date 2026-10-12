@@ -15,6 +15,7 @@ type Spinner struct {
 	active    bool
 }
 
+// Crée un nouveau spinner avec le libellé indiqué.
 func NewSpinner(label string) *Spinner {
 	return &Spinner{
 		label:    label,
@@ -22,6 +23,7 @@ func NewSpinner(label string) *Spinner {
 	}
 }
 
+// Démarre l'animation du spinner dans une goroutine.
 func (s *Spinner) Start() {
 	s.mu.Lock()
 	if s.active {
@@ -66,12 +68,14 @@ func (s *Spinner) Start() {
 	}()
 }
 
+// Met à jour le libellé affiché par le spinner.
 func (s *Spinner) UpdateLabel(newLabel string) {
 	s.mu.Lock()
 	s.label = newLabel
 	s.mu.Unlock()
 }
 
+// Arrête le spinner et affiche éventuellement un message final.
 func (s *Spinner) Stop(finalMsg string) {
 	s.mu.Lock()
 	if !s.active {

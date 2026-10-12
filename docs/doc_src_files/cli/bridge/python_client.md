@@ -26,3 +26,21 @@ Précisions issues des commentaires retirés de `python_client.go` :
 - `PythonClient` implémente `BackendClient` en communiquant avec le sous-processus Python et ne contient AUCUNE logique métier : tout le traitement est délégué à Python.
 - `runPythonCommand` exécute la commande Python et récupère `stdout` ; `PYTHONPATH` pointe sur le dossier `src` de l'application, avec candidats de secours si `appSrc` n'est pas résolu ; la configuration est chargée exclusivement depuis l'application (`p.appRoot`, JAMAIS `p.repoRoot`).
 - `IsMock` retourne toujours `false` ; chaque méthode (`GetRepoStatus`, `GetDiff`, `StageAll`, `GenerateCommit`, `ApplyCommit`, `Push`, `GetReleaseNotes`, `GetConfig`, `SaveConfig`, `PingOllama`, `SaveMarkdownFile`) interroge le backend Python pour l'action correspondante, `SaveConfig` notifiant Python après écriture du `.env` applicatif et `SaveMarkdownFile` écrivant localement le changelog exporté.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `NewPythonClient()` : Instancie le client Python en résolvant la racine applicative.
+- `NewPythonClientWithAppRoot()` : Instancie le client Python avec racines explicites et interpréteur résolu.
+- `PythonClient.runPythonCommand()` : Exécute le module Python et capture sa sortie standard.
+- `PythonClient.IsMock()` : Indique que le client réel n'est jamais en simulation.
+- `PythonClient.GetRepoStatus()` : Interroge le backend Python pour le statut du dépôt.
+- `PythonClient.GetDiff()` : Interroge le backend Python pour le diff.
+- `PythonClient.StageAll()` : Demande au backend Python d'indexer tous les fichiers.
+- `PythonClient.GenerateCommit()` : Demande au backend Python une proposition de commit.
+- `PythonClient.ApplyCommit()` : Demande au backend Python d'appliquer le commit.
+- `PythonClient.Push()` : Demande au backend Python de pousser vers le distant.
+- `PythonClient.GetReleaseNotes()` : Demande au backend Python les notes de version.
+- `PythonClient.GetConfig()` : Charge la configuration réelle depuis l'environnement.
+- `PythonClient.SaveConfig()` : Persiste la configuration puis notifie le backend Python.
+- `PythonClient.PingOllama()` : Interroge le backend Python sur l'état d'Ollama.
+- `PythonClient.SaveMarkdownFile()` : Sauvegarde le contenu Markdown dans le dépôt cible.

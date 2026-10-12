@@ -47,3 +47,17 @@ Ce module constitue le point d'entrée exécutable sous forme de sous-processus 
 - `action_release_notes` : valeurs par défaut `from_tag="v0.1.0"`, `to_tag="HEAD"`. Vérification stricte de joignabilité avant toute génération (échec immédiat si injoignable), puis tentative d'inférence LLM avec invite imposant les sections Markdown, et repli sur le formateur déterministe `_format_release_notes_fallback` si le contenu est vide ou inexploitable.
 - `_format_release_notes_fallback` : catégorise chaque première ligne de commit via une expression Conventional Commits (`feat|fix|docs|refactor|perf|chore|test|ci|build|revert`, `scope` optionnel) en sections `feat`, `fix`, `refactor`, `perf`, `docs`, `other`, avec le SHA court entre backticks ; ajoute la date du jour et `Aucun changement notable.` si aucune section n'est remplie.
 - `action_save_config` : simple notification, renvoie toujours un succès sans écrire de fichier.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `action_status()` : Calcule l'état courant du dépôt Git.
+- `action_diff()` : Expose les fichiers stagés avec patchs assainis.
+- `action_stage_all()` : Indexe toutes les modifications du dépôt.
+- `action_generate_commit()` : Génère un message de commit depuis le diff stagé.
+- `action_apply_commit()` : Applique le message de commit validé au dépôt.
+- `action_push()` : Pousse les commits locaux vers le dépôt distant.
+- `_format_release_notes_fallback()` : Formate les release notes sans appel au LLM.
+- `action_release_notes()` : Génère les release notes Markdown entre deux révisions.
+- `action_save_config()` : Notifie la prise en compte de la configuration.
+- `action_ping_ollama()` : Diagnostique la joignabilité d'Ollama avec modèles installés.
+- `main()` : Exécute l'action demandée et affiche le JSON résultat.

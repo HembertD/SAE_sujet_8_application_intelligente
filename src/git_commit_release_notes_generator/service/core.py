@@ -33,6 +33,7 @@ from git_commit_release_notes_generator.service.git_wrapper import GitWrapper
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(levelname)s: %(message)s")
 
+# Calcule l'état courant du dépôt Git.
 def action_status(repo_path: str = ".") -> dict:
     try:
         wrapper = GitWrapper(repo_path)
@@ -77,6 +78,7 @@ def action_status(repo_path: str = ".") -> dict:
             "error": str(e),
         }
 
+# Expose les fichiers stagés avec patchs assainis.
 def action_diff(repo_path: str = ".") -> dict:
     try:
         wrapper = GitWrapper(repo_path)
@@ -109,6 +111,7 @@ def action_diff(repo_path: str = ".") -> dict:
             "staged_count": 0,
         }
 
+# Indexe toutes les modifications du dépôt.
 def action_stage_all(repo_path: str = ".") -> dict:
     try:
         wrapper = GitWrapper(repo_path)
@@ -124,6 +127,7 @@ def action_stage_all(repo_path: str = ".") -> dict:
             "error": f"Erreur lors de l'indexation : {e}",
         }
 
+# Génère un message de commit depuis le diff stagé.
 def action_generate_commit(repo_path: str = ".", feedback: str = "") -> dict:
     try:
         wrapper = GitWrapper(repo_path)
@@ -168,6 +172,7 @@ def action_generate_commit(repo_path: str = ".", feedback: str = "") -> dict:
         "raw_formatted": raw_formatted,
     }
 
+# Applique le message de commit validé au dépôt.
 def action_apply_commit(repo_path: str = ".", message: str = "") -> dict:
     if not message or not message.strip():
         return {
@@ -190,6 +195,7 @@ def action_apply_commit(repo_path: str = ".", message: str = "") -> dict:
             "error": str(e),
         }
 
+# Pousse les commits locaux vers le dépôt distant.
 def action_push(repo_path: str = ".") -> dict:
     try:
         wrapper = GitWrapper(repo_path)
@@ -211,6 +217,7 @@ def action_push(repo_path: str = ".") -> dict:
             "error": f"Échec lors du git push : {e}",
         }
 
+# Formate les release notes sans appel au LLM.
 def _format_release_notes_fallback(commits: list, from_tag: str, to_tag: str) -> str:
     categories: dict[str, list[str]] = {
         "feat": [],
@@ -272,6 +279,7 @@ def _format_release_notes_fallback(commits: list, from_tag: str, to_tag: str) ->
 
     return "\n".join(lines).strip()
 
+# Génère les release notes Markdown entre deux révisions.
 def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str = "") -> dict:
     if not from_tag:
         from_tag = "v0.1.0"
@@ -368,15 +376,18 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
         "commit_count": len(commits),
     }
 
+# Notifie la prise en compte de la configuration.
 def action_save_config(base_url: str = "", model: str = "", timeout: str = "", language: str = "") -> dict:
     return {
         "success": True,
         "message": "Configuration notifiée avec succès au backend Python.",
     }
 
+# Diagnostique la joignabilité d'Ollama avec modèles installés.
 def action_ping_ollama() -> dict:
     return check_ollama_reachable(timeout=3.0, fetch_models=True).to_dict()
 
+# Exécute l'action demandée et affiche le JSON résultat.
 def main() -> None:
     parser = argparse.ArgumentParser(description="Service Core CLI pour Smart Commit Generator")
     parser.add_argument("--action", required=True, help="Action à exécuter")

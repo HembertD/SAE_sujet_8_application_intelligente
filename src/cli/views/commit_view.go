@@ -10,6 +10,7 @@ import (
 	"sae-git-cli/ui"
 )
 
+// Orchestre le flux interactif de génération et validation du commit.
 func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
 	ui.ClearTerminal()
 	ui.PrintBanner(status)
@@ -222,6 +223,7 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 	}
 }
 
+// Formate un message de commit conventionnel à partir de ses parties.
 func formatCommit(typeStr, scope, subject, body string) string {
 	msg := typeStr
 	if scope != "" {
@@ -234,6 +236,7 @@ func formatCommit(typeStr, scope, subject, body string) string {
 	return msg
 }
 
+// Attend l'appui sur Entrée avant de continuer.
 func waitForEnter(reader *bufio.Reader) {
 	fmt.Printf("\n  %s[Appuyez sur Entrée pour continuer...]%s", ui.Dim, ui.Reset)
 	_, _ = reader.ReadString('\n')

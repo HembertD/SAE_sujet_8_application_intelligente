@@ -4,6 +4,7 @@ from typing import Any
 
 from git_commit_release_notes_generator.models import CommitMessage, DiffFile
 
+# Génère un message de commit simulé pour le mode hors-ligne.
 def mock_generate_commit_message(
     diff_files: list[DiffFile],
     feedback: str = "",
@@ -22,6 +23,7 @@ def mock_generate_commit_message(
         body=body,
     )
 
+# Simule une réponse brute de l'API de chat.
 def mock_call_chat(messages: list[dict]) -> dict:
     return {
         "type": "feat",
@@ -30,6 +32,7 @@ def mock_call_chat(messages: list[dict]) -> dict:
         "body": "Réponse brute simulée par le mock IA.",
     }
 
+# Génère des release notes simulées entre deux révisions.
 def mock_release_notes(commits: list[Any] | None = None, from_tag: str = "", to_tag: str = "") -> str:
     from_tag = from_tag or "v0.1.0"
     to_tag = to_tag or "HEAD"
@@ -38,6 +41,7 @@ def mock_release_notes(commits: list[Any] | None = None, from_tag: str = "", to_
         "Release notes mockées pour test hors ligne."
     )
 
+# Simule un diagnostic de connectivité Ollama réussi.
 def mock_ping() -> dict:
     return {
         "success": True,

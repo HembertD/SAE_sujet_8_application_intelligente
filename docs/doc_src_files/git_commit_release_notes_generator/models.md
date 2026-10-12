@@ -47,3 +47,9 @@ Ils évitent les chaînes non structurées et rendent le code plus robuste et te
 - `DiffFile.status` : codes de statut Git (`A`, `M`, `D`, `R`, etc.). Le constructeur accepte `is_binary` ou l'alias `binary` (mot-clé uniquement) ; si les deux sont fournis avec des valeurs divergentes, il lève `TypeError`, sinon `is_binary` prime, défaut `False`.
 - Propriété `DiffFile.binary` : alias rétrocompatible avec l'ancien contrat historique, renvoie `is_binary`.
 - `CommitMessage.type` : types Conventional Commits (`feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `build`, `ci`).
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `DiffFile.__init__()` : Initialise un fichier de diff en réconciliant les indicateurs binaires.
+- `DiffFile.binary()` : Expose l'indicateur binaire via l'alias historique.
+- `DiffFile.to_dict()` : Sérialise le fichier de diff en dictionnaire.

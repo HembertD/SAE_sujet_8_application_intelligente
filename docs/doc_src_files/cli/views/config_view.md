@@ -21,3 +21,7 @@ Ce module permet de visualiser et de modifier les paramètres opérationnels de 
 ## Rôle dans l’architecture
 
 Interface d'administration et de diagnostic du front-end, garantissant la configurabilité à chaud du système.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `ShowConfigFlow()` : Affiche et gère le flux interactif de configuration.

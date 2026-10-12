@@ -23,10 +23,12 @@ type MockClient struct {
 	CustomError          error
 }
 
+// Instancie le client simulé avec la même racine pour dépôt et application.
 func NewMockClient(repoRoot string) *MockClient {
 	return NewMockClientWithAppRoot(repoRoot, repoRoot)
 }
 
+// Instancie le client simulé avec racines distinctes.
 func NewMockClientWithAppRoot(repoRoot, appRoot string) *MockClient {
 	if appRoot == "" {
 		appRoot = repoRoot
@@ -38,16 +40,19 @@ func NewMockClientWithAppRoot(repoRoot, appRoot string) *MockClient {
 	}
 }
 
+// Simule une latence réseau lorsque activée.
 func (m *MockClient) sleep(d time.Duration) {
 	if m.SimulateDelay {
 		time.Sleep(d)
 	}
 }
 
+// Indique que le client est toujours en mode simulation.
 func (m *MockClient) IsMock() bool {
 	return true
 }
 
+// Retourne un statut de dépôt simulé.
 func (m *MockClient) GetRepoStatus() (*models.RepoStatus, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -65,6 +70,7 @@ func (m *MockClient) GetRepoStatus() (*models.RepoStatus, error) {
 	}, nil
 }
 
+// Retourne un diff simulé avec secrets et binaires.
 func (m *MockClient) GetDiff() (*models.DiffResponse, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -106,6 +112,7 @@ func (m *MockClient) GetDiff() (*models.DiffResponse, error) {
 	}, nil
 }
 
+// Simule l'indexation de tous les fichiers.
 func (m *MockClient) StageAll() (*models.ActionResult, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -117,6 +124,7 @@ func (m *MockClient) StageAll() (*models.ActionResult, error) {
 	}, nil
 }
 
+// Génère une proposition de commit simulée adaptée au retour.
 func (m *MockClient) GenerateCommit(feedback string) (*models.CommitProposal, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -148,6 +156,7 @@ func (m *MockClient) GenerateCommit(feedback string) (*models.CommitProposal, er
 	}, nil
 }
 
+// Simule l'application du commit sur la branche courante.
 func (m *MockClient) ApplyCommit(message string) (*models.ActionResult, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -160,6 +169,7 @@ func (m *MockClient) ApplyCommit(message string) (*models.ActionResult, error) {
 	}, nil
 }
 
+// Simule la poussée vers la branche distante.
 func (m *MockClient) Push() (*models.ActionResult, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -171,6 +181,7 @@ func (m *MockClient) Push() (*models.ActionResult, error) {
 	}, nil
 }
 
+// Génère des notes de version simulées entre deux tags.
 func (m *MockClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNotesResponse, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -204,10 +215,12 @@ Date : %s
 	}, nil
 }
 
+// Charge la configuration simulée depuis l'environnement.
 func (m *MockClient) GetConfig() (*models.ConfigResponse, error) {
 	return LoadConfigFromEnv(m.appRoot, true), nil
 }
 
+// Persiste la configuration simulée dans le .env applicatif.
 func (m *MockClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool, mockAI ...bool) (*models.ActionResult, error) {
 	envPath := FindAppEnvPath(m.appRoot)
 	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface, mockAI...); err != nil {
@@ -226,6 +239,7 @@ func (m *MockClient) SaveConfig(baseURL, model string, timeout float64, lang str
 	}, nil
 }
 
+// Retourne un diagnostic Ollama simulé.
 func (m *MockClient) PingOllama() (*models.PingResponse, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -248,6 +262,7 @@ func (m *MockClient) PingOllama() (*models.PingResponse, error) {
 	}, nil
 }
 
+// Sauvegarde le contenu Markdown dans le dépôt simulé.
 func (m *MockClient) SaveMarkdownFile(filename, content string) error {
 	path := filepath.Join(m.repoRoot, filename)
 	return os.WriteFile(path, []byte(content), 0644)

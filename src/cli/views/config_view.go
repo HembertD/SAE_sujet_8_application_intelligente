@@ -11,6 +11,7 @@ import (
 	"sae-git-cli/ui"
 )
 
+// Affiche et gère le flux interactif de configuration.
 func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
 	for {
 		ui.ClearTerminal()

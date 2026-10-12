@@ -12,6 +12,7 @@ import (
 	"sae-git-cli/models"
 )
 
+// Vérifie si un répertoire est la racine applicative.
 func isAppRoot(dir string) bool {
 	if dir == "" {
 		return false
@@ -29,6 +30,7 @@ func isAppRoot(dir string) bool {
 	return err == nil && stat.IsDir()
 }
 
+// Détecte si un chemin correspond à un répertoire temporaire de test.
 func isTestDir(dir string) bool {
 	if dir == "" {
 		return false
@@ -37,6 +39,7 @@ func isTestDir(dir string) bool {
 	return strings.HasPrefix(dir, tmp) || strings.Contains(dir, "Test")
 }
 
+// Localise la racine applicative à partir des indices et de l'environnement.
 func FindAppRoot(hints ...string) string {
 	for _, h := range hints {
 		if h != "" && isAppRoot(h) {
@@ -107,6 +110,7 @@ func FindAppRoot(hints ...string) string {
 	return "."
 }
 
+// Renvoie le chemin du fichier .env à la racine applicative.
 func FindAppEnvPath(appRoot string) string {
 	if appRoot == "" {
 		appRoot = FindAppRoot()
@@ -120,15 +124,18 @@ func FindAppEnvPath(appRoot string) string {
 	return filepath.Join(clean, ".env")
 }
 
+// Fournit un alias de compatibilité pour le chemin du .env.
 func FindEnvPath(appRoot string) string {
 	return FindAppEnvPath(appRoot)
 }
 
+// Interprète une chaîne comme booléen.
 func ParseBoolFromString(v string) bool {
 	lower := strings.ToLower(strings.TrimSpace(v))
 	return lower == "true" || lower == "1" || lower == "yes" || lower == "oui"
 }
 
+// Lit l'activation du mode simulation depuis l'environnement.
 func ReadMockSettingFromEnv(appRoot string) bool {
 	if envVal := os.Getenv("MOCK_INTERFACE"); envVal != "" {
 		return ParseBoolFromString(envVal)
@@ -161,6 +168,7 @@ func ReadMockSettingFromEnv(appRoot string) bool {
 	return false
 }
 
+// Lit l'activation de la simulation IA depuis l'environnement.
 func ReadMockAISettingFromEnv(appRoot string) bool {
 	if envVal := os.Getenv("MOCK_AI"); envVal != "" {
 		return ParseBoolFromString(envVal)
@@ -190,6 +198,7 @@ func ReadMockAISettingFromEnv(appRoot string) bool {
 	return false
 }
 
+// Charge la configuration complète depuis le .env applicatif.
 func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse {
 	cfg := &models.ConfigResponse{
 		Success:       true,
@@ -251,6 +260,7 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 	return cfg
 }
 
+// Écrit la configuration dans le fichier .env applicatif.
 func WriteEnvFile(envPath string, baseURL, model string, timeout float64, lang string, mockInterface bool, mockAIArgs ...bool) error {
 	cleanPath := filepath.Clean(envPath)
 	dir := filepath.Dir(cleanPath)

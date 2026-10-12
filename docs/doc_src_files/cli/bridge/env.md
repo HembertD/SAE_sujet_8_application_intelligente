@@ -28,3 +28,16 @@ Précisions issues des commentaires retirés de `env.go` :
 - `FindAppEnvPath` renvoie l'emplacement STRICTEMENT à la racine et ne cherche JAMAIS dans `src/` ni dans le dépôt cible ; `FindEnvPath` est un alias conservé pour compatibilité avec le code existant et les tests.
 - `ParseBoolFromString` convertit `"true"`, `"1"`, `"yes"`, `"oui"` en booléen ; `ReadMockSettingFromEnv` / `ReadMockAISettingFromEnv` lisent respectivement `MOCK_INTERFACE` (avec variante historique `MOCKAGE_INTERFACE`) et `MOCK_AI`, avec priorité aux variables d'environnement système directes puis lecture du `.env` applicatif.
 - `LoadConfigFromEnv` purge par sécurité tout `.env` résiduel dans `src/` ; `WriteEnvFile` réécrit le `.env` STRICTEMENT à la racine et supprime préventivement tout ancien `src/.env` pour ne garder que la racine du projet.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `isAppRoot()` : Vérifie si un répertoire est la racine applicative.
+- `isTestDir()` : Détecte si un chemin correspond à un répertoire temporaire de test.
+- `FindAppRoot()` : Localise la racine applicative à partir des indices et de l'environnement.
+- `FindAppEnvPath()` : Renvoie le chemin du fichier .env à la racine applicative.
+- `FindEnvPath()` : Fournit un alias de compatibilité pour le chemin du .env.
+- `ParseBoolFromString()` : Interprète une chaîne comme booléen.
+- `ReadMockSettingFromEnv()` : Lit l'activation du mode simulation depuis l'environnement.
+- `ReadMockAISettingFromEnv()` : Lit l'activation de la simulation IA depuis l'environnement.
+- `LoadConfigFromEnv()` : Charge la configuration complète depuis le .env applicatif.
+- `WriteEnvFile()` : Écrit la configuration dans le fichier .env applicatif.

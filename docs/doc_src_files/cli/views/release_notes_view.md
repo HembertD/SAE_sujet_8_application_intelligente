@@ -25,3 +25,7 @@ Vue secondaire du sujet 8, concrétisant la seconde fonctionnalité majeure de l
 ## Détails déplacés du code source
 
 Anciens commentaires internes de `ShowReleaseNotesFlow` (supprimés du `.go`, conservés ici) : la fonction se structure en trois phases marquées dans le code — saisie des bornes de révision (`fromTag`/`toTag`), génération puis affichage du Markdown dans un panneau encadré, et choix utilisateur final (`S` sauvegarder / `R` retour menu).
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `ShowReleaseNotesFlow()` : Orchestre le flux interactif de génération des release notes.

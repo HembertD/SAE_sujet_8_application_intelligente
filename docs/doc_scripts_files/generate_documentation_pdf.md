@@ -16,3 +16,9 @@ Ce script assemble l'ensemble des pages Markdown référencées dans la navigati
 
 - Toute page référencée mais introuvable lève `FileNotFoundError` avec le chemin fautif.
 - Le script ne dépend que de `pathlib`, `shutil`, `subprocess` et `yaml`.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `collect_pages()` : Collecte les pages de documentation sans doublon.
+- `build_markdown()` : Assemble les pages Markdown en document unique.
+- `main()` : Vérifie les outils et génère le PDF de documentation.

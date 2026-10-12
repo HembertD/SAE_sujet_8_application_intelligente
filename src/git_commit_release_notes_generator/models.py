@@ -11,6 +11,7 @@ class DiffFile:
     is_binary: bool
     patch: str
 
+    # Initialise un fichier de diff en réconciliant les indicateurs binaires.
     def __init__(
         self,
         path: str,
@@ -37,9 +38,11 @@ class DiffFile:
         self.patch = patch
 
     @property
+    # Expose l'indicateur binaire via l'alias historique.
     def binary(self) -> bool:
         return self.is_binary
 
+    # Sérialise le fichier de diff en dictionnaire.
     def to_dict(self) -> dict[str, str | int | bool]:
         return {
             "path": self.path,

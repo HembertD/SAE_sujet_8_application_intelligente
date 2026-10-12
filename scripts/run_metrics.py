@@ -13,14 +13,17 @@ from git_commit_release_notes_generator.ollama_client.llm import generate_commit
 from test.fixtures.golden_diffs import GOLDEN_DIFFS
 
 class _RetryCounter(logging.Handler):
+    # Initialise le compteur de retries détectés.
     def __init__(self) -> None:
         super().__init__()
         self.count = 0
 
+    # Compte les avertissements signalant une génération invalide.
     def emit(self, record: logging.LogRecord) -> None:
         if "invalide" in record.getMessage():
             self.count += 1
 
+# Mesure la conformité et la latence sur les diffs de référence.
 def main() -> None:
     retry_counter = _RetryCounter()
     llm_logger = logging.getLogger("git_commit_release_notes_generator.ollama_client.llm")
@@ -48,6 +51,7 @@ def main() -> None:
 
     _print_report(results)
 
+# Affiche le tableau récapitulatif des mesures.
 def _print_report(results: list[dict]) -> None:
     n = len(results)
     successes = [r for r in results if r["ok"]]

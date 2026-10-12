@@ -186,4 +186,71 @@ GOLDEN_DIFFS: list[GoldenDiff] = [
             ),
         ],
     ),
+    # --- Cas ambigus, ajoutés pour sonder les limites réelles du prompt ---
+    # (voir carte Trello #34 : l'IA confond parfois fix/feat sur ces cas-là)
+    GoldenDiff(
+        name="fix_disguised_as_bounds_check",
+        expected_type="fix",
+        files=[
+            DiffFile(
+                path="src/pricing/discount.py",
+                status="M",
+                added=4,
+                removed=0,
+                is_binary=False,
+                patch=(
+                    "@@ -15,6 +15,10 @@ def apply_discount(price: float, discount: float) -> float:\n"
+                    "+    if discount < 0 or discount > 1:\n"
+                    "+        raise ValueError(\"discount doit être compris entre 0 et 1\")\n"
+                    "     return price * (1 - discount)\n"
+                ),
+            ),
+        ],
+    ),
+    GoldenDiff(
+        name="chore_add_makefile_lint_target",
+        expected_type="chore",
+        files=[
+            DiffFile(
+                path="Makefile",
+                status="M",
+                added=3,
+                removed=0,
+                is_binary=False,
+                patch=(
+                    "@@ -8,3 +8,6 @@\n"
+                    " test:\n"
+                    "\tpytest\n"
+                    "+\n"
+                    "+lint:\n"
+                    "+\truff check src/\n"
+                ),
+            ),
+        ],
+    ),
+    GoldenDiff(
+        name="refactor_hides_rounding_fix",
+        expected_type="fix",
+        files=[
+            DiffFile(
+                path="src/shop/tax.py",
+                status="M",
+                added=4,
+                removed=5,
+                is_binary=False,
+                patch=(
+                    "@@ -10,10 +10,9 @@ def compute_total(price, tax_rate):\n"
+                    "-    tax = int(price * tax_rate)\n"
+                    "-    return price + tax\n"
+                    "+    return price + compute_tax(price, tax_rate)\n"
+                    "+\n"
+                    "+\n"
+                    "+def compute_tax(price, tax_rate):\n"
+                    "+    # round() au lieu de int() : int() tronquait toujours vers le bas et\n"
+                    "+    # sous-facturait systématiquement la taxe de quelques centimes.\n"
+                    "+    return round(price * tax_rate, 2)\n"
+                ),
+            ),
+        ],
+    ),
 ]

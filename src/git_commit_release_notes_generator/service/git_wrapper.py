@@ -86,7 +86,11 @@ class GitWrapper:
             if not file_path:
                 file_path = old_file
 
-            if old_path == "/dev/null":
+            if "new file mode" in section:
+                status = "A"
+            elif "deleted file mode" in section:
+                status = "D"
+            elif old_path == "/dev/null":
                 status = "A"
             elif new_path == "/dev/null":
                 status = "D"
@@ -132,7 +136,7 @@ class GitWrapper:
     def get_staged_diff(self, max_chars: int = 8000) -> list[DiffFile]:
         """Extrait le diff indexé en objets DiffFile structurés, sans fichiers binaires."""
         try:
-            diff_text = self.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTUXB")
+            diff_text = self.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTUXBD")
             if not diff_text.strip():
                 return []
 

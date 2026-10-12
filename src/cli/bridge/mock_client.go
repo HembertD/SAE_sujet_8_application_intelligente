@@ -10,13 +10,11 @@ import (
 	"sae-git-cli/models"
 )
 
-// MockClient fournit une implémentation de BackendClient pour les tests et le mode hors-ligne.
 type MockClient struct {
 	repoRoot      string
 	appRoot       string
 	SimulateDelay bool
 
-	// Champs de surcharge pour les tests unitaires
 	CustomRepoStatus     *models.RepoStatus
 	CustomDiff           *models.DiffResponse
 	CustomCommitProposal *models.CommitProposal
@@ -25,12 +23,10 @@ type MockClient struct {
 	CustomError          error
 }
 
-// NewMockClient instancie un client de test avec les données types du projet.
 func NewMockClient(repoRoot string) *MockClient {
 	return NewMockClientWithAppRoot(repoRoot, repoRoot)
 }
 
-// NewMockClientWithAppRoot instancie un client de test en séparant dépôt cible et application.
 func NewMockClientWithAppRoot(repoRoot, appRoot string) *MockClient {
 	if appRoot == "" {
 		appRoot = repoRoot
@@ -48,12 +44,10 @@ func (m *MockClient) sleep(d time.Duration) {
 	}
 }
 
-// IsMock indique si le mode démo / test est actif.
 func (m *MockClient) IsMock() bool {
 	return true
 }
 
-// GetRepoStatus renvoie l'état du dépôt Git.
 func (m *MockClient) GetRepoStatus() (*models.RepoStatus, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -71,7 +65,6 @@ func (m *MockClient) GetRepoStatus() (*models.RepoStatus, error) {
 	}, nil
 }
 
-// GetDiff renvoie les fichiers indexés et les indicateurs de filtrage.
 func (m *MockClient) GetDiff() (*models.DiffResponse, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -99,21 +92,20 @@ func (m *MockClient) GetDiff() (*models.DiffResponse, error) {
 				Added:            58,
 				Removed:          0,
 				Binary:           false,
-				HasSecretsMasked: true, // Données sensibles masquées
+				HasSecretsMasked: true,
 			},
 			{
 				Path:             "assets/banner.png",
 				Status:           "A",
 				Added:            0,
 				Removed:          0,
-				Binary:           true, // Fichier binaire exclu
+				Binary:           true,
 				HasSecretsMasked: false,
 			},
 		},
 	}, nil
 }
 
-// StageAll indexe l'ensemble des modifications locales.
 func (m *MockClient) StageAll() (*models.ActionResult, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -125,7 +117,6 @@ func (m *MockClient) StageAll() (*models.ActionResult, error) {
 	}, nil
 }
 
-// GenerateCommit renvoie une proposition de commit au format Conventional Commits.
 func (m *MockClient) GenerateCommit(feedback string) (*models.CommitProposal, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -138,26 +129,25 @@ func (m *MockClient) GenerateCommit(feedback string) (*models.CommitProposal, er
 
 	if strings.TrimSpace(feedback) != "" {
 		return &models.CommitProposal{
-			Success: true,
-			Type:    "refactor",
-			Scope:   "auth",
-			Subject: "simplification du flux d'authentification et masquage des secrets",
-			Body: fmt.Sprintf("Ajusté suite à la consigne : \"%s\".\nRevue des fonctions de token et séparation des couches.", feedback),
+			Success:      true,
+			Type:         "refactor",
+			Scope:        "auth",
+			Subject:      "simplification du flux d'authentification et masquage des secrets",
+			Body:         fmt.Sprintf("Ajusté suite à la consigne : \"%s\".\nRevue des fonctions de token et séparation des couches.", feedback),
 			RawFormatted: "refactor(auth): simplification du flux d'authentification et masquage des secrets",
 		}, nil
 	}
 
 	return &models.CommitProposal{
-		Success: true,
-		Type:    "feat",
-		Scope:   "auth",
-		Subject: "ajout de l'authentification OAuth2 sécurisée",
-		Body:    "Intègre la gestion des jetons d'accès et filtre automatiquement les variables d'environnement sensibles.",
+		Success:      true,
+		Type:         "feat",
+		Scope:        "auth",
+		Subject:      "ajout de l'authentification OAuth2 sécurisée",
+		Body:         "Intègre la gestion des jetons d'accès et filtre automatiquement les variables d'environnement sensibles.",
 		RawFormatted: "feat(auth): ajout de l'authentification OAuth2 sécurisée\n\nIntègre la gestion des jetons d'accès et filtre automatiquement les variables d'environnement sensibles.",
 	}, nil
 }
 
-// ApplyCommit applique le commit sur la branche courante.
 func (m *MockClient) ApplyCommit(message string) (*models.ActionResult, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -170,7 +160,6 @@ func (m *MockClient) ApplyCommit(message string) (*models.ActionResult, error) {
 	}, nil
 }
 
-// Push envoie les modifications vers la branche distante.
 func (m *MockClient) Push() (*models.ActionResult, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -182,7 +171,6 @@ func (m *MockClient) Push() (*models.ActionResult, error) {
 	}, nil
 }
 
-// GetReleaseNotes synthétise les notes de version Markdown entre deux tags.
 func (m *MockClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNotesResponse, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -216,12 +204,10 @@ Date : %s
 	}, nil
 }
 
-// GetConfig lit la configuration actuelle depuis le fichier .env applicatif.
 func (m *MockClient) GetConfig() (*models.ConfigResponse, error) {
 	return LoadConfigFromEnv(m.appRoot, true), nil
 }
 
-// SaveConfig met à jour le fichier .env applicatif.
 func (m *MockClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool, mockAI ...bool) (*models.ActionResult, error) {
 	envPath := FindAppEnvPath(m.appRoot)
 	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface, mockAI...); err != nil {
@@ -240,7 +226,6 @@ func (m *MockClient) SaveConfig(baseURL, model string, timeout float64, lang str
 	}, nil
 }
 
-// PingOllama vérifie la joignabilité du serveur Ollama.
 func (m *MockClient) PingOllama() (*models.PingResponse, error) {
 	if m.CustomError != nil {
 		return nil, m.CustomError
@@ -263,7 +248,6 @@ func (m *MockClient) PingOllama() (*models.PingResponse, error) {
 	}, nil
 }
 
-// SaveMarkdownFile enregistre localement le fichier Markdown exporté.
 func (m *MockClient) SaveMarkdownFile(filename, content string) error {
 	path := filepath.Join(m.repoRoot, filename)
 	return os.WriteFile(path, []byte(content), 0644)

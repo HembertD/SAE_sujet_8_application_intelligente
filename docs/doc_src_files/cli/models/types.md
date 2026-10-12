@@ -39,3 +39,13 @@ Proposition de commit générée par le modèle LLM au format Conventional Commi
 ## Rôle dans l’architecture
 
 Contrat d'interface formel entre la sortie standard JSON du backend Python et les vues d'affichage en Go.
+
+## Détails déplacés du code source
+
+Précisions issues des commentaires retirés de `types.go` et non redondantes avec les sections ci-dessus :
+
+- `DiffResponse` contient la liste des fichiers en attente (`Files`) et les métadonnées associées (`Success`, `Error`, `StagedCount`).
+- `ActionResult` représente le retour d'une action exécutée par Python (`commit`, `stage`, `push`, `save`), avec `Message`, `Sha` et `Error` optionnels.
+- `ReleaseNotesResponse` contient le texte Markdown synthétisé par le LLM (`Markdown`), encadré par `FromTag` / `ToTag` et `CommitCount`.
+- Le champ `Status` de `DiffFile` reprend les codes Git usuels (`M`, `A`, `D`, `R`, etc.).
+- `RepoStatus` représente l'état brut du dépôt fourni par le backend Python ; `CommitProposal` représente la suggestion au format Conventional Commits ; `ConfigResponse` contient les paramètres lus ou écrits dans le `.env` par Python ; `PingResponse` contient le diagnostic de joignabilité du serveur Ollama de l'IUT.

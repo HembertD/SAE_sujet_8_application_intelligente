@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// Spinner gère une animation de chargement non-bloquante avec goroutine
 type Spinner struct {
 	label     string
 	stopChan  chan struct{}
@@ -16,7 +15,6 @@ type Spinner struct {
 	active    bool
 }
 
-// NewSpinner initialise un nouveau spinner avec un libellé
 func NewSpinner(label string) *Spinner {
 	return &Spinner{
 		label:    label,
@@ -24,7 +22,6 @@ func NewSpinner(label string) *Spinner {
 	}
 }
 
-// Start démarre la goroutine d'animation
 func (s *Spinner) Start() {
 	s.mu.Lock()
 	if s.active {
@@ -69,14 +66,12 @@ func (s *Spinner) Start() {
 	}()
 }
 
-// UpdateLabel modifie le texte affiché pendant l'animation
 func (s *Spinner) UpdateLabel(newLabel string) {
 	s.mu.Lock()
 	s.label = newLabel
 	s.mu.Unlock()
 }
 
-// Stop arrête le spinner et affiche un message final
 func (s *Spinner) Stop(finalMsg string) {
 	s.mu.Lock()
 	if !s.active {

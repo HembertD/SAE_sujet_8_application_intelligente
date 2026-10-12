@@ -31,3 +31,10 @@ Ce fichier constitue le point d'entrée exécutable de l'interface en ligne de c
 ## Rôle dans l’architecture
 
 `main.go` est le chef d'orchestre du front-end. Il lie la couche de présentation (vues et utilitaires ANSI) au client de pontage backend sans intégrer la moindre règle métier.
+
+## Détails déplacés du code source
+
+Précisions issues des commentaires retirés de `main.go` et non redondantes avec les sections ci-dessus :
+
+- En cas d'erreur de `GetRepoStatus`, le statut est dégradé à `nil` (`status = nil`) et le menu principal est quand même affiché via `views.ShowMainMenu`.
+- Toute option non reconnue dans le `switch` (`default`) provoque un retour direct au menu, sans message d'erreur ni sortie.

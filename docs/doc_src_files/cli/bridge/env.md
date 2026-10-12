@@ -18,3 +18,13 @@ Ce module isole l'ensemble de la logique de localisation, de lecture et d'écrit
 
 - **Isolation stricte** : Aucun fichier `.env` n'est créé ou lu dans `src/`, ni dans le projet externe analysé par l'outil.
 - **Prise d'effet immédiate** : Les modifications saisies dans le TUI sont écrites sur disque et rechargées dynamiquement sans aucune recompilation du binaire Go.
+
+## Détails déplacés du code source
+
+Précisions issues des commentaires retirés de `env.go` :
+
+- `isAppRoot` vérifie si un répertoire est la racine Smart Commit (présence de `src/git_commit_release_notes_generator`, exclusion des dossiers de base `src` / `cli`) ; `isTestDir` détecte les répertoires temporaires de test (préfixe `os.TempDir()` ou sous-chaîne `Test`, ex. `t.TempDir()`).
+- `FindAppRoot` suit un ordre de recherche : hints valides d'abord, puis variable `SMART_COMMIT_APP_ROOT`, puis remontée depuis le code source Go (`runtime.Caller`), depuis l'exécutable Go, depuis le répertoire de travail, avec repli sur le premier hint non vide ou `"."` .
+- `FindAppEnvPath` renvoie l'emplacement STRICTEMENT à la racine et ne cherche JAMAIS dans `src/` ni dans le dépôt cible ; `FindEnvPath` est un alias conservé pour compatibilité avec le code existant et les tests.
+- `ParseBoolFromString` convertit `"true"`, `"1"`, `"yes"`, `"oui"` en booléen ; `ReadMockSettingFromEnv` / `ReadMockAISettingFromEnv` lisent respectivement `MOCK_INTERFACE` (avec variante historique `MOCKAGE_INTERFACE`) et `MOCK_AI`, avec priorité aux variables d'environnement système directes puis lecture du `.env` applicatif.
+- `LoadConfigFromEnv` purge par sécurité tout `.env` résiduel dans `src/` ; `WriteEnvFile` réécrit le `.env` STRICTEMENT à la racine et supprime préventivement tout ancien `src/.env` pour ne garder que la racine du projet.

@@ -38,3 +38,7 @@ Précisions issues des commentaires retirés de `main.go` et non redondantes ave
 
 - En cas d'erreur de `GetRepoStatus`, le statut est dégradé à `nil` (`status = nil`) et le menu principal est quand même affiché via `views.ShowMainMenu`.
 - Toute option non reconnue dans le `switch` (`default`) provoque un retour direct au menu, sans message d'erreur ni sortie.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `main()` : Point d'entrée initialisant l'interface et pilotant le menu principal.

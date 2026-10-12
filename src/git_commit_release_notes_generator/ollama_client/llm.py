@@ -59,6 +59,7 @@ _TYPE_KEYWORD_PATTERNS = {
 }
 
 
+# Détecte le type imposé explicitement par le retour utilisateur.
 def _extract_forced_type(feedback: str) -> str | None:
     if not feedback:
         return None
@@ -66,6 +67,7 @@ def _extract_forced_type(feedback: str) -> str | None:
     return found.pop() if len(found) == 1 else None
 
 
+# Applique le type imposé au message généré si nécessaire.
 def _apply_forced_type(msg: CommitMessage, forced_type: str | None) -> CommitMessage:
     if forced_type and msg.type != forced_type:
         logger.info(
@@ -83,17 +85,21 @@ class PingResult:
     latency_ms: int = 0
     installed_models: list[str] = field(default_factory=list)
 
+    # Permet le déballage du résultat en tuple.
     def __iter__(self):
         return iter((self.reachable, self.error))
 
+    # Permet l'accès au résultat par index.
     def __getitem__(self, index):
         return (self.reachable, self.error)[index]
 
+    # Compare le résultat à un tuple ou un objet.
     def __eq__(self, other):
         if isinstance(other, tuple) and len(other) == 2:
             return (self.reachable, self.error) == other
         return super().__eq__(other)
 
+    # Sérialise le résultat du diagnostic en dictionnaire.
     def to_dict(self) -> dict:
         data = {
             "success": True,
@@ -106,6 +112,7 @@ class PingResult:
         return data
 
 
+# Vérifie la joignabilité du serveur Ollama et mesure la latence.
 def check_ollama_reachable(timeout: float = _PING_TIMEOUT_S, fetch_models: bool = False) -> PingResult:
     if config.MOCK_AI:
         mock_data = mock_ping()
@@ -156,6 +163,7 @@ def check_ollama_reachable(timeout: float = _PING_TIMEOUT_S, fetch_models: bool 
 ping_ollama = check_ollama_reachable
 
 
+# Génère un message de commit à partir des diffs stagés.
 def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> CommitMessage:
     if not diff_files:
         raise ValueError("generate_commit_message() nécessite au moins un DiffFile.")
@@ -201,6 +209,7 @@ def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> C
     return _apply_forced_type(_to_commit_message(raw), forced_type)
 
 
+# Assemble le résumé textuel des diffs pour le prompt.
 def _build_diff_summary(diff_files: list[DiffFile]) -> str:
     parts = [
         f"Fichier: {f.path} (statut={f.status}, +{f.added}/-{f.removed})\n{f.patch}"
@@ -209,6 +218,7 @@ def _build_diff_summary(diff_files: list[DiffFile]) -> str:
     return "\n\n".join(parts)
 
 
+# Envoie les messages au chat Ollama et renvoie le JSON.
 def _call_chat(messages: list[dict]) -> dict:
     if config.MOCK_AI:
         return mock_call_chat(messages)
@@ -248,6 +258,7 @@ def _call_chat(messages: list[dict]) -> dict:
         raise OllamaCallError(f"Contenu non-JSON malgré le format contraint : {content!r}") from e
 
 
+# Valide la réponse brute et signale l'erreur éventuelle.
 def _validate(raw: dict) -> str | None:
     commit_type = raw.get("type")
     if commit_type not in _ALLOWED_TYPES:
@@ -264,6 +275,7 @@ def _validate(raw: dict) -> str | None:
     return None
 
 
+# Convertit la réponse validée en objet CommitMessage.
 def _to_commit_message(raw: dict) -> CommitMessage:
     return CommitMessage(
         type=raw["type"],

@@ -8,6 +8,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 
+# Collecte les pages de documentation sans doublon.
 def collect_pages(entry, pages, seen):
     if isinstance(entry, dict):
         for title, value in entry.items():
@@ -23,6 +24,7 @@ def collect_pages(entry, pages, seen):
             collect_pages(item, pages, seen)
 
 
+# Assemble les pages Markdown en document unique.
 def build_markdown():
     mkdocs_path = ROOT / "mkdocs.yml"
     config = yaml.safe_load(mkdocs_path.read_text(encoding="utf-8"))
@@ -62,6 +64,7 @@ def build_markdown():
     return output
 
 
+# Vérifie les outils et génère le PDF de documentation.
 def main():
     required_tools = ("pandoc", "xelatex")
     missing_tools = [tool for tool in required_tools if shutil.which(tool) is None]

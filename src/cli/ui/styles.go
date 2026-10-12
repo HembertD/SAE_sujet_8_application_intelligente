@@ -31,14 +31,17 @@ const (
 
 var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
+// Supprime les séquences d'échappement ANSI d'une chaîne.
 func StripANSI(s string) string {
 	return ansiRegex.ReplaceAllString(s, "")
 }
 
+// Calcule la longueur visible d'une chaîne sans les codes ANSI.
 func VisualLen(s string) int {
 	return len([]rune(StripANSI(s)))
 }
 
+// Aligne une chaîne à gauche en complétant à droite.
 func PadRight(s string, width int) string {
 	vis := VisualLen(s)
 	if vis >= width {
@@ -47,6 +50,7 @@ func PadRight(s string, width int) string {
 	return s + strings.Repeat(" ", width-vis)
 }
 
+// Aligne une chaîne à droite en complétant à gauche.
 func PadLeft(s string, width int) string {
 	vis := VisualLen(s)
 	if vis >= width {
@@ -55,6 +59,7 @@ func PadLeft(s string, width int) string {
 	return strings.Repeat(" ", width-vis) + s
 }
 
+// Centre une chaîne en complétant des deux côtés.
 func PadCenter(s string, width int) string {
 	vis := VisualLen(s)
 	if vis >= width {
@@ -66,6 +71,7 @@ func PadCenter(s string, width int) string {
 	return strings.Repeat(" ", left) + s + strings.Repeat(" ", right)
 }
 
+// Efface complètement le terminal et son historique de défilement.
 func ClearTerminal() {
 	cmd := exec.Command("clear")
 	cmd.Stdout = os.Stdout
@@ -73,10 +79,12 @@ func ClearTerminal() {
 	fmt.Print(ClearScreen)
 }
 
+// Colore un texte avec une couleur TrueColor RGB.
 func Rgb(r, g, b int, text string) string {
 	return fmt.Sprintf("\033[38;2;%d;%d;%dm%s%s", r, g, b, text, Reset)
 }
 
+// Applique un dégradé néon animé à un texte.
 func NeonGradient(text string, offset float64) string {
 	var sb strings.Builder
 	for i, r := range text {

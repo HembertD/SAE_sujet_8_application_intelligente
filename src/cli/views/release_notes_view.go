@@ -10,6 +10,7 @@ import (
 	"sae-git-cli/ui"
 )
 
+// Orchestre le flux interactif de génération des release notes.
 func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
 	ui.ClearTerminal()
 	ui.PrintBanner(status)

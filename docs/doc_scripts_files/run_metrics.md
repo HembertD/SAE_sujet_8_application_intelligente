@@ -27,3 +27,10 @@ Outil de développement (pas le module lui-même) qui fait tourner `generate_com
 
 - Usage : `python scripts/run_metrics.py`. `_RetryCounter` compte les `warning` contenant `invalide` émis par `llm.py` pour détecter les générations ayant nécessité un retry, sans toucher à son API publique.
 - `_print_report()` affiche le tableau (`Scénario`, `Résultat`, `Attendu`, `Obtenu`, `Retry`, `Latence`) puis les taux de conformité, de type exact, de retry et les latences moyenne/min/max.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `_RetryCounter.__init__()` : Initialise le compteur de retries détectés.
+- `_RetryCounter.emit()` : Compte les avertissements signalant une génération invalide.
+- `main()` : Mesure la conformité et la latence sur les diffs de référence.
+- `_print_report()` : Affiche le tableau récapitulatif des mesures.

@@ -19,6 +19,7 @@ type PythonClient struct {
 	appRoot    string
 }
 
+// Instancie le client Python en résolvant la racine applicative.
 func NewPythonClient(repoRoot string) *PythonClient {
 	appRoot := FindAppRoot(repoRoot)
 	if isTestDir(repoRoot) {
@@ -27,6 +28,7 @@ func NewPythonClient(repoRoot string) *PythonClient {
 	return NewPythonClientWithAppRoot(repoRoot, appRoot)
 }
 
+// Instancie le client Python avec racines explicites et interpréteur résolu.
 func NewPythonClientWithAppRoot(repoRoot, appRoot string) *PythonClient {
 	if appRoot == "" {
 		appRoot = FindAppRoot(repoRoot)
@@ -52,6 +54,7 @@ func NewPythonClientWithAppRoot(repoRoot, appRoot string) *PythonClient {
 	}
 }
 
+// Exécute le module Python et capture sa sortie standard.
 func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 	fullArgs := []string{"-m", p.moduleName}
 	hasRepoArg := false
@@ -128,10 +131,12 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
+// Indique que le client réel n'est jamais en simulation.
 func (p *PythonClient) IsMock() bool {
 	return false
 }
 
+// Interroge le backend Python pour le statut du dépôt.
 func (p *PythonClient) GetRepoStatus() (*models.RepoStatus, error) {
 	out, err := p.runPythonCommand("--action", "status")
 	if err != nil {
@@ -145,6 +150,7 @@ func (p *PythonClient) GetRepoStatus() (*models.RepoStatus, error) {
 	return &status, nil
 }
 
+// Interroge le backend Python pour le diff.
 func (p *PythonClient) GetDiff() (*models.DiffResponse, error) {
 	out, err := p.runPythonCommand("--action", "diff")
 	if err != nil {
@@ -161,6 +167,7 @@ func (p *PythonClient) GetDiff() (*models.DiffResponse, error) {
 	return &diffResp, nil
 }
 
+// Demande au backend Python d'indexer tous les fichiers.
 func (p *PythonClient) StageAll() (*models.ActionResult, error) {
 	out, err := p.runPythonCommand("--action", "stage-all")
 	if err != nil {
@@ -174,6 +181,7 @@ func (p *PythonClient) StageAll() (*models.ActionResult, error) {
 	return &res, nil
 }
 
+// Demande au backend Python une proposition de commit.
 func (p *PythonClient) GenerateCommit(feedback string) (*models.CommitProposal, error) {
 	args := []string{"--action", "generate-commit"}
 	if strings.TrimSpace(feedback) != "" {
@@ -199,6 +207,7 @@ func (p *PythonClient) GenerateCommit(feedback string) (*models.CommitProposal, 
 	return &proposal, nil
 }
 
+// Demande au backend Python d'appliquer le commit.
 func (p *PythonClient) ApplyCommit(message string) (*models.ActionResult, error) {
 	out, err := p.runPythonCommand("--action", "apply-commit", "--message", message)
 	if err != nil {
@@ -212,6 +221,7 @@ func (p *PythonClient) ApplyCommit(message string) (*models.ActionResult, error)
 	return &res, nil
 }
 
+// Demande au backend Python de pousser vers le distant.
 func (p *PythonClient) Push() (*models.ActionResult, error) {
 	out, err := p.runPythonCommand("--action", "push")
 	if err != nil {
@@ -225,6 +235,7 @@ func (p *PythonClient) Push() (*models.ActionResult, error) {
 	return &res, nil
 }
 
+// Demande au backend Python les notes de version.
 func (p *PythonClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNotesResponse, error) {
 	out, err := p.runPythonCommand("--action", "release-notes", "--from", fromTag, "--to", toTag)
 	if err != nil {
@@ -241,10 +252,12 @@ func (p *PythonClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNo
 	return &res, nil
 }
 
+// Charge la configuration réelle depuis l'environnement.
 func (p *PythonClient) GetConfig() (*models.ConfigResponse, error) {
 	return LoadConfigFromEnv(p.appRoot, false), nil
 }
 
+// Persiste la configuration puis notifie le backend Python.
 func (p *PythonClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool, mockAI ...bool) (*models.ActionResult, error) {
 	envPath := FindAppEnvPath(p.appRoot)
 	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface, mockAI...); err != nil {
@@ -270,6 +283,7 @@ func (p *PythonClient) SaveConfig(baseURL, model string, timeout float64, lang s
 	}, nil
 }
 
+// Interroge le backend Python sur l'état d'Ollama.
 func (p *PythonClient) PingOllama() (*models.PingResponse, error) {
 	out, err := p.runPythonCommand("--action", "ping-ollama")
 	if err != nil {
@@ -283,6 +297,7 @@ func (p *PythonClient) PingOllama() (*models.PingResponse, error) {
 	return &ping, nil
 }
 
+// Sauvegarde le contenu Markdown dans le dépôt cible.
 func (p *PythonClient) SaveMarkdownFile(filename, content string) error {
 	path := filepath.Join(p.repoRoot, filename)
 	return os.WriteFile(path, []byte(content), 0644)

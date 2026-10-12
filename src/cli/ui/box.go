@@ -7,6 +7,7 @@ import (
 	"sae-git-cli/models"
 )
 
+// Affiche la bannière d'en-tête avec le statut du dépôt Git.
 func PrintBanner(repoStatus *models.RepoStatus) {
 	width := 72
 	fmt.Println(Cyan + "╭" + strings.Repeat("─", width-2) + "╮" + Reset)
@@ -37,6 +38,7 @@ func PrintBanner(repoStatus *models.RepoStatus) {
 	fmt.Println()
 }
 
+// Affiche un panneau encadré avec titre et lignes de contenu.
 func PrintCard(title string, lines []string, width int, borderColor string) {
 	if borderColor == "" {
 		borderColor = Cyan
@@ -57,6 +59,7 @@ func PrintCard(title string, lines []string, width int, borderColor string) {
 	fmt.Println(borderColor + "╰" + strings.Repeat("─", width-2) + "╯" + Reset)
 }
 
+// Affiche le tableau des fichiers modifiés du diff indexé.
 func PrintDiffTable(files []models.DiffFile, width int) {
 	if len(files) == 0 {
 		PrintWarning("Aucun fichier indexé (staged) pour le moment.")
@@ -100,6 +103,7 @@ func PrintDiffTable(files []models.DiffFile, width int) {
 	PrintCard("Modifications Staged", lines, width, Blue)
 }
 
+// Affiche la proposition de commit conventionnel dans une carte.
 func PrintCommitCard(typeStr, scope, subject, body string, width int) {
 	var lines []string
 
@@ -141,18 +145,22 @@ func PrintCommitCard(typeStr, scope, subject, body string, width int) {
 	PrintCard(cardTitle, lines, width, borderColor)
 }
 
+// Affiche un message de succès standardisé en vert.
 func PrintSuccess(msg string) {
 	fmt.Printf("\n  %s✔%s %s%s%s\n\n", Green, Reset, Bold+Green, msg, Reset)
 }
 
+// Affiche un message d'erreur standardisé en rouge.
 func PrintError(msg string) {
 	fmt.Printf("\n  %s✖ Erreur :%s %s\n\n", Red+Bold, Reset, msg)
 }
 
+// Affiche un message d'avertissement standardisé en jaune.
 func PrintWarning(msg string) {
 	fmt.Printf("\n  %s⚠️ Avertissement :%s %s\n\n", Yellow+Bold, Reset, msg)
 }
 
+// Affiche un message d'information standardisé en cyan.
 func PrintInfo(msg string) {
 	fmt.Printf("  %sℹ%s %s\n", Cyan+Bold, Reset, msg)
 }

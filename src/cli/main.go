@@ -14,6 +14,7 @@ import (
 	"sae-git-cli/views"
 )
 
+// Point d'entrée initialisant l'interface et pilotant le menu principal.
 func main() {
 	mockInterfaceFlag := flag.Bool("mockInterface", false, "Force la simulation complète de l'interface (mode démo sans Git ni Python)")
 	mockIAFlag := flag.Bool("mockIA", false, "Force la simulation de l'IA hors-ligne sans serveur Ollama")

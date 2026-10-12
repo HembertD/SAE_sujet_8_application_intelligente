@@ -48,3 +48,18 @@ Ce module gère la génération du message de commit via Ollama. Il construit le
 - `_to_commit_message(raw)` : mappe `type`, `scope`, `subject`, `body` du dictionnaire validé vers `CommitMessage`.
 - `_extract_forced_type(feedback)` : détecte si le feedback impose explicitement un type. Un préfixe d'intention explicite est requis avant le mot-clé de type (`c'est`, `je veux`, `mets en`, `type:`, ...) sinon un mot comme `test` matcherait n'importe quelle phrase française normale sans rapport avec une consigne. Si un seul type connu est trouvé, il est appliqué de façon déterministe ; si aucun ou plusieurs types contradictoires sont trouvés, retourne `None` et le modèle garde la main.
 - `_apply_forced_type(msg, forced_type)` : écrase `msg.type` par le type imposé (avec trace `info` du type proposé par le modèle) ; appliqué aux trois sorties de `generate_commit_message` (mock, premier essai, retry).
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `_extract_forced_type()` : Détecte le type imposé explicitement par le retour utilisateur.
+- `_apply_forced_type()` : Applique le type imposé au message généré si nécessaire.
+- `PingResult.__iter__()` : Permet le déballage du résultat en tuple.
+- `PingResult.__getitem__()` : Permet l'accès au résultat par index.
+- `PingResult.__eq__()` : Compare le résultat à un tuple ou un objet.
+- `PingResult.to_dict()` : Sérialise le résultat du diagnostic en dictionnaire.
+- `check_ollama_reachable()` : Vérifie la joignabilité du serveur Ollama et mesure la latence.
+- `generate_commit_message()` : Génère un message de commit à partir des diffs stagés.
+- `_build_diff_summary()` : Assemble le résumé textuel des diffs pour le prompt.
+- `_call_chat()` : Envoie les messages au chat Ollama et renvoie le JSON.
+- `_validate()` : Valide la réponse brute et signale l'erreur éventuelle.
+- `_to_commit_message()` : Convertit la réponse validée en objet CommitMessage.

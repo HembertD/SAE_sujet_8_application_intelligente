@@ -47,3 +47,16 @@ Le wrapper est le point d'entrée entre le dépôt Git et les composants de gén
 - `get_staged_diff_as_json()` : liste prête pour JSON via `to_dict()` ; `get_staged_diff_payload()` / `get_llm_payload()` ajoutent un résumé (`file_count`, `binary_file_count`, `truncated`, sans bloc prompt interne).
 - `get_commits_between_tags(tag_a, tag_b)` : parcourt `tag_a..tag_b` et renvoie des `CommitInfo` (SHA court à 7 caractères, message nettoyé, auteur, date ISO).
 - `commit(message)` : refuse si rien n'est indexé (`is_dirty(index=True)` faux) et renvoie le SHA court du commit créé.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `GitWrapper.__init__()` : Ouvre le dépôt Git à partir du chemin donné.
+- `GitWrapper._sanitize_diff_text()` : Masque les secrets détectés dans le texte du diff.
+- `GitWrapper.sanitize_diff()` : Expose publiquement le masquage des secrets du diff.
+- `GitWrapper._parse_diff()` : Découpe le diff brut en objets DiffFile par fichier.
+- `GitWrapper.get_staged_diff()` : Récupère et filtre le diff stagé du dépôt.
+- `GitWrapper.get_staged_diff_as_json()` : Expose le diff stagé sous forme de liste JSON.
+- `GitWrapper.get_staged_diff_payload()` : Construit le payload résumé du diff stagé.
+- `GitWrapper.get_llm_payload()` : Fournit le payload du diff destiné au LLM.
+- `GitWrapper.get_commits_between_tags()` : Liste les commits entre deux révisions Git.
+- `GitWrapper.commit()` : Crée un commit avec le message donné.

@@ -37,3 +37,12 @@ Ce module gère la génération du message de commit via Ollama. Il construit le
 - [mock_llm.md](mock_llm.md)
 - [exceptions.md](exceptions.md)
 - [commit_message_system.md](prompts/commit_message_system.md)
+
+## Détails déplacés du code source
+
+- `PingResult` : outre l'accès par attributs (`.reachable`, `.latency_ms`, `.error`, `.installed_models`), il supporte le déballage en tuple (`reachable, error = check_ollama_reachable()`) via `__iter__`/`__getitem__`, et la comparaison directe à un tuple de 2 éléments via `__eq__`. `to_dict()` renvoie `success`, `reachable`, `latency_ms`, `installed_models`, et n'ajoute la clé `error` que si elle est non vide.
+- `check_ollama_reachable()` : ne lève jamais d'exception ; mesure la latence via `/api/version`, et n'interroge `/api/tags` que si `fetch_models=True` (échec de récupération des modèles seulement tracé en `debug`).
+- `generate_commit_message()` : un seul retry est tenté ; la réponse invalide est réinjectée comme message `assistant` sérialisé en JSON, suivie d'un message `user` signalant l'erreur constatée et exigeant un JSON conforme. Si le second essai échoue, lève `CommitMessageValidationError` plutôt que de renvoyer un message bancal.
+- `_build_diff_summary()` : assemble un résumé textuel `Fichier: {path} (statut={status}, +{added}/-{removed})` suivi du `patch`, fichiers joints par une double newline.
+- `_validate(raw)` : retourne `None` si valide, sinon un message explicite (`type` hors liste autorisée, `subject` manquant ou vide, `subject` de plus de 72 caractères, `subject` se terminant par un point).
+- `_to_commit_message(raw)` : mappe `type`, `scope`, `subject`, `body` du dictionnaire validé vers `CommitMessage`.

@@ -1,11 +1,3 @@
-"""Client Ollama pour la génération de messages de commit (module C).
-
-Contrat : DiffFile (entrée) -> CommitMessage (sortie) validé Conventional
-Commits. Le modèle renvoie du JSON structuré (contraint côté serveur via le
-paramètre `format`), jamais une chaîne déjà formatée : c'est ce module qui
-assemble la ligne finale, pour garantir le format par le code plutôt que par
-la bonne volonté du LLM.
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -56,14 +48,8 @@ _JSON_SCHEMA = {
     "additionalProperties": False,
 }
 
-
 @dataclass
 class PingResult:
-    """Résultat de la vérification de joignabilité d'Ollama.
-
-    Permet à la fois l'accès par attributs (.reachable, .latency_ms, .error, .installed_models)
-    et le déballage direct en tuple (reachable, error) pour une compatibilité totale.
-    """
     reachable: bool
     error: str | None = None
     latency_ms: int = 0
@@ -81,7 +67,6 @@ class PingResult:
         return super().__eq__(other)
 
     def to_dict(self) -> dict:
-        """Formate le résultat en dictionnaire pour le CLI Go."""
         data = {
             "success": True,
             "reachable": self.reachable,
@@ -92,15 +77,7 @@ class PingResult:
             data["error"] = self.error
         return data
 
-
 def check_ollama_reachable(timeout: float = _PING_TIMEOUT_S, fetch_models: bool = False) -> PingResult:
-    """Vérifie la joignabilité du serveur Ollama et optionnellement les modèles installés.
-
-    Mesure la latence en millisecondes et retourne un PingResult.
-    Peut être déballé comme un tuple `reachable, error = check_ollama_reachable()`
-    ou manipulé avec ses attributs (`res.reachable`, `res.latency_ms`, `res.error`, `res.installed_models`).
-    Ne lève jamais d'exception.
-    """
     if config.MOCK_AI:
         mock_data = mock_ping()
         models = mock_data.get("installed_models", []) if fetch_models else []
@@ -146,19 +123,9 @@ def check_ollama_reachable(timeout: float = _PING_TIMEOUT_S, fetch_models: bool 
             installed_models=[],
         )
 
-
-# Alias sémantique
 ping_ollama = check_ollama_reachable
 
-
 def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> CommitMessage:
-    """Génère un CommitMessage validé à partir d'une liste de DiffFile.
-
-    Un seul retry est tenté en cas d'échec de validation, en réinjectant
-    l'erreur constatée dans la conversation. Si le second essai échoue aussi,
-    lève CommitMessageValidationError plutôt que de renvoyer un message
-    bancal en silence.
-    """
     if not diff_files:
         raise ValueError("generate_commit_message() nécessite au moins un DiffFile.")
 
@@ -199,14 +166,12 @@ def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> C
         )
     return _to_commit_message(raw)
 
-
 def _build_diff_summary(diff_files: list[DiffFile]) -> str:
     parts = [
         f"Fichier: {f.path} (statut={f.status}, +{f.added}/-{f.removed})\n{f.patch}"
         for f in diff_files
     ]
     return "\n\n".join(parts)
-
 
 def _call_chat(messages: list[dict]) -> dict:
     if config.MOCK_AI:
@@ -217,9 +182,6 @@ def _call_chat(messages: list[dict]) -> dict:
         "messages": messages,
         "stream": False,
         "format": _JSON_SCHEMA,
-        # Sans ça, Ollama utilise sa fenêtre de contexte par défaut (souvent
-        # bien plus petite que les 262K annoncés pour gemma4:26b) et tronque
-        # silencieusement le début du diff sur les cas volumineux.
         "options": {"num_ctx": OLLAMA_NUM_CTX},
     }
     request = urllib.request.Request(
@@ -249,9 +211,7 @@ def _call_chat(messages: list[dict]) -> dict:
     except json.JSONDecodeError as e:
         raise OllamaCallError(f"Contenu non-JSON malgré le format contraint : {content!r}") from e
 
-
 def _validate(raw: dict) -> str | None:
-    """Retourne None si `raw` est valide, sinon un message d'erreur explicite."""
     commit_type = raw.get("type")
     if commit_type not in _ALLOWED_TYPES:
         return f"type {commit_type!r} hors de la liste autorisée {sorted(_ALLOWED_TYPES)}"
@@ -265,7 +225,6 @@ def _validate(raw: dict) -> str | None:
         return "subject ne doit pas se terminer par un point"
 
     return None
-
 
 def _to_commit_message(raw: dict) -> CommitMessage:
     return CommitMessage(

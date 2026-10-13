@@ -1,3 +1,12 @@
+"""Point d'entrée du backend Python appelé par le CLI Go.
+
+Ce fichier est exécuté en sous-processus par src/cli/bridge/python_client.go :
+python -m git_commit_release_notes_generator.service.core --action <NOM> [args]
+
+Règles impératives :
+- Un unique objet JSON valide est écrit sur stdout à la fin.
+- Tous les messages de logs et diagnostics passent sur stderr via logging.
+"""
 from __future__ import annotations
 
 import argparse
@@ -33,13 +42,20 @@ from git_commit_release_notes_generator.service.git_wrapper import GitWrapper
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(levelname)s: %(message)s")
 
+
 def action_status(repo_path: str = ".") -> dict:
+    """Renvoie l'état du dépôt Git pour le TUI Go.
+
+    Format attendu côté Go :
+    {"is_git_repo": bool, "repo_path": str, "branch": str, "staged_count": int, "unstaged_count": int}
+    """
     try:
         wrapper = GitWrapper(repo_path)
         repo = wrapper.repo
 
         path_str = str(repo.working_tree_dir or repo.git_dir)
 
+        # Récupération de la branche courante (supporte detached HEAD et initial commit)
         try:
             branch = repo.active_branch.name
         except TypeError:
@@ -47,12 +63,14 @@ def action_status(repo_path: str = ".") -> dict:
         except Exception:
             branch = "HEAD"
 
+        # Nombre de fichiers indexés (staged)
         try:
             staged_lines = [l for l in repo.git.diff("--cached", "--name-only").splitlines() if l.strip()]
             staged_count = len(staged_lines)
         except Exception:
             staged_count = 0
 
+        # Nombre de fichiers non indexés (unstaged + untracked)
         try:
             unstaged_lines = [l for l in repo.git.diff("--name-only").splitlines() if l.strip()]
             unstaged_count = len(unstaged_lines) + len(repo.untracked_files)
@@ -77,7 +95,13 @@ def action_status(repo_path: str = ".") -> dict:
             "error": str(e),
         }
 
+
 def action_diff(repo_path: str = ".") -> dict:
+    """Renvoie le diff indexé analysé et assaini pour le TUI Go.
+
+    Format attendu côté Go :
+    {"success": bool, "files": [{"path", "status", "added", "removed", "binary", "patch", "has_secrets_masked"}], "staged_count": int}
+    """
     try:
         wrapper = GitWrapper(repo_path)
         parsed_files = wrapper.get_staged_diff()
@@ -109,7 +133,13 @@ def action_diff(repo_path: str = ".") -> dict:
             "staged_count": 0,
         }
 
+
 def action_stage_all(repo_path: str = ".") -> dict:
+    """Indexe l'ensemble des modifications locales (git add -A).
+
+    Format attendu côté Go :
+    {"success": bool, "message": str}
+    """
     try:
         wrapper = GitWrapper(repo_path)
         wrapper.repo.git.add("-A")
@@ -124,7 +154,13 @@ def action_stage_all(repo_path: str = ".") -> dict:
             "error": f"Erreur lors de l'indexation : {e}",
         }
 
+
 def action_generate_commit(repo_path: str = ".", feedback: str = "") -> dict:
+    """Génère une proposition de message de commit via le LLM.
+
+    Format attendu côté Go :
+    {"success": bool, "type": str, "scope": str, "subject": str, "body": str, "raw_formatted": str}
+    """
     try:
         wrapper = GitWrapper(repo_path)
         diff_files = wrapper.get_staged_diff()
@@ -168,7 +204,13 @@ def action_generate_commit(repo_path: str = ".", feedback: str = "") -> dict:
         "raw_formatted": raw_formatted,
     }
 
+
 def action_apply_commit(repo_path: str = ".", message: str = "") -> dict:
+    """Applique le commit Git sur les modifications indexées.
+
+    Format attendu côté Go :
+    {"success": bool, "sha": str, "message": str}
+    """
     if not message or not message.strip():
         return {
             "success": False,
@@ -190,7 +232,13 @@ def action_apply_commit(repo_path: str = ".", message: str = "") -> dict:
             "error": str(e),
         }
 
+
 def action_push(repo_path: str = ".") -> dict:
+    """Pousse les modifications vers le dépôt distant.
+
+    Format attendu côté Go :
+    {"success": bool, "message": str}
+    """
     try:
         wrapper = GitWrapper(repo_path)
         repo = wrapper.repo
@@ -211,7 +259,9 @@ def action_push(repo_path: str = ".") -> dict:
             "error": f"Échec lors du git push : {e}",
         }
 
+
 def _format_release_notes_fallback(commits: list, from_tag: str, to_tag: str) -> str:
+    """Formate et catégorise les commits en Markdown structuré selon Conventional Commits."""
     categories: dict[str, list[str]] = {
         "feat": [],
         "fix": [],
@@ -272,7 +322,13 @@ def _format_release_notes_fallback(commits: list, from_tag: str, to_tag: str) ->
 
     return "\n".join(lines).strip()
 
+
 def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str = "") -> dict:
+    """Génère les notes de version entre deux tags.
+
+    Format attendu côté Go :
+    {"success": bool, "from_tag": str, "to_tag": str, "markdown": str, "commit_count": int}
+    """
     if not from_tag:
         from_tag = "v0.1.0"
     if not to_tag:
@@ -310,6 +366,7 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
             "commit_count": len(commits),
         }
 
+    # Vérification stricte de joignabilité d'Ollama avant génération
     reachable, ping_error = check_ollama_reachable(timeout=3.0)
     if not reachable:
         logger.warning(f"Serveur Ollama non joignable pour release-notes : {ping_error}")
@@ -322,6 +379,7 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
             "commit_count": 0,
         }
 
+    # Tentative d'inférence LLM
     md_content: str | None = None
     try:
         commits_summary = "\n".join([f"- [{c.sha}] {c.message.splitlines()[0]}" for c in commits])
@@ -368,14 +426,30 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
         "commit_count": len(commits),
     }
 
+
 def action_save_config(base_url: str = "", model: str = "", timeout: str = "", language: str = "") -> dict:
+    """Action de notification de la sauvegarde de configuration.
+
+    Format attendu côté Go :
+    {"success": bool, "message": str}
+    """
     return {
         "success": True,
         "message": "Configuration notifiée avec succès au backend Python.",
     }
 
+
 def action_ping_ollama() -> dict:
+    """Teste la connexion avec le serveur Ollama.
+
+    Délègue l'intégralité du diagnostic (vérification, mesure de latence et
+    récupération des modèles installés) à la fonction de ping unifiée.
+
+    Format attendu côté Go :
+    {"success": bool, "reachable": bool, "latency_ms": int, "installed_models": [str]}
+    """
     return check_ollama_reachable(timeout=3.0, fetch_models=True).to_dict()
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Service Core CLI pour Smart Commit Generator")
@@ -406,6 +480,9 @@ def main() -> None:
 
     handler = handlers.get(args.action)
     if handler is None:
+        # Toujours sortir avec le code 0 : le Go (python_client.go) ignore
+        # entierement stdout si le process sort en code != 0, donc ce
+        # message d'erreur n'atteindrait jamais l'utilisateur.
         result = {"success": False, "error": f"action inconnue: {args.action}"}
         print(json.dumps(result, ensure_ascii=False))
         return
@@ -417,6 +494,7 @@ def main() -> None:
         result = {"success": False, "error": str(e)}
 
     print(json.dumps(result, ensure_ascii=False))
+
 
 if __name__ == "__main__":
     main()

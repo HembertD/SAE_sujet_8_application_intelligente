@@ -1,6 +1,9 @@
+"""Exceptions du client Ollama (module C)."""
+
+
 class OllamaCallError(RuntimeError):
-    pass
+    """Erreur lors de l'appel à Ollama (réseau, réponse incomplète ou illisible)."""
 
 
 class CommitMessageValidationError(RuntimeError):
-    pass
+    """Le message de commit généré ne respecte pas le format attendu, même après retry."""

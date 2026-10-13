@@ -10,6 +10,7 @@ import (
 	"sae-git-cli/ui"
 )
 
+// ShowReleaseNotesFlow orchestre l'écran de génération de changelog / release notes
 func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
 	ui.ClearTerminal()
 	ui.PrintBanner(status)
@@ -19,6 +20,7 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 	fmt.Println(ui.Dim + "Synthèse automatique de l'historique Git catégorisée par le LLM." + ui.Reset)
 	fmt.Println()
 
+	// Saisie des bornes de révision
 	fmt.Printf("  %s• Tag ou révision de départ [v0.1.0] :%s ", ui.Bold, ui.Reset)
 	fromTag, _ := reader.ReadString('\n')
 	fromTag = strings.TrimSpace(fromTag)
@@ -70,6 +72,7 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 	ui.PrintCard(fmt.Sprintf("Release Notes (%s ➔ %s)", fromTag, toTag), lines, width, cardColor)
 	fmt.Println()
 
+	// Choix utilisateur
 	fmt.Println(ui.Bold + "  Options :" + ui.Reset)
 	fmt.Printf("    %s[S]%s Sauvegarder dans un fichier RELEASE_NOTES.md\n", ui.Green+ui.Bold, ui.Reset)
 	fmt.Printf("    %s[R]%s Retourner au menu principal\n\n", ui.Yellow+ui.Bold, ui.Reset)

@@ -1,3 +1,10 @@
+"""Mesure le taux de conformité et la latence du module C sur les golden files.
+
+Outil de dev, pas le module lui-même : celui-ci peut écrire sur stdout.
+Nécessite un accès réseau au serveur Ollama partagé.
+
+Usage : python scripts/run_metrics.py
+"""
 from __future__ import annotations
 
 import logging
@@ -12,7 +19,10 @@ from git_commit_release_notes_generator.ollama_client.exceptions import CommitMe
 from git_commit_release_notes_generator.ollama_client.llm import generate_commit_message
 from test.fixtures.golden_diffs import GOLDEN_DIFFS
 
+
 class _RetryCounter(logging.Handler):
+    """Compte les warnings de retry émis par llm.py, sans toucher à son API publique."""
+
     def __init__(self) -> None:
         super().__init__()
         self.count = 0
@@ -20,6 +30,7 @@ class _RetryCounter(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         if "invalide" in record.getMessage():
             self.count += 1
+
 
 def main() -> None:
     retry_counter = _RetryCounter()
@@ -48,6 +59,7 @@ def main() -> None:
 
     _print_report(results)
 
+
 def _print_report(results: list[dict]) -> None:
     n = len(results)
     successes = [r for r in results if r["ok"]]
@@ -69,6 +81,7 @@ def _print_report(results: list[dict]) -> None:
     print(f"Type exact attendu vs obtenu                          : {type_matches}/{len(successes)} ({type_matches / len(successes):.0%})")
     print(f"Générations ayant nécessité un retry                  : {retries}/{len(successes)} ({retries / len(successes):.0%})")
     print(f"Latence moyenne / min / max                           : {sum(latencies) / n:.1f}s / {min(latencies):.1f}s / {max(latencies):.1f}s")
+
 
 if __name__ == "__main__":
     main()

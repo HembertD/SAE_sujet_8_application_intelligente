@@ -1,11 +1,18 @@
+"""Structures de données partagées entre les modules (contrat d'équipe).
+
+Ne pas modifier sans en discuter avec l'équipe : DiffFile est produit par le
+module de parsing Git (module B), CommitMessage est consommé par la couche
+d'affichage Go.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+
 @dataclass(init=False)
 class DiffFile:
     path: str
-    status: str
+    status: str  # A, M, D, R...
     added: int
     removed: int
     is_binary: bool
@@ -38,6 +45,7 @@ class DiffFile:
 
     @property
     def binary(self) -> bool:
+        """Alias rétrocompatible avec l'ancien contrat historique."""
         return self.is_binary
 
     def to_dict(self) -> dict[str, str | int | bool]:
@@ -50,9 +58,10 @@ class DiffFile:
             "is_binary": self.is_binary,
         }
 
+
 @dataclass
 class CommitMessage:
-    type: str
+    type: str  # feat, fix, chore, docs, refactor, test, perf, build, ci
     scope: str | None
     subject: str
     body: str | None

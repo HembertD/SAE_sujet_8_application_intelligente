@@ -14,7 +14,3 @@ Ce package rassemble la logique métier pure de l’application. Il sert à orch
 ## Objectif
 
 Cette couche permet de garder le code de génération séparé des détails de communication réseau ou de parsing Git.
-
-## Détails déplacés du code source
-
-- Le paquet réexporte `DiffFile` (depuis `models`), ainsi que `GitWrapper` et `GitWrapperError` (depuis `service.git_wrapper`) pour offrir un point d'accès unique à la couche service.

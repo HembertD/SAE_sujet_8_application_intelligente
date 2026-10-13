@@ -18,12 +18,3 @@ Ce fichier définit l'interface maîtresse `BackendClient` et le coordinateur ad
 
 - **Inversion des dépendances (DIP)** : Le front-end dépend exclusivement de l'abstraction `BackendClient`.
 - **Zéro logique métier en Go** : Les traitements d'analyse Git, LLM et release notes sont délégués au backend Python.
-
-## Détails déplacés du code source
-
-Précisions issues des commentaires retirés de `client.go` :
-
-- `BridgeClient` coordonne l'accès au backend en déléguant à `PythonClient` ou `MockClient` ; `activeDelegate` renvoie l'implémentation active selon `IsMock`.
-- `IsMock` indique si le mode simulation est actif : le drapeau forcé `forceMockInterface` est prioritaire, sinon lecture via `ReadMockSettingFromEnv`.
-- `GetConfig` lit la configuration depuis le `.env` de l'application et force `MockAI` à `true` si `forceMockIA` est actif.
-- `SaveConfig` persiste la nouvelle configuration dans le `.env` applicatif puis actualise l'état du client : mise à jour dynamique de `isMock` sauf si forcé par `--mockInterface`, et notification du backend Python via `save-config` uniquement en mode réel.

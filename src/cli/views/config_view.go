@@ -11,6 +11,7 @@ import (
 	"sae-git-cli/ui"
 )
 
+// ShowConfigFlow orchestre l'écran de visualisation et modification de la configuration
 func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
 	for {
 		ui.ClearTerminal()

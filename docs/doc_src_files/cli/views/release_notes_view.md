@@ -21,7 +21,3 @@ Ce module gère l'écran interactif dédié à la synthèse de version et à la 
 ## Rôle dans l’architecture
 
 Vue secondaire du sujet 8, concrétisant la seconde fonctionnalité majeure de la SAÉ : la génération automatisée de notes de version.
-
-## Détails déplacés du code source
-
-Anciens commentaires internes de `ShowReleaseNotesFlow` (supprimés du `.go`, conservés ici) : la fonction se structure en trois phases marquées dans le code — saisie des bornes de révision (`fromTag`/`toTag`), génération puis affichage du Markdown dans un panneau encadré, et choix utilisateur final (`S` sauvegarder / `R` retour menu).

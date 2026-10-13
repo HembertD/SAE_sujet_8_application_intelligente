@@ -1,3 +1,4 @@
+"""Module ollama_client pour l'interaction avec le serveur Ollama."""
 from git_commit_release_notes_generator.ollama_client.llm import (
     PingResult,
     check_ollama_reachable,

@@ -1,5 +1,6 @@
 package models
 
+// RepoStatus représente l'état brut du dépôt Git fourni par le backend Python.
 type RepoStatus struct {
 	IsGitRepo     bool   `json:"is_git_repo"`
 	RepoPath      string `json:"repo_path"`
@@ -9,9 +10,10 @@ type RepoStatus struct {
 	Error         string `json:"error,omitempty"`
 }
 
+// DiffFile représente un fichier modifié analysé et assaini par le backend.
 type DiffFile struct {
 	Path             string `json:"path"`
-	Status           string `json:"status"`
+	Status           string `json:"status"` // M, A, D, R, etc.
 	Added            int    `json:"added"`
 	Removed          int    `json:"removed"`
 	Binary           bool   `json:"binary"`
@@ -19,6 +21,7 @@ type DiffFile struct {
 	HasSecretsMasked bool   `json:"has_secrets_masked"`
 }
 
+// DiffResponse contient la liste des fichiers en attente et les métadonnées.
 type DiffResponse struct {
 	Success     bool       `json:"success"`
 	Error       string     `json:"error,omitempty"`
@@ -26,6 +29,7 @@ type DiffResponse struct {
 	StagedCount int        `json:"staged_count"`
 }
 
+// CommitProposal représente la suggestion de commit au format Conventional Commits.
 type CommitProposal struct {
 	Success      bool   `json:"success"`
 	Error        string `json:"error,omitempty"`
@@ -36,6 +40,7 @@ type CommitProposal struct {
 	RawFormatted string `json:"raw_formatted"`
 }
 
+// ActionResult représente le retour d'une action exécutée par Python (commit, stage, push, save).
 type ActionResult struct {
 	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
@@ -43,6 +48,7 @@ type ActionResult struct {
 	Error   string `json:"error,omitempty"`
 }
 
+// ReleaseNotesResponse contient le texte Markdown synthétisé par le LLM.
 type ReleaseNotesResponse struct {
 	Success     bool   `json:"success"`
 	Error       string `json:"error,omitempty"`
@@ -52,6 +58,7 @@ type ReleaseNotesResponse struct {
 	CommitCount int    `json:"commit_count"`
 }
 
+// ConfigResponse contient les paramètres lus ou écrits dans le .env par Python.
 type ConfigResponse struct {
 	Success       bool    `json:"success"`
 	Error         string  `json:"error,omitempty"`
@@ -63,6 +70,7 @@ type ConfigResponse struct {
 	MockAI        bool    `json:"mock_ai"`
 }
 
+// PingResponse contient le diagnostic de joignabilité du serveur Ollama IUT.
 type PingResponse struct {
 	Success         bool     `json:"success"`
 	Reachable       bool     `json:"reachable"`

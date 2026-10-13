@@ -20,7 +20,7 @@ func ShowMainMenu(reader *bufio.Reader, client bridge.BackendClient, status *mod
 	menuLines = append(menuLines, "")
 	menuLines = append(menuLines, fmt.Sprintf("  %s[1]%s 📝 %sGénérer un message de commit%s  (IA Conventional Commits)", ui.Yellow+ui.Bold, ui.Reset, ui.Bold, ui.Reset))
 	menuLines = append(menuLines, fmt.Sprintf("  %s[2]%s 📦 %sGénérer les Release Notes%s     (Synthèse entre tags)", ui.Yellow+ui.Bold, ui.Reset, ui.Bold, ui.Reset))
-	menuLines = append(menuLines, fmt.Sprintf("  %s[3]%s ⚙️  %sConfiguration%s                  (Modèle, URL Ollama, Langue)", ui.Yellow+ui.Bold, ui.Reset, ui.Bold, ui.Reset))
+	menuLines = append(menuLines, fmt.Sprintf("  %s[3]%s ⚙️  %sConfiguration%s                  (Modèle, URL Ollama, Timeout)", ui.Yellow+ui.Bold, ui.Reset, ui.Bold, ui.Reset))
 	menuLines = append(menuLines, fmt.Sprintf("  %s[4]%s 🚪 %sQuitter%s", ui.Yellow+ui.Bold, ui.Reset, ui.Bold, ui.Reset))
 	menuLines = append(menuLines, "")
 

@@ -275,14 +275,9 @@ func (p *PythonClient) SaveConfig(baseURL, model string, timeout float64, mockIn
 		"--timeout", fmt.Sprintf("%f", timeout),
 	)
 
-	mockAIVal := ReadMockAISettingFromEnv(p.appRoot)
-	if len(mockAI) > 0 {
-		mockAIVal = mockAI[0]
-	}
-
 	return &models.ActionResult{
 		Success: true,
-		Message: fmt.Sprintf("Configuration sauvegardée dans %s (MOCK_INTERFACE=%t, MOCK_AI=%t).", filepath.Base(envPath), mockInterface, mockAIVal),
+		Message: fmt.Sprintf("Configuration sauvegardée dans %s.", filepath.Base(envPath)),
 	}, nil
 }
 

@@ -12,7 +12,12 @@ import (
 )
 
 // ShowConfigFlow orchestre l'écran de visualisation et modification de la configuration
-func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
+func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus, isDev ...bool) {
+	devMode := false
+	if len(isDev) > 0 {
+		devMode = isDev[0]
+	}
+
 	for {
 		ui.ClearTerminal()
 		ui.PrintBanner(status)
@@ -31,23 +36,25 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		lines = append(lines, fmt.Sprintf("  • %sModèle LLM%s        : %s%s%s", ui.Bold, ui.Reset, ui.Yellow, cfg.OllamaModel, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sTimeout requête%s   : %.0fs", ui.Bold, ui.Reset, cfg.TimeoutS))
 
-		mockInterfaceColor := ui.Green
-		mockInterfaceStatus := "Désactivé"
-		if cfg.MockInterface {
-			mockInterfaceColor = ui.Yellow
-			mockInterfaceStatus = "Activé"
-		}
-		lines = append(lines, fmt.Sprintf("  • %sMock Interface%s    : %s%s%s", ui.Bold, ui.Reset, mockInterfaceColor, mockInterfaceStatus, ui.Reset))
+		if devMode {
+			mockInterfaceColor := ui.Green
+			mockInterfaceStatus := "Désactivé"
+			if cfg.MockInterface {
+				mockInterfaceColor = ui.Yellow
+				mockInterfaceStatus = "Activé"
+			}
+			lines = append(lines, fmt.Sprintf("  • %sMock Interface%s    : %s%s%s", ui.Bold, ui.Reset, mockInterfaceColor, mockInterfaceStatus, ui.Reset))
 
-		mockAIColor := ui.Green
-		mockAIStatus := "Désactivé"
-		if cfg.MockAI {
-			mockAIColor = ui.Yellow
-			mockAIStatus = "Activé"
+			mockAIColor := ui.Green
+			mockAIStatus := "Désactivé"
+			if cfg.MockAI {
+				mockAIColor = ui.Yellow
+				mockAIStatus = "Activé"
+			}
+			lines = append(lines, fmt.Sprintf("  • %sMock IA%s           : %s%s%s", ui.Bold, ui.Reset, mockAIColor, mockAIStatus, ui.Reset))
+			lines = append(lines, "")
+			lines = append(lines, ui.Green+"  🛠️  Mode Développeur actif (--dev)"+ui.Reset)
 		}
-		lines = append(lines, fmt.Sprintf("  • %sMock IA%s           : %s%s%s", ui.Bold, ui.Reset, mockAIColor, mockAIStatus, ui.Reset))
-		lines = append(lines, "")
-		lines = append(lines, ui.Dim+"  (Toute modification est répercutée dans le .env sans recompilation)"+ui.Reset)
 		lines = append(lines, "")
 
 		ui.PrintCard("Configuration Active", lines, width, ui.Yellow)
@@ -118,20 +125,22 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				}
 			}
 
-			fmt.Printf("  Mock Interface (true/false) [%t] : ", cfg.MockInterface)
-			newMockInterfaceStr, _ := reader.ReadString('\n')
-			newMockInterfaceStr = strings.TrimSpace(newMockInterfaceStr)
-			if newMockInterfaceStr != "" {
-				lower := strings.ToLower(newMockInterfaceStr)
-				cfg.MockInterface = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
-			}
+			if devMode {
+				fmt.Printf("  Mock Interface (true/false) [%t] : ", cfg.MockInterface)
+				newMockInterfaceStr, _ := reader.ReadString('\n')
+				newMockInterfaceStr = strings.TrimSpace(newMockInterfaceStr)
+				if newMockInterfaceStr != "" {
+					lower := strings.ToLower(newMockInterfaceStr)
+					cfg.MockInterface = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
+				}
 
-			fmt.Printf("  Mock IA (true/false) [%t] : ", cfg.MockAI)
-			newMockAIStr, _ := reader.ReadString('\n')
-			newMockAIStr = strings.TrimSpace(newMockAIStr)
-			if newMockAIStr != "" {
-				lower := strings.ToLower(newMockAIStr)
-				cfg.MockAI = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
+				fmt.Printf("  Mock IA (true/false) [%t] : ", cfg.MockAI)
+				newMockAIStr, _ := reader.ReadString('\n')
+				newMockAIStr = strings.TrimSpace(newMockAIStr)
+				if newMockAIStr != "" {
+					lower := strings.ToLower(newMockAIStr)
+					cfg.MockAI = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
+				}
 			}
 
 			spinnerSave := ui.NewSpinner("Sauvegarde des paramètres dans le .env...")

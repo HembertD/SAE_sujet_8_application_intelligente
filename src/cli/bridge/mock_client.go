@@ -228,15 +228,9 @@ func (m *MockClient) SaveConfig(baseURL, model string, timeout float64, mockInte
 		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
 	}
 
-	m.sleep(200 * time.Millisecond)
-	mockAIVal := ReadMockAISettingFromEnv(m.appRoot)
-	if len(mockAI) > 0 {
-		mockAIVal = mockAI[0]
-	}
-
 	return &models.ActionResult{
 		Success: true,
-		Message: fmt.Sprintf("Configuration sauvegardée dans %s (MOCK_INTERFACE=%t, MOCK_AI=%t).", filepath.Base(envPath), mockInterface, mockAIVal),
+		Message: fmt.Sprintf("Configuration sauvegardée dans %s.", filepath.Base(envPath)),
 	}, nil
 }
 

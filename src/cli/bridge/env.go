@@ -12,6 +12,7 @@ import (
 	"sae-git-cli/models"
 )
 
+// isAppRoot vérifie si un répertoire correspond à la racine de l'application Smart Commit.
 func isAppRoot(dir string) bool {
 	if dir == "" {
 		return false
@@ -29,6 +30,7 @@ func isAppRoot(dir string) bool {
 	return err == nil && stat.IsDir()
 }
 
+// isTestDir détermine si un chemin correspond à un répertoire temporaire de test (ex: t.TempDir()).
 func isTestDir(dir string) bool {
 	if dir == "" {
 		return false
@@ -37,6 +39,7 @@ func isTestDir(dir string) bool {
 	return strings.HasPrefix(dir, tmp) || strings.Contains(dir, "Test")
 }
 
+// FindAppRoot localise la racine de l'application Smart Commit (où vit le code et le .env applicatif).
 func FindAppRoot(hints ...string) string {
 	for _, h := range hints {
 		if h != "" && isAppRoot(h) {
@@ -54,6 +57,7 @@ func FindAppRoot(hints ...string) string {
 		return envRoot
 	}
 
+	// 1. Recherche en remontant depuis l'emplacement du code source Go (développement, go run, tests)
 	if _, sourceFile, _, ok := runtime.Caller(0); ok {
 		curr := filepath.Dir(sourceFile)
 		for {
@@ -68,6 +72,7 @@ func FindAppRoot(hints ...string) string {
 		}
 	}
 
+	// 1. Recherche en remontant depuis l'exécutable Go
 	if exe, err := os.Executable(); err == nil {
 		if realExe, errEval := filepath.EvalSymlinks(exe); errEval == nil {
 			exe = realExe
@@ -85,6 +90,7 @@ func FindAppRoot(hints ...string) string {
 		}
 	}
 
+	// 2. Recherche en remontant depuis le répertoire de travail courant
 	if cwd, err := os.Getwd(); err == nil {
 		curr := cwd
 		for {
@@ -99,6 +105,7 @@ func FindAppRoot(hints ...string) string {
 		}
 	}
 
+	// 3. Repli sur le premier hint non vide, ou "."
 	for _, h := range hints {
 		if h != "" {
 			return h
@@ -107,6 +114,8 @@ func FindAppRoot(hints ...string) string {
 	return "."
 }
 
+// FindAppEnvPath renvoie l'emplacement du fichier .env STRICTEMENT à la racine de l'application.
+// Il ne cherche JAMAIS dans le dossier src/ ni dans le dépôt cible.
 func FindAppEnvPath(appRoot string) string {
 	if appRoot == "" {
 		appRoot = FindAppRoot()
@@ -120,16 +129,20 @@ func FindAppEnvPath(appRoot string) string {
 	return filepath.Join(clean, ".env")
 }
 
+// FindEnvPath est un alias conservé pour la compatibilité avec le code existant et les tests.
 func FindEnvPath(appRoot string) string {
 	return FindAppEnvPath(appRoot)
 }
 
+// ParseBoolFromString convertit les représentations usuelles de booléens ("true", "1", "yes", "oui") en bool.
 func ParseBoolFromString(v string) bool {
 	lower := strings.ToLower(strings.TrimSpace(v))
 	return lower == "true" || lower == "1" || lower == "yes" || lower == "oui"
 }
 
+// ReadMockSettingFromEnv lit la variable MOCK_INTERFACE dans l'environnement ou le fichier .env applicatif.
 func ReadMockSettingFromEnv(appRoot string) bool {
+	// 1. Variables d'environnement système directes prioritaires
 	if envVal := os.Getenv("MOCK_INTERFACE"); envVal != "" {
 		return ParseBoolFromString(envVal)
 	}
@@ -137,6 +150,7 @@ func ReadMockSettingFromEnv(appRoot string) bool {
 		return ParseBoolFromString(envVal)
 	}
 
+	// 2. Lecture du fichier .env applicatif
 	envPath := FindAppEnvPath(appRoot)
 	data, err := os.ReadFile(envPath)
 	if err != nil {
@@ -161,6 +175,7 @@ func ReadMockSettingFromEnv(appRoot string) bool {
 	return false
 }
 
+// ReadMockAISettingFromEnv lit la variable MOCK_AI dans l'environnement ou le fichier .env applicatif.
 func ReadMockAISettingFromEnv(appRoot string) bool {
 	if envVal := os.Getenv("MOCK_AI"); envVal != "" {
 		return ParseBoolFromString(envVal)
@@ -190,6 +205,7 @@ func ReadMockAISettingFromEnv(appRoot string) bool {
 	return false
 }
 
+// LoadConfigFromEnv lit la configuration depuis le fichier .env applicatif et renvoie une structure ConfigResponse.
 func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse {
 	cfg := &models.ConfigResponse{
 		Success:       true,
@@ -202,6 +218,7 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 	}
 
 	envPath := FindAppEnvPath(appRoot)
+	// Sécurité : purge tout fichier .env résiduel dans src/
 	_ = os.Remove(filepath.Join(filepath.Dir(envPath), "src", ".env"))
 	_ = os.Remove(filepath.Join(filepath.Dir(envPath), "src", ".env.exemple"))
 
@@ -251,6 +268,7 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 	return cfg
 }
 
+// WriteEnvFile réécrit le fichier .env STRICTEMENT à la racine du projet.
 func WriteEnvFile(envPath string, baseURL, model string, timeout float64, lang string, mockInterface bool, mockAIArgs ...bool) error {
 	cleanPath := filepath.Clean(envPath)
 	dir := filepath.Dir(cleanPath)
@@ -291,6 +309,7 @@ MOCK_AI=%t
 		return err
 	}
 
+	// Suppression préventive de tout ancien src/.env pour ne garder STRICTEMENT que la racine du projet
 	_ = os.Remove(filepath.Join(dir, "src", ".env"))
 	_ = os.Remove(filepath.Join(dir, "src", ".env.exemple"))
 

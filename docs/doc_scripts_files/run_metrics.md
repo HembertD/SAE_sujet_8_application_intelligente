@@ -22,8 +22,3 @@ Outil de développement (pas le module lui-même) qui fait tourner `generate_com
 
 - [llm.md](../doc_src_files/git_commit_release_notes_generator/ollama_client/llm.md)
 - [golden_diffs.md](../doc_test_files/fixtures/golden_diffs.md)
-
-## Détails déplacés du code source
-
-- Usage : `python scripts/run_metrics.py`. `_RetryCounter` compte les `warning` contenant `invalide` émis par `llm.py` pour détecter les générations ayant nécessité un retry, sans toucher à son API publique.
-- `_print_report()` affiche le tableau (`Scénario`, `Résultat`, `Attendu`, `Obtenu`, `Retry`, `Latence`) puis les taux de conformité, de type exact, de retry et les latences moyenne/min/max.

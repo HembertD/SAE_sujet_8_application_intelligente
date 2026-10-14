@@ -10,6 +10,7 @@ import (
 	"sae-git-cli/ui"
 )
 
+// ShowMainMenu affiche le menu principal et retourne le choix de l'utilisateur
 func ShowMainMenu(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) string {
 	ui.ClearTerminal()
 	ui.PrintBanner(status)

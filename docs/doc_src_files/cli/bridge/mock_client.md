@@ -18,12 +18,3 @@ Ce module implémente l'interface `BackendClient` en fournissant des réponses s
 
 - **Autonomie totale** : Permet de présenter l'application ou d'exécuter des tests d'interface sans nécessiter de serveur Ollama actif ni de backend Python installé.
 - **Conformité aux règles de sécurité** : Démontre la détection des clés API sensibles et l'exclusion des fichiers binaires.
-
-## Détails déplacés du code source
-
-Précisions issues des commentaires retirés de `mock_client.go` :
-
-- `MockClient` fournit une implémentation de `BackendClient` pour les tests et le mode hors-ligne ; les champs `CustomRepoStatus`, `CustomDiff`, `CustomCommitProposal`, `CustomReleaseNotes`, `CustomPing` et `CustomError` permettent la surcharge pour les tests unitaires.
-- `IsMock` retourne toujours `true` ; `SimulateDelay` (via `sleep`) simule les latences réseau.
-- Données types : branche `interface-cli` avec 3 fichiers indexés et 1 non indexé ; `src/auth/token_vault.py` avec données sensibles masquées (`HasSecretsMasked`) ; `assets/banner.png` comme fichier binaire exclu.
-- `GenerateCommit` renvoie une proposition Conventional Commits adaptée au `feedback` éventuel ; `ApplyCommit` applique le commit sur la branche courante ; `Push` envoie vers la branche distante ; `GetReleaseNotes` synthétise le Markdown entre deux tags ; `PingOllama` vérifie la joignabilité d'Ollama ; `SaveMarkdownFile` enregistre localement le Markdown exporté ; `GetConfig` / `SaveConfig` lisent et mettent à jour le `.env` applicatif.

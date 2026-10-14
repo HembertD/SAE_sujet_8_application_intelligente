@@ -12,6 +12,8 @@ import (
 	"sae-git-cli/models"
 )
 
+// PythonClient implémente BackendClient en communiquant avec le sous-processus Python.
+// Il ne contient AUCUNE logique métier et délègue l'intégralité du traitement à Python.
 type PythonClient struct {
 	pythonBin  string
 	moduleName string
@@ -19,6 +21,7 @@ type PythonClient struct {
 	appRoot    string
 }
 
+// NewPythonClient instancie un client communiquant avec le backend Python réel.
 func NewPythonClient(repoRoot string) *PythonClient {
 	appRoot := FindAppRoot(repoRoot)
 	if isTestDir(repoRoot) {
@@ -27,6 +30,7 @@ func NewPythonClient(repoRoot string) *PythonClient {
 	return NewPythonClientWithAppRoot(repoRoot, appRoot)
 }
 
+// NewPythonClientWithAppRoot instancie un client en précisant la racine applicative.
 func NewPythonClientWithAppRoot(repoRoot, appRoot string) *PythonClient {
 	if appRoot == "" {
 		appRoot = FindAppRoot(repoRoot)
@@ -52,6 +56,7 @@ func NewPythonClientWithAppRoot(repoRoot, appRoot string) *PythonClient {
 	}
 }
 
+// runPythonCommand exécute la commande Python et récupère stdout
 func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 	fullArgs := []string{"-m", p.moduleName}
 	hasRepoArg := false
@@ -71,6 +76,7 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 
 	env := os.Environ()
 
+	// 1. PYTHONPATH pointe sur le dossier src de l'application
 	appSrc := filepath.Join(p.appRoot, "src")
 	if stat, err := os.Stat(appSrc); err == nil && stat.IsDir() {
 		existing := os.Getenv("PYTHONPATH")
@@ -80,6 +86,7 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 			env = append(env, fmt.Sprintf("PYTHONPATH=%s", appSrc))
 		}
 	} else {
+		// Candidats de secours si appSrc non résolu
 		candidates := []string{
 			filepath.Join(p.repoRoot, "src"),
 			filepath.Join(p.repoRoot, "SAE_sujet_8_application_intelligente", "src"),
@@ -101,6 +108,7 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 		}
 	}
 
+	// 2. Configuration chargée exclusivement depuis l'application (p.appRoot, JAMAIS p.repoRoot)
 	cfg := LoadConfigFromEnv(p.appRoot, false)
 	mockAIStr := "false"
 	if cfg.MockAI {
@@ -128,10 +136,12 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
+// IsMock indique si le client est en mode test.
 func (p *PythonClient) IsMock() bool {
 	return false
 }
 
+// GetRepoStatus interroge le backend pour connaître l'état du dépôt Git
 func (p *PythonClient) GetRepoStatus() (*models.RepoStatus, error) {
 	out, err := p.runPythonCommand("--action", "status")
 	if err != nil {
@@ -145,6 +155,7 @@ func (p *PythonClient) GetRepoStatus() (*models.RepoStatus, error) {
 	return &status, nil
 }
 
+// GetDiff demande à Python l'analyse et la sanitisation des fichiers staged
 func (p *PythonClient) GetDiff() (*models.DiffResponse, error) {
 	out, err := p.runPythonCommand("--action", "diff")
 	if err != nil {
@@ -161,6 +172,7 @@ func (p *PythonClient) GetDiff() (*models.DiffResponse, error) {
 	return &diffResp, nil
 }
 
+// StageAll demande à Python d'exécuter l'indexation de tous les fichiers
 func (p *PythonClient) StageAll() (*models.ActionResult, error) {
 	out, err := p.runPythonCommand("--action", "stage-all")
 	if err != nil {
@@ -174,6 +186,7 @@ func (p *PythonClient) StageAll() (*models.ActionResult, error) {
 	return &res, nil
 }
 
+// GenerateCommit demande au backend Python d'interroger le LLM avec le diff
 func (p *PythonClient) GenerateCommit(feedback string) (*models.CommitProposal, error) {
 	args := []string{"--action", "generate-commit"}
 	if strings.TrimSpace(feedback) != "" {
@@ -199,6 +212,7 @@ func (p *PythonClient) GenerateCommit(feedback string) (*models.CommitProposal, 
 	return &proposal, nil
 }
 
+// ApplyCommit demande à Python d'effectuer le commit Git
 func (p *PythonClient) ApplyCommit(message string) (*models.ActionResult, error) {
 	out, err := p.runPythonCommand("--action", "apply-commit", "--message", message)
 	if err != nil {
@@ -212,6 +226,7 @@ func (p *PythonClient) ApplyCommit(message string) (*models.ActionResult, error)
 	return &res, nil
 }
 
+// Push demande à Python d'exécuter le git push
 func (p *PythonClient) Push() (*models.ActionResult, error) {
 	out, err := p.runPythonCommand("--action", "push")
 	if err != nil {
@@ -225,6 +240,7 @@ func (p *PythonClient) Push() (*models.ActionResult, error) {
 	return &res, nil
 }
 
+// GetReleaseNotes demande à Python de générer les notes de version entre deux tags
 func (p *PythonClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNotesResponse, error) {
 	out, err := p.runPythonCommand("--action", "release-notes", "--from", fromTag, "--to", toTag)
 	if err != nil {
@@ -241,10 +257,12 @@ func (p *PythonClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNo
 	return &res, nil
 }
 
+// GetConfig lit la configuration depuis le fichier .env de l'application
 func (p *PythonClient) GetConfig() (*models.ConfigResponse, error) {
 	return LoadConfigFromEnv(p.appRoot, false), nil
 }
 
+// SaveConfig enregistre la configuration dans le fichier .env applicatif et notifie Python
 func (p *PythonClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool, mockAI ...bool) (*models.ActionResult, error) {
 	envPath := FindAppEnvPath(p.appRoot)
 	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface, mockAI...); err != nil {
@@ -270,6 +288,7 @@ func (p *PythonClient) SaveConfig(baseURL, model string, timeout float64, lang s
 	}, nil
 }
 
+// PingOllama teste la connexion avec le serveur Ollama de l'IUT
 func (p *PythonClient) PingOllama() (*models.PingResponse, error) {
 	out, err := p.runPythonCommand("--action", "ping-ollama")
 	if err != nil {
@@ -283,6 +302,7 @@ func (p *PythonClient) PingOllama() (*models.PingResponse, error) {
 	return &ping, nil
 }
 
+// SaveMarkdownFile écrit localement le changelog exporté
 func (p *PythonClient) SaveMarkdownFile(filename, content string) error {
 	path := filepath.Join(p.repoRoot, filename)
 	return os.WriteFile(path, []byte(content), 0644)

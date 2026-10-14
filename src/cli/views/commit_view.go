@@ -10,6 +10,7 @@ import (
 	"sae-git-cli/ui"
 )
 
+// ShowCommitFlow orchestre l'écran interactif de génération de commit
 func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
 	ui.ClearTerminal()
 	ui.PrintBanner(status)
@@ -18,6 +19,7 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 	fmt.Println(ui.Bold + ui.Cyan + "📝 [ÉTAPE 1/4] Analyse des modifications locales" + ui.Reset)
 	fmt.Println()
 
+	// 1. Récupération du diff depuis le backend Python
 	spinnerDiff := ui.NewSpinner("Récupération de l'état Git et filtrage des secrets...")
 	spinnerDiff.Start()
 	diffResp, err := client.GetDiff()
@@ -29,6 +31,7 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		return
 	}
 
+	// 2. Gestion de l'absence de fichiers staged
 	if len(diffResp.Files) == 0 {
 		ui.PrintWarning("Aucune modification n'est actuellement indexée (staged).")
 		fmt.Printf("  %s👉 Voulez-vous indexer automatiquement toutes les modifications (git add -A) ? [O/n] :%s ", ui.Bold+ui.Yellow, ui.Reset)
@@ -48,6 +51,7 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			}
 			ui.PrintSuccess(res.Message)
 
+			// Re-télécharger le diff actualisé
 			diffResp, _ = client.GetDiff()
 		} else {
 			ui.PrintInfo("Opération annulée. Indexez d'abord vos fichiers puis relancez le menu.")
@@ -56,9 +60,11 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		}
 	}
 
+	// 3. Affichage du tableau des fichiers modifiés
 	ui.PrintDiffTable(diffResp.Files, width)
 	fmt.Println()
 
+	// 4. Boucle de génération et de raffinement avec le LLM
 	feedback := ""
 	for {
 		actionLabel := "Génération du message de commit avec le LLM..."
@@ -96,6 +102,7 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		ui.PrintCommitCard(proposal.Type, proposal.Scope, proposal.Subject, proposal.Body, width)
 		fmt.Println()
 
+		// 5. Menu de décision utilisateur
 		fmt.Println(ui.Bold + "  Actions disponibles :" + ui.Reset)
 		fmt.Printf("    %s[V]%s Valider et appliquer le commit\n", ui.Green+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[R]%s Refuser et commenter pour régénérer avec l'IA\n", ui.Yellow+ui.Bold, ui.Reset)
@@ -130,6 +137,7 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 			ui.PrintSuccess(fmt.Sprintf("Commit créé avec succès ! [SHA: %s%s%s]", ui.Bold+ui.Green, res.Sha, ui.Reset))
 
+			// Proposition de Push
 			fmt.Printf("  %s👉 Voulez-vous pousser vos modifications vers le serveur distant (git push) ? [o/N] :%s ", ui.Bold+ui.Yellow, ui.Reset)
 			pushAns, _ := reader.ReadString('\n')
 			pushAns = strings.ToLower(strings.TrimSpace(pushAns))

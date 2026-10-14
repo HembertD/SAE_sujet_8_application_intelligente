@@ -25,3 +25,13 @@ Ce module orchestre le workflow interactif de génération, de validation et d'a
 ## Rôle dans l’architecture
 
 Vue maîtresse du sujet 8, réalisant l'automatisation de la rédaction des messages de commit assistée par intelligence artificielle.
+
+## Détails déplacés du code source
+
+Anciens commentaires internes de `ShowCommitFlow` (supprimés du `.go`, conservés ici) : le flux est séquencé en 5 étapes numérotées dans le code — (1) récupération du diff via le backend Python, (2) gestion du cas « aucun fichier staged » avec proposition d'indexation automatique puis re-téléchargement du diff actualisé, (3) affichage du tableau des fichiers modifiés, (4) boucle de génération et de raffinement avec le LLM, (5) menu de décision utilisateur (`V`/`R`/`M`/`A`), avec proposition de `push` après un commit validé.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `ShowCommitFlow()` : Orchestre le flux interactif de génération et validation du commit.
+- `formatCommit()` : Formate un message de commit conventionnel à partir de ses parties.
+- `waitForEnter()` : Attend l'appui sur Entrée avant de continuer.

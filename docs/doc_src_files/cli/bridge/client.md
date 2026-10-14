@@ -18,3 +18,30 @@ Ce fichier définit l'interface maîtresse `BackendClient` et le coordinateur ad
 
 - **Inversion des dépendances (DIP)** : Le front-end dépend exclusivement de l'abstraction `BackendClient`.
 - **Zéro logique métier en Go** : Les traitements d'analyse Git, LLM et release notes sont délégués au backend Python.
+
+## Détails déplacés du code source
+
+Précisions issues des commentaires retirés de `client.go` :
+
+- `BridgeClient` coordonne l'accès au backend en déléguant à `PythonClient` ou `MockClient` ; `activeDelegate` renvoie l'implémentation active selon `IsMock`.
+- `IsMock` indique si le mode simulation est actif : le drapeau forcé `forceMockInterface` est prioritaire, sinon lecture via `ReadMockSettingFromEnv`.
+- `GetConfig` lit la configuration depuis le `.env` de l'application et force `MockAI` à `true` si `forceMockIA` est actif.
+- `SaveConfig` persiste la nouvelle configuration dans le `.env` applicatif puis actualise l'état du client : mise à jour dynamique de `isMock` sauf si forcé par `--mockInterface`, et notification du backend Python via `save-config` uniquement en mode réel.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `NewBackendClient()` : Instancie le client backend en résolvant automatiquement la racine applicative.
+- `NewBackendClientWithAppRoot()` : Instancie le coordinateur avec dépôt cible et racine applicative explicites.
+- `BridgeClient.activeDelegate()` : Sélectionne le délégué actif selon le mode simulation.
+- `BridgeClient.IsMock()` : Indique si le mode simulation est actif.
+- `BridgeClient.GetRepoStatus()` : Délègue la récupération du statut du dépôt.
+- `BridgeClient.GetDiff()` : Délègue la récupération du diff.
+- `BridgeClient.StageAll()` : Délègue l'indexation de tous les fichiers.
+- `BridgeClient.GenerateCommit()` : Délègue la génération de la proposition de commit.
+- `BridgeClient.ApplyCommit()` : Délègue l'application du message de commit.
+- `BridgeClient.Push()` : Délègue la poussée vers le dépôt distant.
+- `BridgeClient.GetReleaseNotes()` : Délègue la génération des notes de version.
+- `BridgeClient.PingOllama()` : Délègue la vérification de joignabilité d'Ollama.
+- `BridgeClient.SaveMarkdownFile()` : Délègue la sauvegarde du fichier Markdown.
+- `BridgeClient.GetConfig()` : Charge la configuration depuis l'environnement applicatif.
+- `BridgeClient.SaveConfig()` : Persiste la configuration et notifie le backend réel si nécessaire.

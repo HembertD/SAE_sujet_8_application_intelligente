@@ -31,3 +31,14 @@ Ce module contient les paramètres globaux utilisés par le client Ollama et le 
 
 Le client LLM et le service `core.py` importent cette configuration pour construire les requêtes HTTP vers Ollama et configurer la langue de traitement.
 
+## Détails déplacés du code source
+
+- `parse_bool(val)` : accepte un `bool` (retourné tel quel), ou une chaîne insensible à la casse et aux espaces. Valeurs vraies : `"true"`, `"1"`, `"yes"`, `"oui"`. Toute valeur absente, vide ou `None` vaut `False`.
+- `load_env()` : construit une liste de chemins candidats (`.env` sous `SMART_COMMIT_APP_ROOT` si défini, puis `.env` à la racine du dépôt déduite de `Path(__file__).resolve().parent.parent`). Chaque candidat est dédupliqué via `resolve()`, seul le premier fichier existant est lu ; chaque ligne est nettoyée (`strip()`, guillemets retirés) et les lignes vides, commençant par `#` ou sans `=` sont ignorées. Les variables système `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT_S`, `OLLAMA_NUM_CTX`, `APP_LANGUAGE`, `MOCK_INTERFACE`, `MOCK_AI` surchargent ensuite le fichier si elles sont non vides.
+- `OLLAMA_NUM_CTX` vaut `"32768"` par défaut : sans ce paramètre explicite, Ollama utilise sa fenêtre de contexte réduite par défaut (souvent 2048-4096 tokens selon le `Modelfile`) même si le modèle supporte bien plus, et tronque silencieusement le début du contexte sur les diffs volumineux.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `parse_bool()` : Convertit une valeur texte ou booléenne en booléen.
+- `load_env()` : Charge les variables depuis le fichier .env et l'environnement système.
+

@@ -25,3 +25,7 @@ Ce module gère l'affichage de la page d'accueil et la capture du premier niveau
 ## Rôle dans l’architecture
 
 Écran racine du CLI, point de départ de toutes les fonctionnalités applicatives.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `ShowMainMenu()` : Affiche le menu principal et retourne le choix utilisateur.

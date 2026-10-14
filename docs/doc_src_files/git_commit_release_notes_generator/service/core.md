@@ -38,3 +38,26 @@ Ce module constitue le point d'entrée exécutable sous forme de sous-processus 
 - `action_generate_commit(repo_path, feedback)` : extrait le diff staged textuel, teste la joignabilité d'Ollama via `check_ollama_reachable()` pour échouer rapidement en cas de problème réseau, et le transmet au module LLM avec la consigne optionnelle utilisateur (ou renvoie le commit statique si `MOCK_AI=True`).
 - `action_release_notes(repo_path, from_tag, to_tag)` : extrait l'historique, teste la joignabilité d'Ollama via `check_ollama_reachable()` (échoue immédiatement avec `success=False` si injoignable, à l'identique de `action_generate_commit`) et génère une synthèse catégorisée (Features, Fixes, Refactoring, Docs) via le LLM avec repli déterministe si l'appel chat échoue (ou renvoie la synthèse statique si `MOCK_AI=True`).
 - `action_ping_ollama()` : teste la joignabilité, mesure la latence et liste les modèles installés en déléguant à la fonction unifiée `check_ollama_reachable(fetch_models=True)`.
+
+## Détails déplacés du code source
+
+- Exécution en sous-processus : `python -m git_commit_release_notes_generator.service.core --action <NOM> [args]`, appelé par `src/cli/bridge/python_client.go`. Le processus sort toujours en code 0, même pour une action inconnue, car le client Go ignore entièrement `stdout` si le code de sortie est non nul.
+- `action_status` : la branche courante gère le `detached HEAD` et le commit initial (repli sur les 7 premiers caractères du SHA, sinon `"HEAD"`). `staged_count` compte les lignes non vides de `git diff --cached --name-only`, `unstaged_count` additionne `git diff --name-only` et `untracked_files`.
+- `action_diff` : chaque fichier expose `has_secrets_masked` (vrai si le `patch` contient `[REDACTED_SECRET]`).
+- `action_release_notes` : valeurs par défaut `from_tag="v0.1.0"`, `to_tag="HEAD"`. Vérification stricte de joignabilité avant toute génération (échec immédiat si injoignable), puis tentative d'inférence LLM avec invite imposant les sections Markdown, et repli sur le formateur déterministe `_format_release_notes_fallback` si le contenu est vide ou inexploitable.
+- `_format_release_notes_fallback` : catégorise chaque première ligne de commit via une expression Conventional Commits (`feat|fix|docs|refactor|perf|chore|test|ci|build|revert`, `scope` optionnel) en sections `feat`, `fix`, `refactor`, `perf`, `docs`, `other`, avec le SHA court entre backticks ; ajoute la date du jour et `Aucun changement notable.` si aucune section n'est remplie.
+- `action_save_config` : simple notification, renvoie toujours un succès sans écrire de fichier.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `action_status()` : Calcule l'état courant du dépôt Git.
+- `action_diff()` : Expose les fichiers stagés avec patchs assainis.
+- `action_stage_all()` : Indexe toutes les modifications du dépôt.
+- `action_generate_commit()` : Génère un message de commit depuis le diff stagé.
+- `action_apply_commit()` : Applique le message de commit validé au dépôt.
+- `action_push()` : Pousse les commits locaux vers le dépôt distant.
+- `_format_release_notes_fallback()` : Formate les release notes sans appel au LLM.
+- `action_release_notes()` : Génère les release notes Markdown entre deux révisions.
+- `action_save_config()` : Notifie la prise en compte de la configuration.
+- `action_ping_ollama()` : Diagnostique la joignabilité d'Ollama avec modèles installés.
+- `main()` : Exécute l'action demandée et affiche le JSON résultat.

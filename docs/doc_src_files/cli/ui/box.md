@@ -23,3 +23,14 @@ Ce module assemble les primitives de style pour construire des composants visuel
 ## Rôle dans l’architecture
 
 Bibliothèque de composants graphiques d'ordre supérieur consommée par les vues interactives (`views`).
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `PrintBanner()` : Affiche la bannière d'en-tête avec le statut du dépôt Git.
+- `PrintCard()` : Affiche un panneau encadré avec titre et lignes de contenu.
+- `PrintDiffTable()` : Affiche le tableau des fichiers modifiés du diff indexé.
+- `PrintCommitCard()` : Affiche la proposition de commit conventionnel dans une carte.
+- `PrintSuccess()` : Affiche un message de succès standardisé en vert.
+- `PrintError()` : Affiche un message d'erreur standardisé en rouge.
+- `PrintWarning()` : Affiche un message d'avertissement standardisé en jaune.
+- `PrintInfo()` : Affiche un message d'information standardisé en cyan.

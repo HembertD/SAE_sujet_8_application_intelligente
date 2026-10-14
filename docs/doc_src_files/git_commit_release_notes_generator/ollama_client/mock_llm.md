@@ -27,3 +27,10 @@ Ce module fournit une implémentation simulée (Mock) des fonctionnalités d'int
 
 - **Simplicité et prévisibilité** : Les réponses sont volontairement statiques et prévisibles afin de faciliter les tests unitaires et le développement hors-ligne.
 - **Délégation automatique** : `llm.py` et `core.py` basculent automatiquement vers ce module dès que la variable `MOCK_AI` est activée dans la configuration.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `mock_generate_commit_message()` : Génère un message de commit simulé pour le mode hors-ligne.
+- `mock_call_chat()` : Simule une réponse brute de l'API de chat.
+- `mock_release_notes()` : Génère des release notes simulées entre deux révisions.
+- `mock_ping()` : Simule un diagnostic de connectivité Ollama réussi.

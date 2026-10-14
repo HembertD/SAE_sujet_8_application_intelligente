@@ -23,3 +23,14 @@ Ce module fournit les constantes d'échappement ANSI et les fonctions utilitaire
 ## Rôle dans l’architecture
 
 Socle de présentation graphique de bas niveau utilisé par tous les composants visuels et toutes les vues du CLI.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `StripANSI()` : Supprime les séquences d'échappement ANSI d'une chaîne.
+- `VisualLen()` : Calcule la longueur visible d'une chaîne sans les codes ANSI.
+- `PadRight()` : Aligne une chaîne à gauche en complétant à droite.
+- `PadLeft()` : Aligne une chaîne à droite en complétant à gauche.
+- `PadCenter()` : Centre une chaîne en complétant des deux côtés.
+- `ClearTerminal()` : Efface complètement le terminal et son historique de défilement.
+- `Rgb()` : Colore un texte avec une couleur TrueColor RGB.
+- `NeonGradient()` : Applique un dégradé néon animé à un texte.

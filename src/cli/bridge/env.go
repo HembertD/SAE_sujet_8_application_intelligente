@@ -12,7 +12,7 @@ import (
 	"sae-git-cli/models"
 )
 
-// isAppRoot vérifie si un répertoire correspond à la racine de l'application Smart Commit.
+// isAppRoot vérifie si un répertoire correspond à la racine de l'application Gitelligence.
 func isAppRoot(dir string) bool {
 	if dir == "" {
 		return false
@@ -39,7 +39,7 @@ func isTestDir(dir string) bool {
 	return strings.HasPrefix(dir, tmp) || strings.Contains(dir, "Test")
 }
 
-// FindAppRoot localise la racine de l'application Smart Commit (où vit le code et le .env applicatif).
+// FindAppRoot localise la racine de l'application Gitelligence (où vit le code et le .env applicatif).
 func FindAppRoot(hints ...string) string {
 	for _, h := range hints {
 		if h != "" && isAppRoot(h) {
@@ -50,6 +50,12 @@ func FindAppRoot(hints ...string) string {
 		}
 	}
 
+	if envRoot := os.Getenv("GITELLIGENCE_APP_ROOT"); envRoot != "" && isAppRoot(envRoot) {
+		if abs, err := filepath.Abs(envRoot); err == nil {
+			return abs
+		}
+		return envRoot
+	}
 	if envRoot := os.Getenv("SMART_COMMIT_APP_ROOT"); envRoot != "" && isAppRoot(envRoot) {
 		if abs, err := filepath.Abs(envRoot); err == nil {
 			return abs

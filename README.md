@@ -1,10 +1,10 @@
-# SAE - Application intelligente
+# Gitelligence - Application intelligente
 
 ## Présentation
 
 ```
-L'objectif de cette SAÉ est de développer un outil en ligne de commande (CLI) ou une interface graphique locale capable d'automatiser la rédaction des messages de commit et la génération de notes de version (release notes).
-Les développeurs négligent souvent la qualité des messages de commit, ce qui rend l'historique du projet difficile à lire et la génération de changelogs fastidieuse. Le logiciel analysera les différences de code (git diff) pour déléguer cette tâche sémantique à un LLM.
+L'objectif de cette SAÉ est de développer Gitelligence, un outil en ligne de commande (CLI) ou une interface graphique locale capable d'automatiser la rédaction des messages de commit et la génération de notes de version (release notes).
+Les développeurs négligent souvent la qualité des messages de commit, ce qui rend l'historique du projet difficile à lire et la génération de changelogs fastidieuse. Gitelligence analyse les différences de code (git diff) pour déléguer cette tâche sémantique à un LLM.
 ```
 
 ## Fonctionnalités principales :
@@ -67,7 +67,7 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
    - `--dev` : active le mode développement (autorise les flags de simulation en CLI et la modification des options de mock dans l'interface de configuration).
    - `--mockInterface` : force la simulation complète de l'interface en mode démo (requiert obligatoirement `--dev`).
    - `--mockIA` : force la simulation de l'IA hors-ligne sans serveur Ollama (requiert obligatoirement `--dev`).
-   - `--app-dir <chemin>` : racine de l'application Smart Commit (contenant le code et le `.env`). Détectée automatiquement dans 99% des cas pour garantir l'isolation complète du `.env`.
+   - `--app-dir <chemin>` : racine de l'application Gitelligence (contenant le code et le `.env`). Détectée automatiquement dans 99% des cas pour garantir l'isolation complète du `.env`.
 
    > [!CAUTION]
    > L'utilisation de `--mockInterface` ou `--mockIA` sans le flag `--dev` lève une erreur bloquante et interrompt immédiatement l'exécution.

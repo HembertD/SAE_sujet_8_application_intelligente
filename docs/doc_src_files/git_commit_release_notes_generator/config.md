@@ -16,7 +16,7 @@ Ce module contient les paramètres globaux utilisés par le client Ollama et le 
 
 ## Emplacement et chargement du fichier `.env`
 
-- **Emplacement strict** : Le fichier `.env` réside **exclusivement à la racine du dépôt du projet** (`SAE_sujet_8_application_intelligente/.env`), ou à l'emplacement indiqué par la variable d'environnement système `SMART_COMMIT_APP_ROOT`.
+- **Emplacement strict** : Le fichier `.env` réside **exclusivement à la racine du dépôt du projet** (`SAE_sujet_8_application_intelligente/.env`), ou à l'emplacement indiqué par la variable d'environnement système `GITELLIGENCE_APP_ROOT` (avec repli sur `SMART_COMMIT_APP_ROOT`).
 - **Aucune pollution** : Le module ne lit ni n'écrit jamais de `.env` dans `src/` ou dans le répertoire de travail courant `Path.cwd()`, évitant toute confusion ou parasitage d'un dépôt Git tiers analysé par l'outil.
 - **Surcharge** : Les variables définies directement dans l'environnement système ont priorité sur le contenu du fichier `.env`.
 

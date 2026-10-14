@@ -119,6 +119,7 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 		fmt.Sprintf("OLLAMA_MODEL=%s", cfg.OllamaModel),
 		fmt.Sprintf("OLLAMA_TIMEOUT_S=%.0f", cfg.TimeoutS),
 		fmt.Sprintf("MOCK_AI=%s", mockAIStr),
+		fmt.Sprintf("GITELLIGENCE_APP_ROOT=%s", p.appRoot),
 		fmt.Sprintf("SMART_COMMIT_APP_ROOT=%s", p.appRoot),
 	)
 	cmd.Env = env

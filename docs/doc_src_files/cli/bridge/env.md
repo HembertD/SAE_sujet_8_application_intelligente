@@ -4,7 +4,7 @@ Fichier source associé : src/cli/bridge/env.go
 
 ## Description
 
-Ce module isole l'ensemble de la logique de localisation, de lecture et d'écriture du fichier de configuration `.env` de l'application Smart Commit.
+Ce module isole l'ensemble de la logique de localisation, de lecture et d'écriture du fichier de configuration `.env` de l'application Gitelligence.
 
 ## Responsabilités
 

@@ -1,6 +1,6 @@
-# SAE - Application intelligente
+# Gitelligence - Application intelligente
 
-Documentation du projet d'application intelligente.
+Documentation du projet Gitelligence (application intelligente).
 
 Cette documentation présente l'architecture technique, les tests, le suivi de projet et les mécanismes de CI/CD associés.
 

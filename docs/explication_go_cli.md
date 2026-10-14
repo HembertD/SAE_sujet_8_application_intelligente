@@ -19,7 +19,7 @@ Le binaire propose les options suivantes pour s'adapter à tous les contextes d'
 | `--dev` | `false` | **Mode développeur** : débloque l'utilisation des drapeaux de mock en CLI et autorise l'affichage et la modification des réglages de mock dans l'écran de configuration. |
 | `--mockInterface` | `false` | **Mock de l'interface** : force le `MockClient` pour manipuler et tester l'interface TUI hors-ligne sans sous-processus Python (requiert obligatoirement `--dev`). |
 | `--mockIA` | `false` | **Mock de l'IA** : active la simulation des réponses Ollama (commits et release notes déterministes hors-ligne, requiert obligatoirement `--dev`). |
-| `--app-dir <chemin>` | Auto-détecté | **Racine de l'application Smart Commit** : chemin vers le dossier de notre outil (`SAE_sujet_8_application_intelligente`), où résident le fichier `.env` applicatif et le code Python. |
+| `--app-dir <chemin>` | Auto-détecté | **Racine de l'application Gitelligence** : chemin vers le dossier de notre outil (`SAE_sujet_8_application_intelligente`), où résident le fichier `.env` applicatif et le code Python. |
 
 > [!CAUTION]
 > **Contrôle d'accès au mode mock**  
@@ -28,7 +28,7 @@ Le binaire propose les options suivantes pour s'adapter à tous les contextes d'
 > [!NOTE]
 > **Pourquoi séparer `--repo` et `--app-dir` ? (Isolation stricte)**  
 > Dans une utilisation classique, l'outil analyse un projet externe (ex: `--repo ~/projets/mon-site`). La distinction garantit que :
-> 1. Les réglages de notre application (URL Ollama, modèle, timeout, etc.) sont lus et modifiés **exclusivement** dans le `.env` de Smart Commit (`--app-dir`).
+> 1. Les réglages de notre application (URL Ollama, modèle, timeout, etc.) sont lus et modifiés **exclusivement** dans le `.env` de Gitelligence (`--app-dir`).
 > 2. Le projet cible analysé (`--repo`) n'est **jamais parasité** par la création d'un `.env` applicatif.
 > 
 > Dans 99% des cas, `--app-dir` est **détecté automatiquement** par l'application (en inspectant le chemin du binaire ou du code source). Ce drapeau n'est utile que si vous installez `git-generator` dans un répertoire système global (ex. `/usr/local/bin`) et que vous l'exécutez depuis un tout autre dossier.

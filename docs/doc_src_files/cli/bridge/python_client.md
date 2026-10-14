@@ -9,7 +9,7 @@ Ce module implémente l'interface `BackendClient` en exécutant le backend Pytho
 ## Responsabilités
 
 - Résoudre dynamiquement l'interpréteur Python (`python3` ou environnement virtuel local `/home/maxence/monenv/bin/python`).
-- Configurer les variables d'environnement du sous-processus : `PYTHONPATH` pointant sur `<appRoot>/src`, et transmission de `SMART_COMMIT_APP_ROOT`.
+- Configurer les variables d'environnement du sous-processus : `PYTHONPATH` pointant sur `<appRoot>/src`, et transmission de `GITELLIGENCE_APP_ROOT` (avec maintien de `SMART_COMMIT_APP_ROOT` pour rétrocompatibilité).
 - Exécuter les commandes métier (`--action status`, `diff`, `stage-all`, `generate-commit`, `apply-commit`, `push`, `release-notes`, `ping-ollama`).
 - Isoler les flux : capture du JSON strict sur `stdout` et redirection des logs/traces sur `stderr`.
 - Désérialiser les réponses JSON dans des structures Go fortement typées (`models`).

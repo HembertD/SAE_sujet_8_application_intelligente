@@ -20,7 +20,7 @@ func main() {
 	mockInterfaceFlag := flag.Bool("mockInterface", false, "Force la simulation complète de l'interface (mode démo sans Git ni Python, requiert --dev)")
 	mockIAFlag := flag.Bool("mockIA", false, "Force la simulation de l'IA hors-ligne sans serveur Ollama (requiert --dev)")
 	repoFlag := flag.String("repo", ".", "Chemin du dépôt Git à analyser")
-	appFlag := flag.String("app-dir", "", "Chemin vers l'application Smart Commit (dossier contenant le .env applicatif)")
+	appFlag := flag.String("app-dir", "", "Chemin vers l'application Gitelligence (dossier contenant le .env applicatif)")
 	flag.Parse()
 
 	// Gestion rigoureuse des signaux OS pour restaurer le terminal (Ctrl+C)
@@ -28,7 +28,7 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-sigChan
-		fmt.Print(ui.ShowCursor + ui.Reset + "\n\n  👋 Arrêt de l'application. À bientôt !\n\n")
+		fmt.Print(ui.ShowCursor + ui.Reset + "\n\n  👋 Arrêt de Gitelligence. À bientôt !\n\n")
 		os.Exit(0)
 	}()
 	defer fmt.Print(ui.ShowCursor + ui.Reset + "\n")
@@ -81,7 +81,7 @@ func main() {
 			views.ShowConfigFlow(reader, client, status, *devFlag)
 		case "4", "q", "Q":
 			ui.ClearTerminal()
-			fmt.Printf("\n  %s👋 Merci d'avoir utilisé Smart Commit Generator ! À bientôt.%s\n\n", ui.Bold+ui.Cyan, ui.Reset)
+			fmt.Printf("\n  %s👋 Merci d'avoir utilisé Gitelligence ! À bientôt.%s\n\n", ui.Bold+ui.Cyan, ui.Reset)
 			return
 		default:
 			// Option non reconnue, retour direct au menu

@@ -21,7 +21,7 @@ Ce fichier constitue le point d'entrée exécutable de l'interface en ligne de c
 - `--dev` : active le mode développeur, autorisant l'utilisation des drapeaux de simulation en CLI et la modification des réglages de mock dans l'écran de configuration.
 - `--mockInterface` : activation forcée du mock de l'interface (`MockClient`) sans exécuter le backend Python (requiert obligatoirement `--dev`).
 - `--mockIA` : activation forcée du mock de l'IA sans serveur Ollama (requiert obligatoirement `--dev`).
-- `--app-dir <chemin>` : chemin explicite vers la racine de l'application Smart Commit (où se trouvent le code et le `.env` applicatif). Permet d'isoler à 100% la configuration applicative lorsque le binaire est exécuté sur un dépôt tiers.
+- `--app-dir <chemin>` : chemin explicite vers la racine de l'application Gitelligence (où se trouvent le code et le `.env` applicatif). Permet d'isoler à 100% la configuration applicative lorsque le binaire est exécuté sur un dépôt tiers.
 
 ## Points clés
 

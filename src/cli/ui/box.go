@@ -11,8 +11,8 @@ import (
 func PrintBanner(repoStatus *models.RepoStatus) {
 	width := 72
 	fmt.Println(Cyan + "╭" + strings.Repeat("─", width-2) + "╮" + Reset)
-	fmt.Printf("%s│%s│%s\n", Cyan, PadCenter(Bold+Yellow+"⚡ SMART COMMIT & RELEASE NOTES GENERATOR"+Reset, width-2), Cyan)
-	fmt.Printf("%s│%s│%s\n", Cyan, PadCenter(Dim+"Application Intelligente - SAÉ Sujet 8"+Reset, width-2), Cyan)
+	fmt.Printf("%s│%s│%s\n", Cyan, PadCenter(Bold+Yellow+"⚡ GITELLIGENCE ⚡"+Reset, width-2), Cyan)
+	fmt.Printf("%s│%s│%s\n", Cyan, PadCenter(Dim+"Assistant Git Intelligent"+Reset, width-2), Cyan)
 	fmt.Println(Cyan + "├" + strings.Repeat("─", width-2) + "┤" + Reset)
 
 	if repoStatus != nil && repoStatus.IsGitRepo {

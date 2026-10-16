@@ -12,7 +12,7 @@ Ce module orchestre le workflow interactif de génération, de validation et d'a
 2. **Génération par le LLM** : déclenche le spinner d'attente pendant que Python interroge le modèle distant.
 3. **Restitution structurée** : affiche la carte du message proposé au format Conventional Commits.
 4. **Boucle de décision utilisateur** :
-   - `[V]` **Valider** : applique le commit via Git et propose d'enchaîner sur un `git push` ;
+   - `[V]` **Valider** : applique le commit via Git et propose d'enchaîner sur un `git push` (option masquée et bloquée si le message est en erreur, jusqu'à modification manuelle [M] ou régénération [R]) ;
    - `[R]` **Régénérer avec consigne** : demande à l'utilisateur un texte de feedback (ex: "sois plus concis", "c'est un fix") et relance l'inférence LLM avec ce contexte ;
    - `[M]` **Modifier manuellement** : permet d'ajuster le type, le scope, le sujet ou le corps directement dans le terminal avant validation ;
    - `[A]` **Annuler** : abandonne l'opération sans impacter le dépôt Git.

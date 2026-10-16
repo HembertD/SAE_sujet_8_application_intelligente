@@ -110,12 +110,18 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 		// 5. Menu de décision utilisateur
 		fmt.Println(ui.Bold + "  Actions disponibles :" + ui.Reset)
-		fmt.Printf("    %s[V]%s Valider et appliquer le commit\n", ui.Green+ui.Bold, ui.Reset)
+		if !isError {
+			fmt.Printf("    %s[V]%s Valider et appliquer le commit\n", ui.Green+ui.Bold, ui.Reset)
+		}
 		fmt.Printf("    %s[R]%s Refuser et commenter pour régénérer avec l'IA\n", ui.Yellow+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[M]%s Modifier manuellement le message avant de commiter\n", ui.Cyan+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[A]%s Annuler et revenir au menu principal\n\n", ui.Red+ui.Bold, ui.Reset)
 
-		fmt.Printf("  %s👉 Votre choix (V/R/M/A) :%s ", ui.Bold+ui.Yellow, ui.Reset)
+		promptChoices := "V/R/M/A"
+		if isError {
+			promptChoices = "R/M/A"
+		}
+		fmt.Printf("  %s👉 Votre choix (%s) :%s ", ui.Bold+ui.Yellow, promptChoices, ui.Reset)
 		choice, err := reader.ReadString('\n')
 		if err != nil {
 			return

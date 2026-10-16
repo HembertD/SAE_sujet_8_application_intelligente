@@ -76,10 +76,16 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 
 	// Choix utilisateur
 	fmt.Println(ui.Bold + "  Options :" + ui.Reset)
-	fmt.Printf("    %s[S]%s Sauvegarder dans un fichier RELEASE_NOTES.md\n", ui.Green+ui.Bold, ui.Reset)
+	if !isError {
+		fmt.Printf("    %s[S]%s Sauvegarder dans un fichier RELEASE_NOTES.md\n", ui.Green+ui.Bold, ui.Reset)
+	}
 	fmt.Printf("    %s[R]%s Retourner au menu principal\n\n", ui.Yellow+ui.Bold, ui.Reset)
 
-	fmt.Printf("  %s👉 Votre choix (S/R) :%s ", ui.Bold+ui.Yellow, ui.Reset)
+	promptChoices := "S/R"
+	if isError {
+		promptChoices = "R"
+	}
+	fmt.Printf("  %s👉 Votre choix (%s) :%s ", ui.Bold+ui.Yellow, promptChoices, ui.Reset)
 	choice, err := reader.ReadString('\n')
 	if err != nil {
 		return

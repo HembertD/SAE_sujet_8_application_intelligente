@@ -11,7 +11,7 @@ Ce module gère l'écran interactif dédié à la synthèse de version et à la 
 - inviter l'utilisateur à saisir le tag de départ (par défaut `v0.1.0`) et le tag d'arrivée (par défaut `HEAD`) ;
 - déclencher la synthèse des commits auprès du backend Python avec retour visuel animé ;
 - afficher le document Markdown catégorisé dans un panneau encadré ;
-- proposer l'enregistrement direct du résultat dans un fichier `RELEASE_NOTES.md` à la racine du projet.
+- proposer l'enregistrement direct du résultat dans un fichier `RELEASE_NOTES.md` à la racine du projet (option masquée et bloquée en cas d'erreur de génération).
 
 ## Points clés
 

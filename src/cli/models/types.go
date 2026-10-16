@@ -65,7 +65,6 @@ type ConfigResponse struct {
 	OllamaBaseURL string  `json:"ollama_base_url"`
 	OllamaModel   string  `json:"ollama_model"`
 	TimeoutS      float64 `json:"timeout_s"`
-	Language      string  `json:"language"`
 	MockInterface bool    `json:"mock_interface"`
 	MockAI        bool    `json:"mock_ai"`
 }

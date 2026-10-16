@@ -8,19 +8,20 @@ Ce fichier constitue le point d'entrée exécutable de l'interface en ligne de c
 
 ## Responsabilités
 
-- analyser les arguments et flags de la ligne de commande (`--mockInterface`, `--mockIA`, `--repo`, `--app-dir`) ;
+- analyser les arguments et flags de la ligne de commande (`--dev`, `--mockInterface`, `--mockIA`, `--repo`, `--app-dir`) ;
 - localiser la racine applicative via `FindAppRoot` pour pointer sur le `.env` de l'application indépendamment du dépôt cible analysé ;
 - intercepter les signaux d'interruption système (`SIGINT` / `SIGTERM` / `Ctrl+C`) pour restaurer l'état du terminal (réaffichage du curseur et réinitialisation des couleurs) ;
-- initialiser le `BackendClient` relié au répertoire du dépôt Git et à la racine de l'application ;
+- initialiser le `BackendClient` relié au répertoire du dépôt Git et à la racine de l'application (en respectant la priorité du fichier `.env`) ;
 - interroger l'état du dépôt auprès du backend Python à chaque itération ;
-- aiguiller l'utilisateur vers les différentes vues (`commit`, `release-notes`, `config`, ou sortie propre).
+- aiguiller l'utilisateur vers les différentes vues (`commit`, `release-notes`, `config`, ou sortie propre) en transmettant le mode développeur `--dev` à l'écran de configuration.
 
 ## Arguments de la ligne de commande
 
 - `--repo <chemin>` : chemin vers le dépôt Git cible à analyser (défaut : `.`).
-- `--mockInterface` : activation forcée du mock de l'interface (`MockClient`) sans exécuter le backend Python.
-- `--mockIA` : activation forcée du mock de l'IA (le backend Python simule les retours Ollama).
-- `--app-dir <chemin>` : chemin explicite vers la racine de l'application Smart Commit (où se trouvent le code et le `.env` applicatif). Permet d'isoler à 100% la configuration applicative lorsque le binaire est exécuté sur un dépôt tiers.
+- `--dev` : active le mode développeur, autorisant l'utilisation des drapeaux de simulation en CLI et la modification des réglages de mock dans l'écran de configuration.
+- `--mockInterface` : activation forcée du mock de l'interface (`MockClient`) sans exécuter le backend Python (requiert obligatoirement `--dev`).
+- `--mockIA` : activation forcée du mock de l'IA sans serveur Ollama (requiert obligatoirement `--dev`).
+- `--app-dir <chemin>` : chemin explicite vers la racine de l'application Gitelligence (où se trouvent le code et le `.env` applicatif). Permet d'isoler à 100% la configuration applicative lorsque le binaire est exécuté sur un dépôt tiers.
 
 ## Points clés
 
@@ -31,3 +32,14 @@ Ce fichier constitue le point d'entrée exécutable de l'interface en ligne de c
 ## Rôle dans l’architecture
 
 `main.go` est le chef d'orchestre du front-end. Il lie la couche de présentation (vues et utilitaires ANSI) au client de pontage backend sans intégrer la moindre règle métier.
+
+## Détails déplacés du code source
+
+Précisions issues des commentaires retirés de `main.go` et non redondantes avec les sections ci-dessus :
+
+- En cas d'erreur de `GetRepoStatus`, le statut est dégradé à `nil` (`status = nil`) et le menu principal est quand même affiché via `views.ShowMainMenu`.
+- Toute option non reconnue dans le `switch` (`default`) provoque un retour direct au menu, sans message d'erreur ni sortie.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `main()` : Point d'entrée initialisant l'interface et pilotant le menu principal.

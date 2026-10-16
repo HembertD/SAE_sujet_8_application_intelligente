@@ -29,6 +29,14 @@ Parmi les cas couverts, on trouve :
 - l’ajout de tests ;
 - une modification de dépendances ou de build.
 
+Trois scénarios volontairement ambigus ont été ajoutés pour sonder les limites réelles du prompt (cf. carte Trello #34, « l'IA confond parfois fix/feat ») :
+
+- `fix_disguised_as_bounds_check` : une validation ajoutée qui corrige en réalité un bug (prix négatif possible), pour vérifier que le modèle privilégie bien "fix" même quand le diff a l'air d'ajouter une capacité ;
+- `chore_add_makefile_lint_target` : une modification de Makefile, pour vérifier que le modèle ne la confond pas avec "build" (réservé au packaging/dépendances selon le prompt) ;
+- `refactor_hides_rounding_fix` : une extraction de fonction qui corrige au passage un bug d'arrondi, pour vérifier que le modèle priorise "fix" sur "refactor" quand les deux sont mélangés.
+
+Mesuré via `scripts/run_metrics.py` sur le vrai serveur Ollama : 100% de conformité et de type exact sur les 9 scénarios (les 6 historiques + ces 3 nouveaux), un seul retry observé (subject 1 caractère trop long, corrigé automatiquement).
+
 ## Points de vigilance
 
 - Les scénarios doivent rester représentatifs des modifications réelles du projet.

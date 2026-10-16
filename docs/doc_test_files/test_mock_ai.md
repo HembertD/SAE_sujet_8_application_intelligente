@@ -20,6 +20,7 @@ Ce fichier contient la suite de tests automatisés validant le module de simulat
 10. **`test_core_action_generate_commit_with_mock_ai`** : valide le fonctionnement de l'action `generate-commit` du service core sous mode mock.
 11. **`test_core_action_release_notes_with_mock_ai`** : valide l'action `release-notes` du service core sous mode mock.
 12. **`test_core_action_ping_ollama_with_mock_ai`** : valide l'action `ping-ollama` du service core sous mode mock.
+13. **`test_llm_generate_commit_mock_ai_feedback_forces_type`** : vérifie que l'override déterministe de type s'applique aussi en mode mock — le mock renvoie toujours `type="feat"` codé en dur, mais un feedback citant explicitement "fix" doit tout de même forcer le résultat final à `fix`.
 
 ## Stratégie de test
 

@@ -127,6 +127,16 @@ def test_llm_generate_commit_delegates_to_mock_when_mock_ai():
         assert llm._validate({"type": msg.type, "subject": msg.subject, "scope": msg.scope, "body": msg.body}) is None
 
 
+def test_llm_generate_commit_mock_ai_feedback_forces_type():
+    """Même en mode mock (type "feat" codé en dur), un feedback citant un type
+    explicite doit forcer ce type sur le résultat final."""
+    diff = [DiffFile(path="src/cli/main.go", status="M", added=10, removed=2, patch="+ func newFeature() {}")]
+
+    with patch.object(config, "MOCK_AI", True):
+        msg = llm.generate_commit_message(diff, feedback="c'est un fix, je veux un fix")
+        assert msg.type == "fix"
+
+
 def test_core_action_generate_commit_with_mock_ai():
     """action_generate_commit doit réussir hors-ligne grâce à MOCK_AI."""
     diff = [DiffFile(path="src/service.py", status="M", added=5, removed=1, patch="+ def run(): pass")]

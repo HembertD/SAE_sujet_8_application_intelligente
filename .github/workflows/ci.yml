@@ -43,6 +43,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -68,6 +69,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install MkDocs
         run: |
@@ -106,6 +108,21 @@ jobs:
           if suffix.strip():
               data['site_name'] = f"{site_name}{suffix}"
 
+          # Auto-détection des suivis de sprint : chaque fichier
+          # docs/monitoring/sprint-*.md est ajouté à la section "Monitoring"
+          # de la navigation s'il n'y est pas déjà. Cela permet d'ajouter
+          # des sprints sans toucher à mkdocs.yml (nombre final inconnu).
+          for section in data.get('nav', []):
+              if isinstance(section, dict) and 'Monitoring' in section:
+                  monitoring = section['Monitoring']
+                  declared = {list(e.values())[0] for e in monitoring if isinstance(e, dict)}
+                  for page in sorted(Path('docs/monitoring').glob('sprint-*.md')):
+                      rel = f"monitoring/{page.name}"
+                      if rel not in declared:
+                          label = page.stem.replace('sprint-', 'Sprint ').replace('-', ' ')
+                          monitoring.append({label: rel})
+                          print(f"nav auto: + {rel}")
+
           path.write_text(
               yaml.safe_dump(
                   data,
@@ -117,6 +134,9 @@ jobs:
 
           print(f"site_name={data['site_name']}")
           PY
+
+      - name: Stage versioned PDF for the site
+        run: cp documentation.pdf docs/documentation.pdf
 
       - name: Build documentation
         run: mkdocs build

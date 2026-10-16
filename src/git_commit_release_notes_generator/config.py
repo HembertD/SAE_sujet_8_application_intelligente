@@ -20,7 +20,7 @@ def load_env() -> dict[str, str]:
     candidates: list[Path] = []
 
     # 1. Chemin racine explicite transmis via l'environnement (ex: par le Go CLI)
-    custom_root = os.environ.get("SMART_COMMIT_APP_ROOT")
+    custom_root = os.environ.get("GITELLIGENCE_APP_ROOT") or os.environ.get("SMART_COMMIT_APP_ROOT")
     if custom_root:
         c_path = Path(custom_root)
         candidates.append(c_path / ".env")

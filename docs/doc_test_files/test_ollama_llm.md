@@ -13,7 +13,8 @@ Ce module couvre la logique de validation et d’interaction avec le client Olla
 - l’échec après plusieurs réponses invalides ;
 - les règles de validation du message (`type`, `scope`, `subject`) ;
 - la vérification de joignabilité rapide et extraction des modèles via `check_ollama_reachable()` / `ping_ollama()` (succès, échec réseau, mesure de latence, récupération des modèles avec `fetch_models`, sérialisation `to_dict`, compatibilité tuple) ;
-- la compatibilité avec les anciennes structures de données binaires.
+- la compatibilité avec les anciennes structures de données binaires ;
+- l'override déterministe du type via `feedback` : une consigne contenant une formulation d'intention explicite ("c'est un fix, je veux un fix") force le type final même si le modèle en propose un autre ; une consigne sans mot-clé de type, ou avec deux types contradictoires, ne déclenche aucun override ; la simple présence du mot "test" (homonyme d'un type et d'un mot français courant) sans formulation d'intention ne doit pas non plus déclencher d'override ; `_extract_forced_type()` est aussi testée directement, isolément de la génération.
 
 ## Stratégie de test
 
@@ -38,3 +39,4 @@ Le test contrôle que les sujets terminés par un point, ainsi que les types inc
 - La validation doit rester stricte pour éviter des messages de commit peu lisibles ou incohérents.
 - Le mécanisme de retry ne doit pas masquer des erreurs de fond ou des réponses non exploitables.
 - La compatibilité avec les objets historiques de type `binary` doit être conservée pour ne pas casser les données existantes.
+- La détection d'un type imposé par `feedback` doit rester prudente : exiger une formulation d'intention explicite, pas la simple présence du mot, sinon toute mention anodine d'un mot comme "test" casserait le type choisi par le modèle.

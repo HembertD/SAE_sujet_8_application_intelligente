@@ -12,7 +12,7 @@ Ce module orchestre le workflow interactif de génération, de validation et d'a
 2. **Génération par le LLM** : déclenche le spinner d'attente pendant que Python interroge le modèle distant.
 3. **Restitution structurée** : affiche la carte du message proposé au format Conventional Commits.
 4. **Boucle de décision utilisateur** :
-   - `[V]` **Valider** : applique le commit via Git et propose d'enchaîner sur un `git push` ;
+   - `[V]` **Valider** : applique le commit via Git et propose d'enchaîner sur un `git push` (option masquée et bloquée si le message est en erreur, jusqu'à modification manuelle [M] ou régénération [R]) ;
    - `[R]` **Régénérer avec consigne** : demande à l'utilisateur un texte de feedback (ex: "sois plus concis", "c'est un fix") et relance l'inférence LLM avec ce contexte ;
    - `[M]` **Modifier manuellement** : permet d'ajuster le type, le scope, le sujet ou le corps directement dans le terminal avant validation ;
    - `[A]` **Annuler** : abandonne l'opération sans impacter le dépôt Git.
@@ -20,8 +20,20 @@ Ce module orchestre le workflow interactif de génération, de validation et d'a
 ## Points clés
 
 - **Respect absolu du rôle front-end** : aucune commande Git directe n'est exécutée depuis ce fichier ; toutes les requêtes (`stage`, `commit`, `push`, `llm`) sont transmises au `BackendClient` ;
-- **Contrôle utilisateur total** : l'utilisateur reste maître absolu de la validation finale du commit.
+- **Contrôle utilisateur total** : l'utilisateur reste maître absolu de la validation finale du commit ;
+- **Fonction `ReadChoice`** : utilitaire de saisie partagé absorbant les appuis sur Entrée à vide in-situ via des séquences ANSI (`\033[1A\r` + `\033[K`) avec préservation de l'espace après l'emoji, sans générer de sauts de ligne intempestifs ;
+- **Architecture Event Loop (Clean Code)** : découplage strict entre la génération initiale et la boucle d'interaction utilisateur, avec appel direct du LLM dans le choix `[R]` et édition manuelle dédiée (`promptManualEdit`).
 
 ## Rôle dans l’architecture
 
 Vue maîtresse du sujet 8, réalisant l'automatisation de la rédaction des messages de commit assistée par intelligence artificielle.
+
+## Détails déplacés du code source
+
+Anciens commentaires internes de `ShowCommitFlow` (supprimés du `.go`, conservés ici) : le flux est séquencé en 5 étapes numérotées dans le code — (1) récupération du diff via le backend Python, (2) gestion du cas « aucun fichier staged » avec proposition d'indexation automatique puis re-téléchargement du diff actualisé, (3) affichage du tableau des fichiers modifiés, (4) boucle de génération et de raffinement avec le LLM, (5) menu de décision utilisateur (`V`/`R`/`M`/`A`), avec proposition de `push` après un commit validé.
+
+## Commentaires de fonction (dupliqués du code source)
+
+- `ShowCommitFlow()` : Orchestre le flux interactif de génération et validation du commit.
+- `formatCommit()` : Formate un message de commit conventionnel à partir de ses parties.
+- `waitForEnter()` : Attend l'appui sur Entrée avant de continuer.

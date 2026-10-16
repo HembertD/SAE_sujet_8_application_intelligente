@@ -12,15 +12,16 @@ Ce module gère l'affichage de la page d'accueil et la capture du premier niveau
 - présenter les 4 choix d'actions numérotés :
   - `[1]` Générer un message de commit (IA Conventional Commits) ;
   - `[2]` Générer les Release Notes (Synthèse entre tags) ;
-  - `[3]` Configuration (Modèle, URL Ollama, Langue) ;
+  - `[3]` Configuration (Modèle, URL Ollama, Timeout) ;
   - `[4]` Quitter ;
 - signaler distinctement si le mode simulation de l'interface (`Mock Interface actif`) et/ou la simulation de l'IA (`Mock IA actif`) sont actifs (les deux s'affichent si les deux options sont activées) ;
-- capturer la saisie utilisateur et gérer les signaux de fin de flux (EOF).
+- capturer la saisie utilisateur de manière robuste via `ReadChoice`.
 
 ## Points clés
 
 - **Simplicité d'utilisation** : navigation rapide par touche directe (`1`, `2`, `3`, `4` ou `q`) ;
-- **Contexte temps réel** : actualisation de la branche et du nombre de fichiers modifiés à chaque retour sur le menu.
+- **Contexte temps réel** : actualisation de la branche et du nombre de fichiers modifiés à chaque retour sur le menu ;
+- **Saisie stable** : utilisation de `ReadChoice` avec prompt mono-ligne empêchant tout défilement en cascade lors d'appuis répétés sur Entrée à vide.
 
 ## Rôle dans l’architecture
 

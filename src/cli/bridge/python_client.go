@@ -118,8 +118,8 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 		fmt.Sprintf("OLLAMA_BASE_URL=%s", cfg.OllamaBaseURL),
 		fmt.Sprintf("OLLAMA_MODEL=%s", cfg.OllamaModel),
 		fmt.Sprintf("OLLAMA_TIMEOUT_S=%.0f", cfg.TimeoutS),
-		fmt.Sprintf("APP_LANGUAGE=%s", cfg.Language),
 		fmt.Sprintf("MOCK_AI=%s", mockAIStr),
+		fmt.Sprintf("GITELLIGENCE_APP_ROOT=%s", p.appRoot),
 		fmt.Sprintf("SMART_COMMIT_APP_ROOT=%s", p.appRoot),
 	)
 	cmd.Env = env
@@ -263,9 +263,9 @@ func (p *PythonClient) GetConfig() (*models.ConfigResponse, error) {
 }
 
 // SaveConfig enregistre la configuration dans le fichier .env applicatif et notifie Python
-func (p *PythonClient) SaveConfig(baseURL, model string, timeout float64, lang string, mockInterface bool, mockAI ...bool) (*models.ActionResult, error) {
+func (p *PythonClient) SaveConfig(baseURL, model string, timeout float64, mockInterface bool, mockAI ...bool) (*models.ActionResult, error) {
 	envPath := FindAppEnvPath(p.appRoot)
-	if err := WriteEnvFile(envPath, baseURL, model, timeout, lang, mockInterface, mockAI...); err != nil {
+	if err := WriteEnvFile(envPath, baseURL, model, timeout, mockInterface, mockAI...); err != nil {
 		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
 	}
 
@@ -274,17 +274,11 @@ func (p *PythonClient) SaveConfig(baseURL, model string, timeout float64, lang s
 		"--base-url", baseURL,
 		"--model", model,
 		"--timeout", fmt.Sprintf("%f", timeout),
-		"--language", lang,
 	)
-
-	mockAIVal := ReadMockAISettingFromEnv(p.appRoot)
-	if len(mockAI) > 0 {
-		mockAIVal = mockAI[0]
-	}
 
 	return &models.ActionResult{
 		Success: true,
-		Message: fmt.Sprintf("Configuration sauvegardée dans %s (MOCK_INTERFACE=%t, MOCK_AI=%t).", filepath.Base(envPath), mockInterface, mockAIVal),
+		Message: fmt.Sprintf("Configuration sauvegardée dans %s.", filepath.Base(envPath)),
 	}, nil
 }
 

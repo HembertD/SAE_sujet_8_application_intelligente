@@ -12,7 +12,8 @@ Ce module assemble les primitives de style pour construire des composants visuel
 - `PrintCard` : trace des panneaux encadrés rectilignes avec titre centré et couleur de bordure personnalisée ;
 - `PrintDiffTable` : affiche le tableau récapitulatif des fichiers modifiés avec coloration syntaxique du statut (`[M]` jaune/cyan, `[A]` vert, `[D]` rouge), métriques de lignes `+`/`-`, et badge d'avertissement `🔒 [Secret Masqué]` ;
 - `PrintCommitCard` : présente la proposition de commit mise en valeur (Type en vert gras, Scope en jaune, Sujet en blanc gras, Body séparé par un filet discret) ;
-- `PrintSuccess`, `PrintError`, `PrintWarning`, `PrintInfo` : affiche des alertes typées et colorées standardisées.
+- `PrintErrorCard` : affiche un encadré d'erreur rouge harmonisé avec titre, message principal découpé automatiquement et liste de suggestions/actions recommandées ;
+- `PrintSuccess`, `PrintWarning`, `PrintInfo` : affichent des alertes typées et colorées standardisées.
 
 ## Points clés
 

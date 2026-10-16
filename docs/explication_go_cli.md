@@ -11,19 +11,24 @@ go build -o git-generator main.go
 
 ### Options de la ligne de commande (Flags)
 
-Le binaire propose trois options pour s'adapter à tous les contextes d'utilisation :
+Le binaire propose les options suivantes pour s'adapter à tous les contextes d'utilisation :
 
 | Option | Valeur par défaut | Description |
 |---|---|---|
 | `--repo <chemin>` | `.` (répertoire courant) | **Dépôt Git cible à analyser** : chemin du projet sur lequel vous travaillez (pour extraire le `git diff`, générer un message de commit ou créer les release notes). |
-| `--mockInterface` | `false` | **Mock de l'interface** : force le `MockClient` pour manipuler et tester l'interface TUI hors-ligne sans sous-processus Python. |
-| `--mockIA` | `false` | **Mock de l'IA** : active la simulation des réponses Ollama (commits et release notes déterministes hors-ligne). |
-| `--app-dir <chemin>` | Auto-détecté | **Racine de l'application Smart Commit** : chemin vers le dossier de notre outil (`SAE_sujet_8_application_intelligente`), où résident le fichier `.env` applicatif et le code Python. |
+| `--dev` | `false` | **Mode développeur** : débloque l'utilisation des drapeaux de mock en CLI et autorise l'affichage et la modification des réglages de mock dans l'écran de configuration. |
+| `--mockInterface` | `false` | **Mock de l'interface** : force le `MockClient` pour manipuler et tester l'interface TUI hors-ligne sans sous-processus Python (requiert obligatoirement `--dev`). |
+| `--mockIA` | `false` | **Mock de l'IA** : active la simulation des réponses Ollama (commits et release notes déterministes hors-ligne, requiert obligatoirement `--dev`). |
+| `--app-dir <chemin>` | Auto-détecté | **Racine de l'application Gitelligence** : chemin vers le dossier de notre outil (`SAE_sujet_8_application_intelligente`), où résident le fichier `.env` applicatif et le code Python. |
+
+> [!CAUTION]
+> **Contrôle d'accès au mode mock**  
+> L'utilisation de `--mockInterface` ou `--mockIA` sans le flag `--dev` lève une erreur bloquante et interrompt immédiatement l'exécution.
 
 > [!NOTE]
 > **Pourquoi séparer `--repo` et `--app-dir` ? (Isolation stricte)**  
 > Dans une utilisation classique, l'outil analyse un projet externe (ex: `--repo ~/projets/mon-site`). La distinction garantit que :
-> 1. Les réglages de notre application (URL Ollama, modèle, timeout, etc.) sont lus et modifiés **exclusivement** dans le `.env` de Smart Commit (`--app-dir`).
+> 1. Les réglages de notre application (URL Ollama, modèle, timeout, etc.) sont lus et modifiés **exclusivement** dans le `.env` de Gitelligence (`--app-dir`).
 > 2. Le projet cible analysé (`--repo`) n'est **jamais parasité** par la création d'un `.env` applicatif.
 > 
 > Dans 99% des cas, `--app-dir` est **détecté automatiquement** par l'application (en inspectant le chemin du binaire ou du code source). Ce drapeau n'est utile que si vous installez `git-generator` dans un répertoire système global (ex. `/usr/local/bin`) et que vous l'exécutez depuis un tout autre dossier.
@@ -33,16 +38,19 @@ Le binaire propose trois options pour s'adapter à tous les contextes d'utilisat
 # 1. Lancement standard dans le dépôt courant (mode réel ou mock selon le .env) :
 ./git-generator
 
-# 2. Lancement avec mock de l'interface (autonome, sans backend Python requis) :
-./git-generator --mockInterface
+# 2. Lancement en mode développeur (accès à la configuration des mocks) :
+./git-generator --dev
 
-# 3. Lancement avec mock de l'IA (passe par Python, mais simule les réponses Ollama sans serveur IA) :
-./git-generator --mockIA
+# 3. Lancement avec mock de l'interface (autonome, requiert --dev) :
+./git-generator --dev --mockInterface
 
-# 4. Lancement en ciblant un autre dépôt Git :
+# 4. Lancement avec mock de l'IA (requiert --dev) :
+./git-generator --dev --mockIA
+
+# 5. Lancement en ciblant un autre dépôt Git :
 ./git-generator --repo /chemin/vers/un/autre/projet
 
-# 5. Lancement avec indication explicite de la racine de l'application :
+# 6. Lancement avec indication explicite de la racine de l'application :
 ./git-generator --repo /chemin/vers/projet --app-dir /chemin/vers/SAE_sujet_8_application_intelligente
 ```
 
@@ -143,7 +151,7 @@ classDiagram
 ```
 
 #### Configuration via le fichier `.env` (`MOCK_INTERFACE` et `MOCK_AI`)
-L'activation des mocks est pilotée par les variables `MOCK_INTERFACE` et `MOCK_AI` dans le fichier `.env` ou par les drapeaux `--mockInterface` et `--mockIA` en ligne de commande :
+L'activation des mocks est pilotée par les variables `MOCK_INTERFACE` et `MOCK_AI` dans le fichier `.env` ou par les drapeaux `--mockInterface` et `--mockIA` en ligne de commande (sous réserve d'activer le flag `--dev`) :
 
 ```dotenv
 # Dans le .env à la racine de l'application (et .env.exemple)
@@ -159,7 +167,7 @@ Pour les tests unitaires automatisés situés dans le dossier `test/` (`test/cli
 
 #### La bascule dynamique sans recompilation
 La fonction factory `NewBackendClientWithAppRoot(repoRoot, appRoot, forceMockInterface, forceMockIA)` instancie le coordinateur `BridgeClient`.  
-Lorsque l'utilisateur modifie la configuration depuis l'écran `[3]` de la CLI :
+Lorsque l'utilisateur modifie la configuration depuis l'écran `[3]` de la CLI (en mode développeur `--dev`) :
 1. `SaveConfig` met à jour le fichier `.env` à la racine de l'application via le module dédié `env.go`.
 2. Le `BridgeClient` bascule instantanément son délégué actif entre `MockClient` et `PythonClient` sans nécessiter **la moindre modification ni recompilation de code côté Go**.
 
@@ -254,11 +262,10 @@ C'est le cœur de l'outil :
 Cet écran répond directement aux **consignes impératives de contrôle de l'IUT** :
 * Affiche les variables lues par Python et Go :
   * `OLLAMA_BASE_URL` (par défaut `http://10.22.28.190:11434`)
-  * `OLLAMA_MODEL` (par défaut `gemma4:12b`)
-  * `OLLAMA_TIMEOUT_S` (60s)
-  * `APP_LANGUAGE` (fr)
-  * `MOCK_INTERFACE` (true / false)
+  * `OLLAMA_MODEL` (par défaut `gemma4:26b`)
+  * `OLLAMA_TIMEOUT_S` (300s)
+  * `MOCK_INTERFACE` et `MOCK_AI` (visibles et modifiables uniquement si le mode `--dev` est actif)
 * **Action `[T]` (Test Ping)** : Go demande à Python d'effectuer une requête rapide vers le serveur Ollama. S'il répond, l'écran affiche en vert la latence en millisecondes et la liste réelle des modèles installés sur le serveur !
-* **Action `[M]` (Modification)** : Permet de modifier l'adresse IP, le modèle, le timeout ou d'activer/désactiver le mode démo (`true`/`false`). Go sauvegarde immédiatement les valeurs dans le fichier `.env`.  
+* **Action `[M]` (Modification)** : Permet de modifier l'adresse IP, le modèle, le timeout (et d'activer/désactiver les mocks si `--dev` est actif). Go sauvegarde immédiatement les valeurs dans le fichier `.env` (`✔ Configuration sauvegardée dans .env.`).  
    👉 **Aucune recompilation du binaire Go n'est nécessaire.**
 

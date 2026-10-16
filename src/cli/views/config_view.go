@@ -12,7 +12,12 @@ import (
 )
 
 // ShowConfigFlow orchestre l'écran de visualisation et modification de la configuration
-func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
+func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus, isDev ...bool) {
+	devMode := false
+	if len(isDev) > 0 {
+		devMode = isDev[0]
+	}
+
 	for {
 		ui.ClearTerminal()
 		ui.PrintBanner(status)
@@ -20,7 +25,7 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 		cfg, err := client.GetConfig()
 		if err != nil {
-			ui.PrintError(fmt.Sprintf("Impossible de charger la configuration : %v", err))
+			ui.PrintErrorCard("Configuration Inaccessible", fmt.Sprintf("Impossible de charger la configuration : %v", err))
 			waitForEnter(reader)
 			return
 		}
@@ -30,25 +35,26 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		lines = append(lines, fmt.Sprintf("  • %sURL Serveur Ollama%s : %s%s%s", ui.Bold, ui.Reset, ui.Cyan, cfg.OllamaBaseURL, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sModèle LLM%s        : %s%s%s", ui.Bold, ui.Reset, ui.Yellow, cfg.OllamaModel, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sTimeout requête%s   : %.0fs", ui.Bold, ui.Reset, cfg.TimeoutS))
-		lines = append(lines, fmt.Sprintf("  • %sLangue%s            : %s", ui.Bold, ui.Reset, cfg.Language))
 
-		mockInterfaceColor := ui.Green
-		mockInterfaceStatus := "Désactivé"
-		if cfg.MockInterface {
-			mockInterfaceColor = ui.Yellow
-			mockInterfaceStatus = "Activé"
-		}
-		lines = append(lines, fmt.Sprintf("  • %sMock Interface%s    : %s%s%s", ui.Bold, ui.Reset, mockInterfaceColor, mockInterfaceStatus, ui.Reset))
+		if devMode {
+			mockInterfaceColor := ui.Green
+			mockInterfaceStatus := "Désactivé"
+			if cfg.MockInterface {
+				mockInterfaceColor = ui.Yellow
+				mockInterfaceStatus = "Activé"
+			}
+			lines = append(lines, fmt.Sprintf("  • %sMock Interface%s    : %s%s%s", ui.Bold, ui.Reset, mockInterfaceColor, mockInterfaceStatus, ui.Reset))
 
-		mockAIColor := ui.Green
-		mockAIStatus := "Désactivé"
-		if cfg.MockAI {
-			mockAIColor = ui.Yellow
-			mockAIStatus = "Activé"
+			mockAIColor := ui.Green
+			mockAIStatus := "Désactivé"
+			if cfg.MockAI {
+				mockAIColor = ui.Yellow
+				mockAIStatus = "Activé"
+			}
+			lines = append(lines, fmt.Sprintf("  • %sMock IA%s           : %s%s%s", ui.Bold, ui.Reset, mockAIColor, mockAIStatus, ui.Reset))
+			lines = append(lines, "")
+			lines = append(lines, ui.Green+"  🛠️  Mode Développeur actif (--dev)"+ui.Reset)
 		}
-		lines = append(lines, fmt.Sprintf("  • %sMock IA%s           : %s%s%s", ui.Bold, ui.Reset, mockAIColor, mockAIStatus, ui.Reset))
-		lines = append(lines, "")
-		lines = append(lines, ui.Dim+"  (Toute modification est répercutée dans le .env sans recompilation)"+ui.Reset)
 		lines = append(lines, "")
 
 		ui.PrintCard("Configuration Active", lines, width, ui.Yellow)
@@ -59,12 +65,11 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		fmt.Printf("    %s[M]%s ✏️  Modifier les paramètres et sauvegarder dans le .env\n", ui.Green+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[R]%s 🚪 Retour au menu principal\n\n", ui.Red+ui.Bold, ui.Reset)
 
-		fmt.Printf("  %s👉 Votre choix (T/M/R) :%s ", ui.Bold+ui.Yellow, ui.Reset)
-		choice, err := reader.ReadString('\n')
+		prompt := fmt.Sprintf("  %s👉 Votre choix (T/M/R) :%s ", ui.Bold+ui.Yellow, ui.Reset)
+		choice, err := ReadChoice(reader, prompt)
 		if err != nil {
 			return
 		}
-		choice = strings.ToUpper(strings.TrimSpace(choice))
 
 		switch choice {
 		case "T":
@@ -80,7 +85,11 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				} else if ping != nil && ping.Error != "" {
 					errMsg = ping.Error
 				}
-				ui.PrintError(fmt.Sprintf("Erreur : Serveur injoignable (%s)", errMsg))
+				ui.PrintErrorCard("Diagnostic Connexion Ollama", fmt.Sprintf("Le serveur Ollama à l'adresse %s est injoignable.", cfg.OllamaBaseURL),
+					fmt.Sprintf("Détail technique : %s", errMsg),
+					"Vérifiez l'URL du serveur et le port avec l'option [M] Modifier",
+					"Assurez-vous qu'Ollama est bien démarré sur la machine hôte",
+				)
 			} else {
 				ui.PrintSuccess(fmt.Sprintf("Connexion réussie ! Latence : %d ms", ping.LatencyMs))
 				if len(ping.InstalledModels) > 0 {
@@ -119,42 +128,37 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				}
 			}
 
-			fmt.Printf("  Langue (fr/en) [%s] : ", cfg.Language)
-			newLang, _ := reader.ReadString('\n')
-			newLang = strings.TrimSpace(newLang)
-			if newLang != "" {
-				cfg.Language = newLang
-			}
+			if devMode {
+				fmt.Printf("  Mock Interface (true/false) [%t] : ", cfg.MockInterface)
+				newMockInterfaceStr, _ := reader.ReadString('\n')
+				newMockInterfaceStr = strings.TrimSpace(newMockInterfaceStr)
+				if newMockInterfaceStr != "" {
+					lower := strings.ToLower(newMockInterfaceStr)
+					cfg.MockInterface = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
+				}
 
-			fmt.Printf("  Mock Interface (true/false) [%t] : ", cfg.MockInterface)
-			newMockInterfaceStr, _ := reader.ReadString('\n')
-			newMockInterfaceStr = strings.TrimSpace(newMockInterfaceStr)
-			if newMockInterfaceStr != "" {
-				lower := strings.ToLower(newMockInterfaceStr)
-				cfg.MockInterface = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
-			}
-
-			fmt.Printf("  Mock IA (true/false) [%t] : ", cfg.MockAI)
-			newMockAIStr, _ := reader.ReadString('\n')
-			newMockAIStr = strings.TrimSpace(newMockAIStr)
-			if newMockAIStr != "" {
-				lower := strings.ToLower(newMockAIStr)
-				cfg.MockAI = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
+				fmt.Printf("  Mock IA (true/false) [%t] : ", cfg.MockAI)
+				newMockAIStr, _ := reader.ReadString('\n')
+				newMockAIStr = strings.TrimSpace(newMockAIStr)
+				if newMockAIStr != "" {
+					lower := strings.ToLower(newMockAIStr)
+					cfg.MockAI = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
+				}
 			}
 
 			spinnerSave := ui.NewSpinner("Sauvegarde des paramètres dans le .env...")
 			spinnerSave.Start()
-			res, saveErr := client.SaveConfig(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.Language, cfg.MockInterface, cfg.MockAI)
+			res, saveErr := client.SaveConfig(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.MockInterface, cfg.MockAI)
 			spinnerSave.Stop("")
 
 			if saveErr != nil {
-				ui.PrintError(fmt.Sprintf("Échec de la sauvegarde : %v", saveErr))
+				ui.PrintErrorCard("Sauvegarde Impossible", fmt.Sprintf("Échec de la sauvegarde dans le fichier .env : %v", saveErr))
 			} else {
 				ui.PrintSuccess(res.Message)
 			}
 			waitForEnter(reader)
 
-		case "R", "":
+		case "R":
 			return
 
 		default:

@@ -452,7 +452,7 @@ def action_ping_ollama() -> dict:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Service Core CLI pour Smart Commit Generator")
+    parser = argparse.ArgumentParser(description="Service Core CLI pour Gitelligence")
     parser.add_argument("--action", required=True, help="Action à exécuter")
     parser.add_argument("--repo", default=".", help="Chemin vers le dépôt Git cible")
     parser.add_argument("--feedback", default="", help="Consigne utilisateur pour réviser le commit")
@@ -474,7 +474,7 @@ def main() -> None:
         "apply-commit": lambda: action_apply_commit(args.repo, message=args.message),
         "push": lambda: action_push(args.repo),
         "release-notes": lambda: action_release_notes(args.repo, from_tag=args.from_tag, to_tag=args.to_tag),
-        "save-config": lambda: action_save_config(args.base_url, args.model, args.timeout, args.language),
+        "save-config": lambda: action_save_config(args.base_url, args.model, args.timeout),
         "ping-ollama": action_ping_ollama,
     }
 

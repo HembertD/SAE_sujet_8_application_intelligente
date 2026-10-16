@@ -25,7 +25,7 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 		cfg, err := client.GetConfig()
 		if err != nil {
-			ui.PrintError(fmt.Sprintf("Impossible de charger la configuration : %v", err))
+			ui.PrintErrorCard("Configuration Inaccessible", fmt.Sprintf("Impossible de charger la configuration : %v", err))
 			waitForEnter(reader)
 			return
 		}
@@ -86,7 +86,11 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				} else if ping != nil && ping.Error != "" {
 					errMsg = ping.Error
 				}
-				ui.PrintError(fmt.Sprintf("Erreur : Serveur injoignable (%s)", errMsg))
+				ui.PrintErrorCard("Diagnostic Connexion Ollama", fmt.Sprintf("Le serveur Ollama à l'adresse %s est injoignable.", cfg.OllamaBaseURL),
+					fmt.Sprintf("Détail technique : %s", errMsg),
+					"Vérifiez l'URL du serveur et le port avec l'option [M] Modifier",
+					"Assurez-vous qu'Ollama est bien démarré sur la machine hôte",
+				)
 			} else {
 				ui.PrintSuccess(fmt.Sprintf("Connexion réussie ! Latence : %d ms", ping.LatencyMs))
 				if len(ping.InstalledModels) > 0 {
@@ -149,7 +153,7 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			spinnerSave.Stop("")
 
 			if saveErr != nil {
-				ui.PrintError(fmt.Sprintf("Échec de la sauvegarde : %v", saveErr))
+				ui.PrintErrorCard("Sauvegarde Impossible", fmt.Sprintf("Échec de la sauvegarde dans le fichier .env : %v", saveErr))
 			} else {
 				ui.PrintSuccess(res.Message)
 			}

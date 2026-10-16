@@ -41,7 +41,10 @@ func main() {
 		} else if *mockInterfaceFlag {
 			flagName = "--mockInterface"
 		}
-		ui.PrintError(fmt.Sprintf("Attention : l'utilisation de %s nécessite obligatoirement le flag --dev.\n    👉 Exemple d'exécution : ./git-generator --dev %s", flagName, flagName))
+		ui.PrintErrorCard("Mode Développeur Requis",
+			fmt.Sprintf("L'utilisation de %s nécessite obligatoirement le flag --dev.", flagName),
+			fmt.Sprintf("Exemple d'exécution : ./git-generator --dev %s", flagName),
+		)
 		os.Exit(1)
 	}
 

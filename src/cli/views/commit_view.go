@@ -26,7 +26,7 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 	spinnerDiff.Stop("")
 
 	if err != nil {
-		ui.PrintError(fmt.Sprintf("Échec de récupération du diff : %v", err))
+		ui.PrintErrorCard("Analyse Git", fmt.Sprintf("Échec de récupération du diff : %v", err), "Vérifiez que le répertoire cible est un dépôt Git valide.")
 		waitForEnter(reader)
 		return
 	}
@@ -45,7 +45,7 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			spinnerStage.Stop("")
 
 			if stageErr != nil {
-				ui.PrintError(fmt.Sprintf("Erreur lors de l'indexation : %v", stageErr))
+				ui.PrintErrorCard("Indexation Git", fmt.Sprintf("Erreur lors de l'indexation (git add -A) : %v", stageErr))
 				waitForEnter(reader)
 				return
 			}
@@ -86,21 +86,27 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				errMsg = proposal.Error
 			}
 
-			ui.PrintError(fmt.Sprintf("Échec de la génération : %s", errMsg))
+			ui.PrintErrorCard("Erreur de Génération du Commit", errMsg,
+				"Vérifiez que le serveur Ollama est démarré et accessible (menu [3] Configuration)",
+				"Réessayez avec une consigne [R] ou saisissez manuellement votre message [M]",
+				"Vous pouvez aussi annuler l'opération et revenir au menu principal [A]",
+			)
 
-			proposal = &models.CommitProposal{
-				Success: false,
-				Type:    "erreur",
-				Scope:   "",
-				Subject: "aucune réponse du serveur LLM (timeout)",
-				Body:    fmt.Sprintf("Détail de l'erreur : %s\n\nVous pouvez :\n  - Réessayer la génération avec une consigne [R]\n  - Saisir manuellement votre message de commit [M]\n  - Annuler l'opération [A]", errMsg),
-				Error:   errMsg,
+			if proposal == nil {
+				proposal = &models.CommitProposal{
+					Success: false,
+					Type:    "feat",
+					Scope:   "",
+					Subject: "",
+					Body:    "",
+					Error:   errMsg,
+				}
 			}
+		} else {
+			fmt.Println()
+			ui.PrintCommitCard(proposal.Type, proposal.Scope, proposal.Subject, proposal.Body, width)
+			fmt.Println()
 		}
-
-		fmt.Println()
-		ui.PrintCommitCard(proposal.Type, proposal.Scope, proposal.Subject, proposal.Body, width)
-		fmt.Println()
 
 		// 5. Menu de décision utilisateur
 		fmt.Println(ui.Bold + "  Actions disponibles :" + ui.Reset)
@@ -118,8 +124,11 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 		switch choice {
 		case "V":
-			if isError || proposal.Type == "erreur" || !proposal.Success {
-				ui.PrintError("Impossible de valider un message en erreur. Modifiez-le manuellement avec [M] ou réessayez avec [R].")
+			if isError || proposal == nil || !proposal.Success || strings.ToLower(proposal.Type) == "erreur" || proposal.Subject == "" {
+				ui.PrintErrorCard("Validation Impossible", "Impossible de valider un message de commit en erreur ou incomplet.",
+					"Modifiez manuellement le message avec l'option [M]",
+					"Ou relancez la génération avec une consigne avec [R]",
+				)
 				continue
 			}
 
@@ -130,7 +139,7 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			spinnerCommit.Stop("")
 
 			if errCommit != nil {
-				ui.PrintError(fmt.Sprintf("Échec du commit : %v", errCommit))
+				ui.PrintErrorCard("Échec du Commit", fmt.Sprintf("Impossible d'appliquer le commit Git : %v", errCommit))
 				waitForEnter(reader)
 				return
 			}
@@ -149,7 +158,9 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				spinnerPush.Stop("")
 
 				if errPush != nil {
-					ui.PrintError(fmt.Sprintf("Échec du push : %v", errPush))
+					ui.PrintErrorCard("Échec du Push", fmt.Sprintf("Impossible de pousser vers le dépôt distant : %v", errPush),
+						"Vérifiez votre connexion réseau et vos droits d'accès sur le dépôt distant.",
+					)
 				} else {
 					ui.PrintSuccess(resPush.Message)
 				}

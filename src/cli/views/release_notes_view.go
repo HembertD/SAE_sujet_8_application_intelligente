@@ -50,27 +50,29 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 			errMsg = notes.Error
 		}
 
-		ui.PrintError(fmt.Sprintf("Impossible de générer les Release Notes : %s", errMsg))
-		notes = &models.ReleaseNotesResponse{
-			Success:  false,
-			Error:    errMsg,
-			FromTag:  fromTag,
-			ToTag:    toTag,
-			Markdown: fmt.Sprintf("# Erreur\n\nImpossible de générer les Release Notes : %s\n\nVérifiez l'état du serveur Ollama dans le menu [3] Configuration.", errMsg),
-		}
-	}
+		ui.PrintErrorCard("Erreur de Génération des Release Notes", errMsg,
+			"Vérifiez que le serveur Ollama est démarré et accessible (menu [3] Configuration)",
+			fmt.Sprintf("Vérifiez que les révisions '%s' et '%s' existent dans l'historique Git", fromTag, toTag),
+			"Vous pouvez retourner au menu principal avec [R]",
+		)
 
-	fmt.Println()
-	var lines []string
-	for _, l := range strings.Split(notes.Markdown, "\n") {
-		lines = append(lines, l)
+		if notes == nil {
+			notes = &models.ReleaseNotesResponse{
+				Success: false,
+				Error:   errMsg,
+				FromTag: fromTag,
+				ToTag:   toTag,
+			}
+		}
+	} else {
+		fmt.Println()
+		var lines []string
+		for _, l := range strings.Split(notes.Markdown, "\n") {
+			lines = append(lines, l)
+		}
+		ui.PrintCard(fmt.Sprintf("Release Notes (%s ➔ %s)", fromTag, toTag), lines, width, ui.Magenta)
+		fmt.Println()
 	}
-	cardColor := ui.Magenta
-	if isError {
-		cardColor = ui.Red
-	}
-	ui.PrintCard(fmt.Sprintf("Release Notes (%s ➔ %s)", fromTag, toTag), lines, width, cardColor)
-	fmt.Println()
 
 	// Choix utilisateur
 	fmt.Println(ui.Bold + "  Options :" + ui.Reset)
@@ -85,14 +87,16 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 	choice = strings.ToUpper(strings.TrimSpace(choice))
 
 	if choice == "S" {
-		if !notes.Success {
-			ui.PrintError("Impossible d'enregistrer des Release Notes en erreur.")
+		if isError || notes == nil || !notes.Success || notes.Markdown == "" {
+			ui.PrintErrorCard("Sauvegarde Impossible", "Impossible d'enregistrer des Release Notes en erreur.",
+				"Assurez-vous qu'une génération valide a été effectuée avant d'enregistrer",
+			)
 			waitForEnter(reader)
 			return
 		}
 		saveErr := client.SaveMarkdownFile("RELEASE_NOTES.md", notes.Markdown)
 		if saveErr != nil {
-			ui.PrintError(fmt.Sprintf("Erreur lors de l'enregistrement du fichier : %v", saveErr))
+			ui.PrintErrorCard("Échec d'Enregistrement", fmt.Sprintf("Erreur lors de l'enregistrement de RELEASE_NOTES.md : %v", saveErr))
 		} else {
 			ui.PrintSuccess("Le fichier RELEASE_NOTES.md a été enregistré avec succès à la racine du dépôt !")
 		}

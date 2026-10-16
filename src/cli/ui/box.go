@@ -150,9 +150,81 @@ func PrintSuccess(msg string) {
 	fmt.Printf("\n  %s✔%s %s%s%s\n\n", Green, Reset, Bold+Green, msg, Reset)
 }
 
-// PrintError affiche une alerte d'erreur
-func PrintError(msg string) {
-	fmt.Printf("\n  %s✖ Erreur :%s %s\n\n", Red+Bold, Reset, msg)
+// wrapText découpe un texte en plusieurs lignes ne dépassant pas maxWidth caractères visibles
+func wrapText(text string, maxWidth int) []string {
+	if maxWidth <= 10 {
+		maxWidth = 60
+	}
+	var result []string
+	paragraphs := strings.Split(text, "\n")
+	for _, p := range paragraphs {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			result = append(result, "")
+			continue
+		}
+		words := strings.Fields(p)
+		if len(words) == 0 {
+			continue
+		}
+		curr := words[0]
+		for _, w := range words[1:] {
+			if VisualLen(curr+" "+w) <= maxWidth {
+				curr += " " + w
+			} else {
+				result = append(result, curr)
+				curr = w
+			}
+		}
+		if curr != "" {
+			result = append(result, curr)
+		}
+	}
+	return result
+}
+
+// PrintErrorCard affiche un encadré d'erreur standardisé et harmonisé pour toute l'application
+func PrintErrorCard(title string, message string, hints ...string) {
+	width := 72
+	var lines []string
+
+	if strings.TrimSpace(title) == "" {
+		title = "Erreur"
+	}
+
+	lines = append(lines, "")
+
+	// Formatage du message principal avec découpage automatique
+	msgLines := wrapText(message, 62)
+	for i, l := range msgLines {
+		if i == 0 {
+			lines = append(lines, fmt.Sprintf("  %s✖%s %s%s%s", Bold+Red, Reset, Bold+White, l, Reset))
+		} else {
+			lines = append(lines, fmt.Sprintf("    %s%s", l, Reset))
+		}
+	}
+
+	// Suggestions et actions de dépannage optionnelles
+	if len(hints) > 0 {
+		lines = append(lines, "")
+		lines = append(lines, "  "+Dim+strings.Repeat("─", width-8)+Reset)
+		lines = append(lines, "")
+		lines = append(lines, fmt.Sprintf("  %s💡 Suggestions / Actions :%s", Bold+Yellow, Reset))
+		for _, hint := range hints {
+			hintLines := wrapText(hint, 58)
+			for j, hl := range hintLines {
+				if j == 0 {
+					lines = append(lines, fmt.Sprintf("    • %s%s", hl, Reset))
+				} else {
+					lines = append(lines, fmt.Sprintf("      %s%s", hl, Reset))
+				}
+			}
+		}
+	}
+	lines = append(lines, "")
+
+	PrintCard(title, lines, width, Red)
+	fmt.Println()
 }
 
 // PrintWarning affiche un avertissement

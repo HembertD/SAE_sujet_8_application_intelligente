@@ -64,51 +64,18 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 	ui.PrintDiffTable(diffResp.Files, width)
 	fmt.Println()
 
-	// 4. Boucle de génération et de raffinement avec le LLM
-	feedback := ""
+	// 4. Génération initiale du message de commit avec le LLM
+	proposal, isError := generateCommit(client, "")
+
+	// 5. Boucle d'interaction et de décision utilisateur (Event Loop)
 	for {
-		actionLabel := "Génération du message de commit avec le LLM..."
-		if feedback != "" {
-			actionLabel = fmt.Sprintf("Régénération avec consigne : \"%s\"...", feedback)
-		}
-
-		spinnerLLM := ui.NewSpinner(actionLabel)
-		spinnerLLM.Start()
-		proposal, errGen := client.GenerateCommit(feedback)
-		spinnerLLM.Stop("")
-
-		isError := (errGen != nil) || (proposal != nil && (!proposal.Success || proposal.Subject == "" || strings.ToLower(proposal.Type) == "erreur"))
-		if isError {
-			errMsg := "délai d'attente dépassé (timeout) ou aucune réponse du serveur LLM"
-			if errGen != nil {
-				errMsg = errGen.Error()
-			} else if proposal != nil && proposal.Error != "" {
-				errMsg = proposal.Error
-			}
-
-			ui.PrintErrorCard("Erreur de Génération du Commit", errMsg,
-				"Vérifiez que le serveur Ollama est démarré et accessible (menu [3] Configuration)",
-				"Réessayez avec une consigne [R] ou saisissez manuellement votre message [M]",
-				"Vous pouvez aussi annuler l'opération et revenir au menu principal [A]",
-			)
-
-			if proposal == nil {
-				proposal = &models.CommitProposal{
-					Success: false,
-					Type:    "feat",
-					Scope:   "",
-					Subject: "",
-					Body:    "",
-					Error:   errMsg,
-				}
-			}
-		} else {
+		if !isError {
 			fmt.Println()
 			ui.PrintCommitCard(proposal.Type, proposal.Scope, proposal.Subject, proposal.Body, width)
 			fmt.Println()
 		}
 
-		// 5. Menu de décision utilisateur
+		// Affichage des actions disponibles
 		fmt.Println(ui.Bold + "  Actions disponibles :" + ui.Reset)
 		if !isError {
 			fmt.Printf("    %s[V]%s Valider et appliquer le commit\n", ui.Green+ui.Bold, ui.Reset)
@@ -121,12 +88,11 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		if isError {
 			promptChoices = "R/M/A"
 		}
-		fmt.Printf("  %s👉 Votre choix (%s) :%s ", ui.Bold+ui.Yellow, promptChoices, ui.Reset)
-		choice, err := reader.ReadString('\n')
+		prompt := fmt.Sprintf("  %s👉 Votre choix (%s) :%s ", ui.Bold+ui.Yellow, promptChoices, ui.Reset)
+		choice, err := ReadChoice(reader, prompt)
 		if err != nil {
 			return
 		}
-		choice = strings.ToUpper(strings.TrimSpace(choice))
 
 		switch choice {
 		case "V":
@@ -178,63 +144,14 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		case "R":
 			fmt.Printf("\n  %s💬 Donnez votre consigne à l'IA pour ajuster le commit :%s\n  > ", ui.Bold+ui.Yellow, ui.Reset)
 			fb, _ := reader.ReadString('\n')
-			feedback = strings.TrimSpace(fb)
+			feedback := strings.TrimSpace(fb)
 			if feedback == "" {
 				feedback = "Corrige et améliore la précision du message."
 			}
+			proposal, isError = generateCommit(client, feedback)
 
 		case "M":
-			fmt.Println(ui.Bold + "\n  ✏️ Modification manuelle :" + ui.Reset)
-
-			defaultType := proposal.Type
-			if strings.ToLower(defaultType) == "erreur" {
-				defaultType = "feat"
-			}
-			fmt.Printf("  Type [%s] : ", defaultType)
-			newType, _ := reader.ReadString('\n')
-			newType = strings.TrimSpace(newType)
-			if newType != "" {
-				proposal.Type = newType
-			} else {
-				proposal.Type = defaultType
-			}
-
-			fmt.Printf("  Scope [%s] : ", proposal.Scope)
-			newScope, _ := reader.ReadString('\n')
-			newScope = strings.TrimSpace(newScope)
-			if newScope != "" {
-				proposal.Scope = newScope
-			}
-
-			defaultSubject := proposal.Subject
-			if strings.Contains(strings.ToLower(defaultSubject), "aucune réponse") || strings.Contains(strings.ToLower(defaultSubject), "erreur") {
-				defaultSubject = ""
-			}
-			if defaultSubject != "" {
-				fmt.Printf("  Sujet [%s] : ", defaultSubject)
-			} else {
-				fmt.Print("  Sujet : ")
-			}
-			newSubject, _ := reader.ReadString('\n')
-			newSubject = strings.TrimSpace(newSubject)
-			if newSubject != "" {
-				proposal.Subject = newSubject
-			} else if defaultSubject != "" {
-				proposal.Subject = defaultSubject
-			}
-
-			fmt.Printf("  Description / Body [%s] : ", proposal.Body)
-			newBody, _ := reader.ReadString('\n')
-			newBody = strings.TrimSpace(newBody)
-			if newBody != "" {
-				proposal.Body = newBody
-			}
-
-			feedback = ""
-			if proposal.Type != "erreur" && proposal.Subject != "" {
-				proposal.Success = true
-				isError = false
-			}
+			isError = promptManualEdit(reader, proposal)
 
 		case "A":
 			ui.PrintInfo("Opération abandonnée. Aucun commit n'a été créé.")
@@ -242,9 +159,110 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			return
 
 		default:
-			ui.PrintWarning("Choix non reconnu, veuillez choisir parmi V, R, M ou A.")
+			if isError {
+				ui.PrintWarning("Choix non reconnu, veuillez choisir parmi R, M ou A.")
+			} else {
+				ui.PrintWarning("Choix non reconnu, veuillez choisir parmi V, R, M ou A.")
+			}
 		}
 	}
+}
+
+// generateCommit encapsule l'appel au LLM avec spinner et gestion standardisée des erreurs
+func generateCommit(client bridge.BackendClient, feedback string) (*models.CommitProposal, bool) {
+	actionLabel := "Génération du message de commit avec le LLM..."
+	if feedback != "" {
+		actionLabel = fmt.Sprintf("Régénération avec consigne : \"%s\"...", feedback)
+	}
+
+	spinnerLLM := ui.NewSpinner(actionLabel)
+	spinnerLLM.Start()
+	proposal, errGen := client.GenerateCommit(feedback)
+	spinnerLLM.Stop("")
+
+	isError := (errGen != nil) || (proposal != nil && (!proposal.Success || proposal.Subject == "" || strings.ToLower(proposal.Type) == "erreur"))
+	if isError {
+		errMsg := "délai d'attente dépassé (timeout) ou aucune réponse du serveur LLM"
+		if errGen != nil {
+			errMsg = errGen.Error()
+		} else if proposal != nil && proposal.Error != "" {
+			errMsg = proposal.Error
+		}
+
+		ui.PrintErrorCard("Erreur de Génération du Commit", errMsg,
+			"Vérifiez que le serveur Ollama est démarré et accessible (menu [3] Configuration)",
+			"Réessayez avec une consigne [R] ou saisissez manuellement votre message [M]",
+			"Vous pouvez aussi annuler l'opération et revenir au menu principal [A]",
+		)
+
+		if proposal == nil {
+			proposal = &models.CommitProposal{
+				Success: false,
+				Type:    "feat",
+				Scope:   "",
+				Subject: "",
+				Body:    "",
+				Error:   errMsg,
+			}
+		}
+	}
+
+	return proposal, isError
+}
+
+// promptManualEdit guide l'utilisateur pour éditer manuellement les champs du message de commit
+func promptManualEdit(reader *bufio.Reader, proposal *models.CommitProposal) bool {
+	fmt.Println(ui.Bold + "\n  ✏️ Modification manuelle :" + ui.Reset)
+
+	defaultType := proposal.Type
+	if strings.ToLower(defaultType) == "erreur" {
+		defaultType = "feat"
+	}
+	fmt.Printf("  Type [%s] : ", defaultType)
+	newType, _ := reader.ReadString('\n')
+	newType = strings.TrimSpace(newType)
+	if newType != "" {
+		proposal.Type = newType
+	} else {
+		proposal.Type = defaultType
+	}
+
+	fmt.Printf("  Scope [%s] : ", proposal.Scope)
+	newScope, _ := reader.ReadString('\n')
+	newScope = strings.TrimSpace(newScope)
+	if newScope != "" {
+		proposal.Scope = newScope
+	}
+
+	defaultSubject := proposal.Subject
+	if strings.Contains(strings.ToLower(defaultSubject), "aucune réponse") || strings.Contains(strings.ToLower(defaultSubject), "erreur") {
+		defaultSubject = ""
+	}
+	if defaultSubject != "" {
+		fmt.Printf("  Sujet [%s] : ", defaultSubject)
+	} else {
+		fmt.Print("  Sujet : ")
+	}
+	newSubject, _ := reader.ReadString('\n')
+	newSubject = strings.TrimSpace(newSubject)
+	if newSubject != "" {
+		proposal.Subject = newSubject
+	} else if defaultSubject != "" {
+		proposal.Subject = defaultSubject
+	}
+
+	fmt.Printf("  Description / Body [%s] : ", proposal.Body)
+	newBody, _ := reader.ReadString('\n')
+	newBody = strings.TrimSpace(newBody)
+	if newBody != "" {
+		proposal.Body = newBody
+	}
+
+	if proposal.Type != "erreur" && proposal.Subject != "" {
+		proposal.Success = true
+		return false
+	}
+	return true
 }
 
 func formatCommit(typeStr, scope, subject, body string) string {
@@ -262,4 +280,30 @@ func formatCommit(typeStr, scope, subject, body string) string {
 func waitForEnter(reader *bufio.Reader) {
 	fmt.Printf("\n  %s[Appuyez sur Entrée pour continuer...]%s", ui.Dim, ui.Reset)
 	_, _ = reader.ReadString('\n')
+}
+
+// ReadChoice lit un choix utilisateur et absorbe les appuis sur Entrée à vide sur place sans saut de ligne
+func ReadChoice(reader *bufio.Reader, prompt string) (string, error) {
+	parts := strings.Split(prompt, "\n")
+	prefix := ""
+	lastLine := prompt
+	if len(parts) > 1 {
+		prefix = strings.Join(parts[:len(parts)-1], "\n") + "\n"
+		lastLine = parts[len(parts)-1]
+		fmt.Print(prefix)
+	}
+	fmt.Print(lastLine)
+	for {
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return "", err
+		}
+		trimmed := strings.ToUpper(strings.TrimSpace(input))
+		if trimmed == "" {
+			// L'utilisateur a appuyé sur Entrée à vide : on remonte le curseur et on réécrit la ligne du prompt sur place
+			fmt.Print("\033[1A\r" + lastLine + "\033[K")
+			continue
+		}
+		return trimmed, nil
+	}
 }

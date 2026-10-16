@@ -16,7 +16,8 @@ Ce module permet de visualiser et de modifier les paramètres opérationnels de 
 ## Points clés
 
 - **Conformité stricte aux exigences d'évaluation** : respect de la règle d'or "tout doit être dans un `.env`, aucune recompilation requise lors d'un changement de modèle ou d'adresse" ;
-- **Diagnostic intégré** : permet de valider instantanément si le serveur de l'IUT (`10.22.28.190:11434`) répond avant de lancer des opérations de génération.
+- **Diagnostic intégré** : permet de valider instantanément si le serveur de l'IUT (`10.22.28.190:11434`) répond avant de lancer des opérations de génération ;
+- **Saisie sécurisée** : utilisation de `ReadChoice` pour éviter toute sortie accidentelle lors d'un appui sur Entrée à vide (retour exigeant explicitement la touche `[R]`).
 
 ## Rôle dans l’architecture
 

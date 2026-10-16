@@ -65,12 +65,11 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		fmt.Printf("    %s[M]%s ✏️  Modifier les paramètres et sauvegarder dans le .env\n", ui.Green+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[R]%s 🚪 Retour au menu principal\n\n", ui.Red+ui.Bold, ui.Reset)
 
-		fmt.Printf("  %s👉 Votre choix (T/M/R) :%s ", ui.Bold+ui.Yellow, ui.Reset)
-		choice, err := reader.ReadString('\n')
+		prompt := fmt.Sprintf("  %s👉 Votre choix (T/M/R) :%s ", ui.Bold+ui.Yellow, ui.Reset)
+		choice, err := ReadChoice(reader, prompt)
 		if err != nil {
 			return
 		}
-		choice = strings.ToUpper(strings.TrimSpace(choice))
 
 		switch choice {
 		case "T":
@@ -159,7 +158,7 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			}
 			waitForEnter(reader)
 
-		case "R", "":
+		case "R":
 			return
 
 		default:

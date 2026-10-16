@@ -20,7 +20,9 @@ Ce module orchestre le workflow interactif de génération, de validation et d'a
 ## Points clés
 
 - **Respect absolu du rôle front-end** : aucune commande Git directe n'est exécutée depuis ce fichier ; toutes les requêtes (`stage`, `commit`, `push`, `llm`) sont transmises au `BackendClient` ;
-- **Contrôle utilisateur total** : l'utilisateur reste maître absolu de la validation finale du commit.
+- **Contrôle utilisateur total** : l'utilisateur reste maître absolu de la validation finale du commit ;
+- **Fonction `ReadChoice`** : utilitaire de saisie partagé absorbant les appuis sur Entrée à vide in-situ via des séquences ANSI (`\033[1A\r` + `\033[K`) avec préservation de l'espace après l'emoji, sans générer de sauts de ligne intempestifs ;
+- **Architecture Event Loop (Clean Code)** : découplage strict entre la génération initiale et la boucle d'interaction utilisateur, avec appel direct du LLM dans le choix `[R]` et édition manuelle dédiée (`promptManualEdit`).
 
 ## Rôle dans l’architecture
 

@@ -16,7 +16,8 @@ Ce module gère l'écran interactif dédié à la synthèse de version et à la 
 ## Points clés
 
 - **Catégorisation sémantique** : exploitation de la classification produite par le LLM (Nouveautés, Corrections de bogues, Documentation & Maintenance) ;
-- **Export en 1 touche** : écriture immédiate du fichier Markdown sans quitter l'interface.
+- **Export en 1 touche** : écriture immédiate du fichier Markdown sans quitter l'interface ;
+- **Boucle de décision robuste** : utilisation de `ReadChoice` pour absorber les appuis vides sur Entrée sans quitter l'écran et verrouillage contextuel de la sauvegarde `[S]`.
 
 ## Rôle dans l’architecture
 

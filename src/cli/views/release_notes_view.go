@@ -75,37 +75,46 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 	}
 
 	// Choix utilisateur
-	fmt.Println(ui.Bold + "  Options :" + ui.Reset)
-	if !isError {
-		fmt.Printf("    %s[S]%s Sauvegarder dans un fichier RELEASE_NOTES.md\n", ui.Green+ui.Bold, ui.Reset)
-	}
-	fmt.Printf("    %s[R]%s Retourner au menu principal\n\n", ui.Yellow+ui.Bold, ui.Reset)
+	for {
+		fmt.Println(ui.Bold + "  Options :" + ui.Reset)
+		if !isError {
+			fmt.Printf("    %s[S]%s Sauvegarder dans un fichier RELEASE_NOTES.md\n", ui.Green+ui.Bold, ui.Reset)
+		}
+		fmt.Printf("    %s[R]%s Retourner au menu principal\n\n", ui.Yellow+ui.Bold, ui.Reset)
 
-	promptChoices := "S/R"
-	if isError {
-		promptChoices = "R"
-	}
-	fmt.Printf("  %s👉 Votre choix (%s) :%s ", ui.Bold+ui.Yellow, promptChoices, ui.Reset)
-	choice, err := reader.ReadString('\n')
-	if err != nil {
-		return
-	}
-	choice = strings.ToUpper(strings.TrimSpace(choice))
-
-	if choice == "S" {
-		if isError || notes == nil || !notes.Success || notes.Markdown == "" {
-			ui.PrintErrorCard("Sauvegarde Impossible", "Impossible d'enregistrer des Release Notes en erreur.",
-				"Assurez-vous qu'une génération valide a été effectuée avant d'enregistrer",
-			)
-			waitForEnter(reader)
+		promptChoices := "S/R"
+		if isError {
+			promptChoices = "R"
+		}
+		prompt := fmt.Sprintf("  %s👉 Votre choix (%s) :%s ", ui.Bold+ui.Yellow, promptChoices, ui.Reset)
+		choice, err := ReadChoice(reader, prompt)
+		if err != nil {
 			return
 		}
-		saveErr := client.SaveMarkdownFile("RELEASE_NOTES.md", notes.Markdown)
-		if saveErr != nil {
-			ui.PrintErrorCard("Échec d'Enregistrement", fmt.Sprintf("Erreur lors de l'enregistrement de RELEASE_NOTES.md : %v", saveErr))
+
+		if choice == "S" {
+			if isError || notes == nil || !notes.Success || notes.Markdown == "" {
+				ui.PrintErrorCard("Sauvegarde Impossible", "Impossible d'enregistrer des Release Notes en erreur.",
+					"Assurez-vous qu'une génération valide a été effectuée avant d'enregistrer",
+				)
+				continue
+			}
+			saveErr := client.SaveMarkdownFile("RELEASE_NOTES.md", notes.Markdown)
+			if saveErr != nil {
+				ui.PrintErrorCard("Échec d'Enregistrement", fmt.Sprintf("Erreur lors de l'enregistrement de RELEASE_NOTES.md : %v", saveErr))
+			} else {
+				ui.PrintSuccess("Le fichier RELEASE_NOTES.md a été enregistré avec succès à la racine du dépôt !")
+			}
+			waitForEnter(reader)
+			return
+		} else if choice == "R" {
+			return
 		} else {
-			ui.PrintSuccess("Le fichier RELEASE_NOTES.md a été enregistré avec succès à la racine du dépôt !")
+			if isError {
+				ui.PrintWarning("Choix non reconnu, appuyez sur R pour retourner au menu principal.")
+			} else {
+				ui.PrintWarning("Choix non reconnu, veuillez choisir parmi S ou R.")
+			}
 		}
-		waitForEnter(reader)
 	}
 }

@@ -3,7 +3,6 @@ package views
 import (
 	"bufio"
 	"fmt"
-	"strings"
 
 	"sae-git-cli/bridge"
 	"sae-git-cli/models"
@@ -37,10 +36,11 @@ func ShowMainMenu(reader *bufio.Reader, client bridge.BackendClient, status *mod
 
 	ui.PrintCard("Menu Principal", menuLines, width, ui.Cyan)
 
-	fmt.Printf("\n  %s👉 Choisissez une option (1-4 ou q) :%s ", ui.Bold+ui.Yellow, ui.Reset)
-	input, err := reader.ReadString('\n')
+	fmt.Println()
+	prompt := fmt.Sprintf("  %s👉 Choisissez une option (1-4 ou q) :%s ", ui.Bold+ui.Yellow, ui.Reset)
+	choice, err := ReadChoice(reader, prompt)
 	if err != nil {
 		return "q"
 	}
-	return strings.TrimSpace(input)
+	return choice
 }

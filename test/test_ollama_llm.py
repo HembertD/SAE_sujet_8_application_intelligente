@@ -40,6 +40,16 @@ def _ollama_payload(content: dict, done_reason: str = "stop") -> dict:
     }
 
 
+def _ollama_raw_content_payload(raw_content: str, done_reason: str = "stop") -> dict:
+    """Comme _ollama_payload, mais avec un `content` brut (non-JSON), pour
+    simuler le cas où le modèle ne respecte pas le format contraint."""
+    return {
+        "message": {"role": "assistant", "content": raw_content, "thinking": "..."},
+        "done": True,
+        "done_reason": done_reason,
+    }
+
+
 SAMPLE_DIFF = [DiffFile(path="auth.py", status="M", added=10, removed=2, is_binary=False, patch="+ def login(): ...")]
 
 
@@ -70,6 +80,31 @@ def test_generate_commit_message_retries_then_succeeds(monkeypatch):
 def test_generate_commit_message_fails_after_second_invalid(monkeypatch):
     invalid = {"type": "banana", "scope": None, "subject": "test.", "body": None}
     monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: _FakeResponse(_ollama_payload(invalid)))
+
+    with pytest.raises(CommitMessageValidationError):
+        llm.generate_commit_message(SAMPLE_DIFF)
+
+
+def test_generate_commit_message_retries_on_malformed_json_then_succeeds(monkeypatch):
+    # Premier essai : le modèle ne respecte pas le format contraint (texte libre).
+    valid = {"type": "fix", "scope": None, "subject": "corrige le crash au démarrage", "body": None}
+    responses = [
+        _ollama_raw_content_payload("Voici votre message de commit : ceci n'est pas du JSON."),
+        _ollama_payload(valid),
+    ]
+    monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: _FakeResponse(responses.pop(0)))
+
+    result = llm.generate_commit_message(SAMPLE_DIFF)
+
+    assert result.type == "fix"
+    assert not responses  # les deux appels ont bien été consommés
+
+
+def test_generate_commit_message_fails_after_second_malformed_json(monkeypatch):
+    monkeypatch.setattr(
+        llm.urllib.request, "urlopen",
+        lambda *a, **k: _FakeResponse(_ollama_raw_content_payload("toujours pas du JSON")),
+    )
 
     with pytest.raises(CommitMessageValidationError):
         llm.generate_commit_message(SAMPLE_DIFF)

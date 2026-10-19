@@ -27,6 +27,7 @@ from git_commit_release_notes_generator.config import (
 from git_commit_release_notes_generator.models import CommitMessage, DiffFile
 from git_commit_release_notes_generator.ollama_client.exceptions import (
     CommitMessageValidationError,
+    MalformedResponseError,
     OllamaCallError,
 )
 from git_commit_release_notes_generator.ollama_client.mock_llm import (
@@ -195,10 +196,11 @@ ping_ollama = check_ollama_reachable
 def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> CommitMessage:
     """Génère un CommitMessage validé à partir d'une liste de DiffFile.
 
-    Un seul retry est tenté en cas d'échec de validation, en réinjectant
-    l'erreur constatée dans la conversation. Si le second essai échoue aussi,
-    lève CommitMessageValidationError plutôt que de renvoyer un message
-    bancal en silence.
+    Un seul retry est tenté en cas d'échec de validation OU de réponse non-JSON
+    malgré le format contraint, en réinjectant l'erreur constatée dans la
+    conversation. Si le second essai échoue aussi, lève
+    CommitMessageValidationError plutôt que de renvoyer un message bancal en
+    silence.
     """
     if not diff_files:
         raise ValueError("generate_commit_message() nécessite au moins un DiffFile.")
@@ -220,28 +222,36 @@ def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> C
             "content": f"Consigne additionnelle de révision : {feedback.strip()}",
         })
 
-    raw = _call_chat(messages)
-    error = _validate(raw)
-    if error is None:
-        return _apply_forced_type(_to_commit_message(raw), forced_type)
+    last_error: str | None = None
+    for attempt in range(2):
+        if attempt == 1:
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"Ta réponse précédente est invalide : {last_error}. "
+                    "Corrige-la et renvoie uniquement un JSON conforme au schéma."
+                ),
+            })
 
-    logger.warning("Génération invalide (%s), tentative de retry.", error)
-    messages.append({"role": "assistant", "content": json.dumps(raw, ensure_ascii=False)})
-    messages.append({
-        "role": "user",
-        "content": (
-            f"Ta réponse précédente est invalide : {error}. "
-            "Corrige-la et renvoie uniquement un JSON conforme au schéma."
-        ),
-    })
+        try:
+            raw = _call_chat(messages)
+        except MalformedResponseError as e:
+            last_error = f"réponse non-JSON malgré le format contraint ({e.content!r})"
+            logger.warning("Génération invalide (%s), tentative de retry.", last_error)
+            messages.append({"role": "assistant", "content": e.content})
+            continue
 
-    raw = _call_chat(messages)
-    error = _validate(raw)
-    if error is not None:
-        raise CommitMessageValidationError(
-            f"Échec de validation après retry : {error}. Réponse brute : {raw!r}"
-        )
-    return _apply_forced_type(_to_commit_message(raw), forced_type)
+        error = _validate(raw)
+        if error is None:
+            return _apply_forced_type(_to_commit_message(raw), forced_type)
+
+        last_error = error
+        logger.warning("Génération invalide (%s), tentative de retry.", error)
+        messages.append({"role": "assistant", "content": json.dumps(raw, ensure_ascii=False)})
+
+    raise CommitMessageValidationError(
+        f"Échec de validation après retry : {last_error}"
+    )
 
 
 def _build_diff_summary(diff_files: list[DiffFile]) -> str:
@@ -291,7 +301,9 @@ def _call_chat(messages: list[dict]) -> dict:
     try:
         return json.loads(content)
     except json.JSONDecodeError as e:
-        raise OllamaCallError(f"Contenu non-JSON malgré le format contraint : {content!r}") from e
+        raise MalformedResponseError(
+            content, f"Contenu non-JSON malgré le format contraint : {content!r}"
+        ) from e
 
 
 def _validate(raw: dict) -> str | None:

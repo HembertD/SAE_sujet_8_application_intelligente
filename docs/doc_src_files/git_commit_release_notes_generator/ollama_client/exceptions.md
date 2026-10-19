@@ -9,7 +9,8 @@ Ce module définit les erreurs spécifiques à la couche LLM et aux échanges av
 ## Exceptions prévues
 
 - OllamaCallError : échec de l’appel au serveur.
-- CommitMessageValidationError : validation du JSON de réponse impossible ou incohérente.
+- MalformedResponseError (sous-classe d'OllamaCallError) : le contenu renvoyé n'est pas du JSON valide malgré le `format` contraint. Porte le contenu brut (`.content`) pour permettre à `generate_commit_message()` de le réinjecter dans la conversation et de retenter une fois, au lieu de lever une erreur fatale immédiate.
+- CommitMessageValidationError : validation du JSON de réponse impossible ou incohérente, y compris après un retry déclenché par une réponse non-JSON.
 
 ## Pourquoi les centraliser ?
 

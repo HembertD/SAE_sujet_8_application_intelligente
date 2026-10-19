@@ -103,7 +103,10 @@ class GitWrapper:
             else:
                 status = "M"
 
-            if "Binary files" in section or "GIT binary patch" in section:
+            section_lines = section.splitlines()
+            if any(line.startswith("Binary files") for line in section_lines) or any(
+                line.startswith("GIT binary patch") for line in section_lines
+            ):
                 diff_files.append(
                     DiffFile(
                         path=file_path,
@@ -137,11 +140,37 @@ class GitWrapper:
 
         return diff_files
 
+    def get_staged_file_names(self) -> list[str]:
+        """Renvoie la liste des noms de fichiers indexés (staged), même si le diff est vide.
+
+        Permet de distinguer "aucun fichier staged" de "fichier(s) staged mais
+        sans diff exploitable" (fichier vide, par exemple).
+        """
+        try:
+            names = self.repo.git.diff("--cached", "--name-only", "--diff-filter=ACMRTUXBD")
+            return [n for n in names.splitlines() if n.strip()]
+        except Exception as exc:
+            raise GitWrapperError(f"Erreur lors de la récupération des fichiers indexés : {exc}") from exc
+
     def get_staged_diff(self, max_chars: int = 8000) -> list[DiffFile]:
         """Extrait le diff indexé en objets DiffFile structurés, sans fichiers binaires."""
         try:
             diff_text = self.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTUXBD")
             if not diff_text.strip():
+                staged_files = self.get_staged_file_names()
+                if staged_files:
+                    # Fichiers indexés mais sans diff exploitable (ex: fichier vide).
+                    # Retourne un DiffFile vide pour que l'appelant sache qu'un fichier est staged.
+                    return [
+                        DiffFile(
+                            path=staged_files[0],
+                            status="M",
+                            added=0,
+                            removed=0,
+                            is_binary=False,
+                            patch="",
+                        )
+                    ]
                 return []
 
             parsed = self._parse_diff(diff_text)

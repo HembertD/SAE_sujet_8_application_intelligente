@@ -7,7 +7,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from git_commit_release_notes_generator.models import CommitMessage, DiffFile
+from git_commit_release_notes_generator.models import (
+    CommitMessage,
+    ConflictResolution,
+    ConflictSection,
+    DiffFile,
+)
 
 
 def mock_generate_commit_message(
@@ -47,6 +52,17 @@ def mock_release_notes(commits: list[Any] | None = None, from_tag: str = "", to_
     return (
         f"# Release Notes ({from_tag} ➔ {to_tag})\n\n"
         "Release notes mockées pour test hors ligne."
+    )
+
+
+def mock_conflict_resolution(conflict: ConflictSection) -> ConflictResolution:
+    """Simule une proposition de résolution de conflit, sans appel réseau."""
+    return ConflictResolution(
+        resolved_code=conflict.ours,
+        explanation=(
+            "Résolution mockée pour test hors ligne : la version \"ours\" a été "
+            "conservée par défaut, sans analyse réelle du conflit."
+        ),
     )
 
 

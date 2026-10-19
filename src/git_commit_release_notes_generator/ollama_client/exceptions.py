@@ -20,3 +20,8 @@ class MalformedResponseError(OllamaCallError):
 
 class CommitMessageValidationError(RuntimeError):
     """Le message de commit généré ne respecte pas le format attendu, même après retry."""
+
+
+class ConflictResolutionError(RuntimeError):
+    """La proposition de résolution de conflit de merge est invalide, même après retry
+    (marqueurs de conflit non résolus, contenu vide, ou réponse non exploitable)."""

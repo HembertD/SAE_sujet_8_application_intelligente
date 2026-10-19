@@ -15,7 +15,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from git_commit_release_notes_generator.models import DiffFile
 from git_commit_release_notes_generator.ollama_client import llm
-from git_commit_release_notes_generator.ollama_client.exceptions import CommitMessageValidationError
+from git_commit_release_notes_generator.ollama_client.exceptions import (
+    CommitMessageValidationError,
+    OllamaCallError,
+)
 
 
 class _FakeResponse:
@@ -83,6 +86,19 @@ def test_generate_commit_message_fails_after_second_invalid(monkeypatch):
 
     with pytest.raises(CommitMessageValidationError):
         llm.generate_commit_message(SAMPLE_DIFF)
+
+
+def test_call_chat_json_wraps_bare_timeout_error(monkeypatch):
+    # Un TimeoutError peut survenir pendant la lecture de la reponse (apres
+    # connexion etablie), sans etre enveloppe dans urllib.error.URLError par
+    # urllib lui-meme (constate en conditions reelles contre le vrai serveur).
+    def _raise(*a, **k):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", _raise)
+
+    with pytest.raises(OllamaCallError):
+        llm.call_chat_json([{"role": "user", "content": "x"}], {"type": "object"})
 
 
 def test_generate_commit_message_retries_on_malformed_json_then_succeeds(monkeypatch):

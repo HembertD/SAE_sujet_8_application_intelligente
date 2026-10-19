@@ -265,12 +265,23 @@ def _build_diff_summary(diff_files: list[DiffFile]) -> str:
 def _call_chat(messages: list[dict]) -> dict:
     if config.MOCK_AI:
         return mock_call_chat(messages)
+    return call_chat_json(messages, _JSON_SCHEMA)
 
+
+def call_chat_json(messages: list[dict], json_schema: dict) -> dict:
+    """Appelle /api/chat avec un `format` JSON contraint et renvoie le contenu parsé.
+
+    Socle d'appel réutilisable par d'autres sous-modules ollama_client (ex:
+    résolution de conflits de merge) qui ont besoin de la même robustesse
+    réseau avec un schéma JSON différent. Ne gère pas MOCK_AI : chaque
+    appelant connaît son propre format de simulation et doit brancher son
+    propre mock avant d'arriver ici.
+    """
     body = {
         "model": OLLAMA_MODEL,
         "messages": messages,
         "stream": False,
-        "format": _JSON_SCHEMA,
+        "format": json_schema,
         # Sans ça, Ollama utilise sa fenêtre de contexte par défaut (souvent
         # bien plus petite que les 262K annoncés pour gemma4:26b) et tronque
         # silencieusement le début du diff sur les cas volumineux.
@@ -286,7 +297,12 @@ def _call_chat(messages: list[dict]) -> dict:
     try:
         with urllib.request.urlopen(request, timeout=OLLAMA_TIMEOUT_S) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except urllib.error.URLError as e:
+    except OSError as e:
+        # OSError (pas seulement urllib.error.URLError) : un timeout survenant
+        # pendant la lecture de la reponse (apres connexion etablie) peut
+        # remonter comme un TimeoutError brut, non enveloppe par urllib.
+        # URLError est lui-meme une sous-classe d'OSError, donc ce handler
+        # couvre les deux cas sous une seule erreur applicative.
         raise OllamaCallError(f"Impossible de joindre Ollama à {OLLAMA_BASE_URL} : {e}") from e
     except json.JSONDecodeError as e:
         raise OllamaCallError(f"Réponse non-JSON depuis Ollama : {e}") from e

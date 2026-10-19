@@ -65,3 +65,29 @@ class CommitMessage:
     scope: str | None
     subject: str
     body: str | None
+
+
+@dataclass
+class ConflictSection:
+    """Une section de conflit de merge extraite d'un fichier.
+
+    Produite par le module de parsing Git (module B, GitWrapper) lors de la
+    détection d'un conflit sur le disque ; consommée par le module C
+    (ollama_client.conflict_resolver) pour proposer une résolution.
+    """
+    file_path: str
+    ours: str
+    theirs: str
+    base: str | None = None
+
+
+@dataclass
+class ConflictResolution:
+    """Proposition de résolution d'un conflit, produite par le module C.
+
+    Jamais appliquée automatiquement au fichier : consommée par la couche
+    d'affichage Go, qui doit toujours la soumettre à validation humaine
+    avant toute écriture sur disque.
+    """
+    resolved_code: str
+    explanation: str

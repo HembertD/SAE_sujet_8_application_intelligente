@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"sae-git-cli/models"
@@ -38,15 +39,7 @@ func NewPythonClientWithAppRoot(repoRoot, appRoot string) *PythonClient {
 	if isTestDir(repoRoot) {
 		appRoot = repoRoot
 	}
-	pyBin := "python3"
-	if customPy := os.Getenv("PYTHON_BIN"); customPy != "" {
-		pyBin = customPy
-	} else if home, err := os.UserHomeDir(); err == nil {
-		monenvPy := filepath.Join(home, "monenv", "bin", "python")
-		if _, statErr := os.Stat(monenvPy); statErr == nil {
-			pyBin = monenvPy
-		}
-	}
+	pyBin := resolvePythonBin(appRoot)
 
 	return &PythonClient{
 		pythonBin:  pyBin,
@@ -54,6 +47,35 @@ func NewPythonClientWithAppRoot(repoRoot, appRoot string) *PythonClient {
 		repoRoot:   repoRoot,
 		appRoot:    appRoot,
 	}
+}
+
+// resolvePythonBin détermine quel interpréteur Python utiliser, par ordre de priorité :
+//  1. PYTHON_BIN (variable d'environnement système, ou définie dans le .env applicatif) ;
+//  2. l'environnement virtuel autonome créé dans les fichiers de l'application
+//     (<appRoot>/.venv, via scripts/setup_python_env.py) ;
+//  3. l'interpréteur système, selon l'OS ("python" sous Windows, où "python3"
+//     n'existe souvent pas ; "python3" ailleurs).
+//
+// Ne dépend plus d'un chemin d'environnement virtuel personnel codé en dur :
+// chaque poste de développement doit soit lancer scripts/setup_python_env.py,
+// soit renseigner PYTHON_BIN explicitement.
+func resolvePythonBin(appRoot string) string {
+	if customPy := ReadPythonBinFromEnv(appRoot); customPy != "" {
+		return customPy
+	}
+
+	venvPy := filepath.Join(appRoot, ".venv", "Scripts", "python.exe")
+	if runtime.GOOS != "windows" {
+		venvPy = filepath.Join(appRoot, ".venv", "bin", "python")
+	}
+	if _, err := os.Stat(venvPy); err == nil {
+		return venvPy
+	}
+
+	if runtime.GOOS == "windows" {
+		return "python"
+	}
+	return "python3"
 }
 
 // runPythonCommand exécute la commande Python et récupère stdout
@@ -76,12 +98,15 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 
 	env := os.Environ()
 
-	// 1. PYTHONPATH pointe sur le dossier src de l'application
+	// 1. PYTHONPATH pointe sur le dossier src de l'application.
+	// os.PathListSeparator vaut ';' sous Windows et ':' ailleurs : un ':' en
+	// dur cassait PYTHONPATH sous Windows dès qu'une valeur préexistait.
+	pathSep := string(os.PathListSeparator)
 	appSrc := filepath.Join(p.appRoot, "src")
 	if stat, err := os.Stat(appSrc); err == nil && stat.IsDir() {
 		existing := os.Getenv("PYTHONPATH")
 		if existing != "" {
-			env = append(env, fmt.Sprintf("PYTHONPATH=%s:%s", appSrc, existing))
+			env = append(env, fmt.Sprintf("PYTHONPATH=%s%s%s", appSrc, pathSep, existing))
 		} else {
 			env = append(env, fmt.Sprintf("PYTHONPATH=%s", appSrc))
 		}
@@ -98,7 +123,7 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 				if stat, err := os.Stat(abs); err == nil && stat.IsDir() {
 					existing := os.Getenv("PYTHONPATH")
 					if existing != "" {
-						env = append(env, fmt.Sprintf("PYTHONPATH=%s:%s", abs, existing))
+						env = append(env, fmt.Sprintf("PYTHONPATH=%s%s%s", abs, pathSep, existing))
 					} else {
 						env = append(env, fmt.Sprintf("PYTHONPATH=%s", abs))
 					}

@@ -4,6 +4,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Environnement virtuel Python autonome (créé par scripts/setup_python_env.py)
+.venv/
+
 # Distribution / packaging
 
 build/

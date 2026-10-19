@@ -8,8 +8,8 @@ Ce module implémente l'interface `BackendClient` en exécutant le backend Pytho
 
 ## Responsabilités
 
-- Résoudre dynamiquement l'interpréteur Python (`python3` ou environnement virtuel local `/home/maxence/monenv/bin/python`).
-- Configurer les variables d'environnement du sous-processus : `PYTHONPATH` pointant sur `<appRoot>/src`, et transmission de `GITELLIGENCE_APP_ROOT` (avec maintien de `SMART_COMMIT_APP_ROOT` pour rétrocompatibilité).
+- Résoudre dynamiquement l'interpréteur Python (`resolvePythonBin`), par ordre de priorité : `PYTHON_BIN` (variable système ou `.env` applicatif) → environnement virtuel autonome `<appRoot>/.venv` (créé par `scripts/setup_python_env.py`) → interpréteur système selon l'OS (`python` sous Windows, `python3` ailleurs). Ne dépend plus d'un chemin d'environnement virtuel personnel codé en dur.
+- Configurer les variables d'environnement du sous-processus : `PYTHONPATH` pointant sur `<appRoot>/src` (séparateur `os.PathListSeparator`, portable Windows/Unix), et transmission de `GITELLIGENCE_APP_ROOT` (avec maintien de `SMART_COMMIT_APP_ROOT` pour rétrocompatibilité).
 - Exécuter les commandes métier (`--action status`, `diff`, `stage-all`, `generate-commit`, `apply-commit`, `push`, `release-notes`, `ping-ollama`).
 - Isoler les flux : capture du JSON strict sur `stdout` et redirection des logs/traces sur `stderr`.
 - Désérialiser les réponses JSON dans des structures Go fortement typées (`models`).
@@ -24,6 +24,7 @@ Ce module implémente l'interface `BackendClient` en exécutant le backend Pytho
 Précisions issues des commentaires retirés de `python_client.go` :
 
 - `PythonClient` implémente `BackendClient` en communiquant avec le sous-processus Python et ne contient AUCUNE logique métier : tout le traitement est délégué à Python.
+- `resolvePythonBin` : priorité à `PYTHON_BIN` (système puis `.env`), puis `<appRoot>/.venv/Scripts/python.exe` (Windows) ou `<appRoot>/.venv/bin/python` (Unix) si présent, puis repli sur l'interpréteur système selon `runtime.GOOS`.
 - `runPythonCommand` exécute la commande Python et récupère `stdout` ; `PYTHONPATH` pointe sur le dossier `src` de l'application, avec candidats de secours si `appSrc` n'est pas résolu ; la configuration est chargée exclusivement depuis l'application (`p.appRoot`, JAMAIS `p.repoRoot`).
 - `IsMock` retourne toujours `false` ; chaque méthode (`GetRepoStatus`, `GetDiff`, `StageAll`, `GenerateCommit`, `ApplyCommit`, `Push`, `GetReleaseNotes`, `GetConfig`, `SaveConfig`, `PingOllama`, `SaveMarkdownFile`) interroge le backend Python pour l'action correspondante, `SaveConfig` notifiant Python après écriture du `.env` applicatif et `SaveMarkdownFile` écrivant localement le changelog exporté.
 

@@ -81,12 +81,13 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			fmt.Printf("    %s[V]%s Valider et appliquer le commit\n", ui.Green+ui.Bold, ui.Reset)
 		}
 		fmt.Printf("    %s[R]%s Refuser et commenter pour régénérer avec l'IA\n", ui.Yellow+ui.Bold, ui.Reset)
+		fmt.Printf("    %s[T]%s Imposer un type Conventional Commit et régénérer\n", ui.Magenta+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[M]%s Modifier manuellement le message avant de commiter\n", ui.Cyan+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[A]%s Annuler et revenir au menu principal\n\n", ui.Red+ui.Bold, ui.Reset)
 
-		promptChoices := "V/R/M/A"
+		promptChoices := "V/R/T/M/A"
 		if isError {
-			promptChoices = "R/M/A"
+			promptChoices = "R/T/M/A"
 		}
 		prompt := fmt.Sprintf("  %s👉 Votre choix (%s) :%s ", ui.Bold+ui.Yellow, promptChoices, ui.Reset)
 		choice, err := ReadChoice(reader, prompt)
@@ -99,7 +100,7 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			if isError || proposal == nil || !proposal.Success || strings.ToLower(proposal.Type) == "erreur" || proposal.Subject == "" {
 				ui.PrintErrorCard("Validation Impossible", "Impossible de valider un message de commit en erreur ou incomplet.",
 					"Modifiez manuellement le message avec l'option [M]",
-					"Ou relancez la génération avec une consigne avec [R]",
+					"Ou relancez la génération avec une consigne avec [R] ou [T]",
 				)
 				continue
 			}
@@ -142,13 +143,21 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			return
 
 		case "R":
-			fmt.Printf("\n  %s💬 Donnez votre consigne à l'IA pour ajuster le commit :%s\n  > ", ui.Bold+ui.Yellow, ui.Reset)
+			fmt.Printf("\n  %s💬 Donnez votre consigne à l'IA pour ajuster le commit :%s\n", ui.Bold+ui.Yellow, ui.Reset)
+			fmt.Printf("  %s💡 Astuce : vous pouvez imposer un type (ex: \"type: fix\", \"c'est un feat\")%s\n  > ", ui.Dim, ui.Reset)
 			fb, _ := reader.ReadString('\n')
 			feedback := strings.TrimSpace(fb)
 			if feedback == "" {
 				feedback = "Corrige et améliore la précision du message."
 			}
 			proposal, isError = generateCommit(client, feedback)
+
+		case "T":
+			newProposal, isErr, canceled := promptForcedType(reader, client)
+			if !canceled {
+				proposal = newProposal
+				isError = isErr
+			}
 
 		case "M":
 			isError = promptManualEdit(reader, proposal)
@@ -160,9 +169,9 @@ func ShowCommitFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 		default:
 			if isError {
-				ui.PrintWarning("Choix non reconnu, veuillez choisir parmi R, M ou A.")
+				ui.PrintWarning("Choix non reconnu, veuillez choisir parmi R, T, M ou A.")
 			} else {
-				ui.PrintWarning("Choix non reconnu, veuillez choisir parmi V, R, M ou A.")
+				ui.PrintWarning("Choix non reconnu, veuillez choisir parmi V, R, T, M ou A.")
 			}
 		}
 	}
@@ -191,7 +200,8 @@ func generateCommit(client bridge.BackendClient, feedback string) (*models.Commi
 
 		ui.PrintErrorCard("Erreur de Génération du Commit", errMsg,
 			"Vérifiez que le serveur Ollama est démarré et accessible (menu [3] Configuration)",
-			"Réessayez avec une consigne [R] ou saisissez manuellement votre message [M]",
+			"Réessayez avec une consigne [R] ou imposez un type [T]",
+			"Ou saisissez manuellement votre message [M]",
 			"Vous pouvez aussi annuler l'opération et revenir au menu principal [A]",
 		)
 
@@ -307,3 +317,108 @@ func ReadChoice(reader *bufio.Reader, prompt string) (string, error) {
 		return trimmed, nil
 	}
 }
+
+// CommitTypeOption structure un type Conventional Commits avec sa description pour le TUI
+type CommitTypeOption struct {
+	Type        string
+	Description string
+}
+
+// ConventionalCommitTypes liste les 9 types standards supportés par le LLM (carte #58 / #42)
+var ConventionalCommitTypes = []CommitTypeOption{
+	{Type: "feat", Description: "Nouvelle fonctionnalité"},
+	{Type: "fix", Description: "Correction d'un bug"},
+	{Type: "chore", Description: "Maintenance générale, tâches courantes"},
+	{Type: "docs", Description: "Documentation (README, docstrings...)"},
+	{Type: "refactor", Description: "Refactorisation de code (sans changer le comportement)"},
+	{Type: "perf", Description: "Amélioration des performances"},
+	{Type: "test", Description: "Ajout ou modification de tests"},
+	{Type: "build", Description: "Système de build ou dépendances externes"},
+	{Type: "ci", Description: "Configuration CI/CD, pipelines et scripts"},
+}
+
+// ResolveForcedType valide et normalise le choix de type saisi par numéro (1-9) ou par nom
+func ResolveForcedType(input string) (string, bool) {
+	trimmed := strings.ToLower(strings.TrimSpace(input))
+	if trimmed == "" {
+		return "", false
+	}
+	switch trimmed {
+	case "1":
+		return "feat", true
+	case "2":
+		return "fix", true
+	case "3":
+		return "chore", true
+	case "4":
+		return "docs", true
+	case "5":
+		return "refactor", true
+	case "6":
+		return "perf", true
+	case "7":
+		return "test", true
+	case "8":
+		return "build", true
+	case "9":
+		return "ci", true
+	}
+	for _, opt := range ConventionalCommitTypes {
+		if trimmed == opt.Type {
+			return opt.Type, true
+		}
+	}
+	return "", false
+}
+
+// BuildForcedTypeFeedback construit la consigne de feedback respectant le motif attendu par le LLM (carte #58 / #42)
+func BuildForcedTypeFeedback(chosenType, comment string) string {
+	comment = strings.TrimSpace(comment)
+	if comment == "" {
+		return fmt.Sprintf("type: %s", chosenType)
+	}
+	return fmt.Sprintf("type: %s. %s", chosenType, comment)
+}
+
+// promptForcedType guide l'utilisateur pour sélectionner explicitement un type Conventional Commits à imposer à l'IA
+func promptForcedType(reader *bufio.Reader, client bridge.BackendClient) (*models.CommitProposal, bool, bool) {
+	fmt.Println()
+	fmt.Println(ui.Bold + ui.Cyan + "  🏷️  Imposer un type Conventional Commit :" + ui.Reset)
+	fmt.Println()
+	for i, opt := range ConventionalCommitTypes {
+		fmt.Printf("    %s[%d]%s %-10s %s%s%s\n",
+			ui.Bold+ui.Yellow, i+1, ui.Reset,
+			opt.Type,
+			ui.Dim, opt.Description, ui.Reset,
+		)
+	}
+	fmt.Printf("    %s[A]%s Annuler et revenir aux choix\n\n", ui.Bold+ui.Red, ui.Reset)
+
+	var chosenType string
+	for {
+		fmt.Printf("  %s👉 Choisissez un type (1-9 ou nom, [A] pour annuler) :%s ", ui.Bold+ui.Yellow, ui.Reset)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, true, true
+		}
+		trimmed := strings.TrimSpace(input)
+		if strings.ToUpper(trimmed) == "A" || strings.ToLower(trimmed) == "annuler" {
+			ui.PrintInfo("Opération annulée, retour aux choix.")
+			return nil, false, true
+		}
+		t, ok := ResolveForcedType(trimmed)
+		if ok {
+			chosenType = t
+			break
+		}
+		ui.PrintWarning("Type non reconnu. Entrez un numéro entre 1 et 9 ou le nom du type (ex: feat, fix).")
+	}
+
+	fmt.Printf("\n  %s💬 Consigne additionnelle pour l'IA (optionnelle, [Entrée] pour passer) :%s\n  > ", ui.Bold+ui.Yellow, ui.Reset)
+	comment, _ := reader.ReadString('\n')
+	feedback := BuildForcedTypeFeedback(chosenType, comment)
+
+	proposal, isErr := generateCommit(client, feedback)
+	return proposal, isErr, false
+}
+

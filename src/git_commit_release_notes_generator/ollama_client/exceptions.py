@@ -25,3 +25,8 @@ class CommitMessageValidationError(RuntimeError):
 class ConflictResolutionError(RuntimeError):
     """La proposition de résolution de conflit de merge est invalide, même après retry
     (marqueurs de conflit non résolus, contenu vide, ou réponse non exploitable)."""
+
+
+class ReleaseNotesError(RuntimeError):
+    """Les release notes générées par le modèle sont invalides, même après retry
+    (contenu vide ou réponse non exploitable)."""

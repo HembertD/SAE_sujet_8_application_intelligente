@@ -10,6 +10,7 @@ Ce fichier constitue le point d'entrée exécutable de l'interface en ligne de c
 
 - analyser les arguments et flags de la ligne de commande (`--dev`, `--mockInterface`, `--mockIA`, `--repo`, `--app-dir`) ;
 - localiser la racine applicative via `FindAppRoot` pour pointer sur le `.env` de l'application indépendamment du dépôt cible analysé ;
+- vérifier qu'un environnement Python valide est configuré (`bridge.CheckPythonEnvironment`) avant toute initialisation du backend, sauf en mode mock-interface ; arrêt immédiat (`os.Exit(1)`) avec une carte d'erreur guidée si ce n'est pas le cas ;
 - intercepter les signaux d'interruption système (`SIGINT` / `SIGTERM` / `Ctrl+C`) pour restaurer l'état du terminal (réaffichage du curseur et réinitialisation des couleurs) ;
 - initialiser le `BackendClient` relié au répertoire du dépôt Git et à la racine de l'application (en respectant la priorité du fichier `.env`) ;
 - interroger l'état du dépôt auprès du backend Python à chaque itération ;
@@ -39,6 +40,7 @@ Précisions issues des commentaires retirés de `main.go` et non redondantes ave
 
 - En cas d'erreur de `GetRepoStatus`, le statut est dégradé à `nil` (`status = nil`) et le menu principal est quand même affiché via `views.ShowMainMenu`.
 - Toute option non reconnue dans le `switch` (`default`) provoque un retour direct au menu, sans message d'erreur ni sortie.
+- Le contrôle de l'environnement Python (`CheckPythonEnvironment`) suit exactement le même schéma que le garde `--dev` qui le précède : `ui.PrintErrorCard` suivi de `os.Exit(1)`. Il est volontairement sauté si le mode mock-interface est actif (flag `--mockInterface` ou `.env`), puisqu'aucun sous-processus Python n'est alors jamais lancé.
 
 ## Commentaires de fonction (dupliqués du code source)
 

@@ -8,7 +8,7 @@ Ce module implémente l'interface `BackendClient` en exécutant le backend Pytho
 
 ## Responsabilités
 
-- Résoudre dynamiquement l'interpréteur Python (`resolvePythonBin`), par ordre de priorité : `PYTHON_BIN` (variable système ou `.env` applicatif) → environnement virtuel autonome `<appRoot>/.venv` (créé par `scripts/setup_python_env.py`) → interpréteur système selon l'OS (`python` sous Windows, `python3` ailleurs). Ne dépend plus d'un chemin d'environnement virtuel personnel codé en dur.
+- Résoudre dynamiquement l'interpréteur Python (`resolvePythonBin`), par ordre de priorité : `PYTHON_BIN` (variable système ou `.env` applicatif) → environnement virtuel autonome `<appRoot>/.venv` (créé par `scripts/setup_python_env.py`). Aucun repli sur l'interpréteur système (ni `python3` ni `python`) : si aucun des deux n'est trouvé, l'erreur est conservée sur le client et renvoyée au premier appel réel plutôt que de démarrer avec un interpréteur non maîtrisé (voir `CheckPythonEnvironment`, utilisé par `main.go` pour un échec immédiat au lancement).
 - Configurer les variables d'environnement du sous-processus : `PYTHONPATH` pointant sur `<appRoot>/src` (séparateur `os.PathListSeparator`, portable Windows/Unix), et transmission de `GITELLIGENCE_APP_ROOT` (avec maintien de `SMART_COMMIT_APP_ROOT` pour rétrocompatibilité).
 - Exécuter les commandes métier (`--action status`, `diff`, `stage-all`, `generate-commit`, `apply-commit`, `push`, `release-notes`, `ping-ollama`).
 - Isoler les flux : capture du JSON strict sur `stdout` et redirection des logs/traces sur `stderr`.
@@ -24,8 +24,9 @@ Ce module implémente l'interface `BackendClient` en exécutant le backend Pytho
 Précisions issues des commentaires retirés de `python_client.go` :
 
 - `PythonClient` implémente `BackendClient` en communiquant avec le sous-processus Python et ne contient AUCUNE logique métier : tout le traitement est délégué à Python.
-- `resolvePythonBin` : priorité à `PYTHON_BIN` (système puis `.env`), puis `<appRoot>/.venv/Scripts/python.exe` (Windows) ou `<appRoot>/.venv/bin/python` (Unix) si présent, puis repli sur l'interpréteur système selon `runtime.GOOS`.
-- `runPythonCommand` exécute la commande Python et récupère `stdout` ; `PYTHONPATH` pointe sur le dossier `src` de l'application, avec candidats de secours si `appSrc` n'est pas résolu ; la configuration est chargée exclusivement depuis l'application (`p.appRoot`, JAMAIS `p.repoRoot`).
+- `resolvePythonBin` : priorité à `PYTHON_BIN` (système puis `.env`), puis `<appRoot>/.venv/Scripts/python.exe` (Windows) ou `<appRoot>/.venv/bin/python` (Unix) si présent. Si ni l'un ni l'autre n'existe, retourne une erreur explicite guidant vers `scripts/setup_python_env.py` ou `PYTHON_BIN` (*fail fast*, plutôt qu'un repli silencieux suivi d'un `ModuleNotFoundError` différé).
+- `CheckPythonEnvironment(appRoot)` : expose cette même résolution sans construire de client, pour un contrôle explicite au démarrage du CLI (`main.go`), ignoré en mode mock-interface puisque Python n'y est jamais appelé.
+- `runPythonCommand` exécute la commande Python et récupère `stdout`, après avoir vérifié qu'aucune erreur de résolution d'interpréteur n'est en attente (`pythonBinErr`) ; `PYTHONPATH` pointe sur le dossier `src` de l'application, avec candidats de secours si `appSrc` n'est pas résolu ; la configuration est chargée exclusivement depuis l'application (`p.appRoot`, JAMAIS `p.repoRoot`).
 - `IsMock` retourne toujours `false` ; chaque méthode (`GetRepoStatus`, `GetDiff`, `StageAll`, `GenerateCommit`, `ApplyCommit`, `Push`, `GetReleaseNotes`, `GetConfig`, `SaveConfig`, `PingOllama`, `SaveMarkdownFile`) interroge le backend Python pour l'action correspondante, `SaveConfig` notifiant Python après écriture du `.env` applicatif et `SaveMarkdownFile` écrivant localement le changelog exporté.
 
 ## Commentaires de fonction (dupliqués du code source)

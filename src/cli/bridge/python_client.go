@@ -16,10 +16,11 @@ import (
 // PythonClient implémente BackendClient en communiquant avec le sous-processus Python.
 // Il ne contient AUCUNE logique métier et délègue l'intégralité du traitement à Python.
 type PythonClient struct {
-	pythonBin  string
-	moduleName string
-	repoRoot   string
-	appRoot    string
+	pythonBin    string
+	pythonBinErr error
+	moduleName   string
+	repoRoot     string
+	appRoot      string
 }
 
 // NewPythonClient instancie un client communiquant avec le backend Python réel.
@@ -32,6 +33,12 @@ func NewPythonClient(repoRoot string) *PythonClient {
 }
 
 // NewPythonClientWithAppRoot instancie un client en précisant la racine applicative.
+//
+// Si aucun interpréteur Python valide n'est résolu (cf. resolvePythonBin), la
+// construction n'échoue pas immédiatement : l'erreur est conservée et renvoyée
+// au premier appel réel (runPythonCommand). C'est CheckPythonEnvironment,
+// appelé explicitement au démarrage du CLI (main.go), qui doit stopper le
+// programme avant d'en arriver là quand le mode mock-interface n'est pas actif.
 func NewPythonClientWithAppRoot(repoRoot, appRoot string) *PythonClient {
 	if appRoot == "" {
 		appRoot = FindAppRoot(repoRoot)
@@ -39,29 +46,38 @@ func NewPythonClientWithAppRoot(repoRoot, appRoot string) *PythonClient {
 	if isTestDir(repoRoot) {
 		appRoot = repoRoot
 	}
-	pyBin := resolvePythonBin(appRoot)
+	pyBin, err := resolvePythonBin(appRoot)
 
 	return &PythonClient{
-		pythonBin:  pyBin,
-		moduleName: "git_commit_release_notes_generator.service.core",
-		repoRoot:   repoRoot,
-		appRoot:    appRoot,
+		pythonBin:    pyBin,
+		pythonBinErr: err,
+		moduleName:   "git_commit_release_notes_generator.service.core",
+		repoRoot:     repoRoot,
+		appRoot:      appRoot,
 	}
+}
+
+// CheckPythonEnvironment vérifie qu'un interpréteur Python valide est résolu
+// pour appRoot, sans construire de client. Destiné à un contrôle explicite au
+// démarrage du CLI (main.go), pour un échec immédiat et clair plutôt qu'un
+// plantage différé (ModuleNotFoundError) lors de la première action réelle.
+func CheckPythonEnvironment(appRoot string) error {
+	_, err := resolvePythonBin(appRoot)
+	return err
 }
 
 // resolvePythonBin détermine quel interpréteur Python utiliser, par ordre de priorité :
 //  1. PYTHON_BIN (variable d'environnement système, ou définie dans le .env applicatif) ;
 //  2. l'environnement virtuel autonome créé dans les fichiers de l'application
-//     (<appRoot>/.venv, via scripts/setup_python_env.py) ;
-//  3. l'interpréteur système, selon l'OS ("python" sous Windows, où "python3"
-//     n'existe souvent pas ; "python3" ailleurs).
+//     (<appRoot>/.venv, via scripts/setup_python_env.py).
 //
-// Ne dépend plus d'un chemin d'environnement virtuel personnel codé en dur :
-// chaque poste de développement doit soit lancer scripts/setup_python_env.py,
-// soit renseigner PYTHON_BIN explicitement.
-func resolvePythonBin(appRoot string) string {
+// Aucun repli sur l'interpréteur système : un repli silencieux ("python3" sous
+// Unix, "python" sous Windows) ferait démarrer l'application même sans
+// dépendances installées, pour planter plus tard avec un ModuleNotFoundError
+// incompréhensible. On préfère échouer tout de suite, explicitement.
+func resolvePythonBin(appRoot string) (string, error) {
 	if customPy := ReadPythonBinFromEnv(appRoot); customPy != "" {
-		return customPy
+		return customPy, nil
 	}
 
 	venvPy := filepath.Join(appRoot, ".venv", "Scripts", "python.exe")
@@ -69,17 +85,24 @@ func resolvePythonBin(appRoot string) string {
 		venvPy = filepath.Join(appRoot, ".venv", "bin", "python")
 	}
 	if _, err := os.Stat(venvPy); err == nil {
-		return venvPy
+		return venvPy, nil
 	}
 
-	if runtime.GOOS == "windows" {
-		return "python"
-	}
-	return "python3"
+	return "", fmt.Errorf(
+		"Aucun environnement Python valide n'a été trouvé.\n" +
+			"Pour initialiser l'environnement de l'application, exécutez :\n" +
+			"    python scripts/setup_python_env.py\n\n" +
+			"Pour utiliser un interpréteur existant, renseignez PYTHON_BIN dans votre .env :\n" +
+			"    PYTHON_BIN=/chemin/vers/votre/python",
+	)
 }
 
 // runPythonCommand exécute la commande Python et récupère stdout
 func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
+	if p.pythonBinErr != nil {
+		return nil, p.pythonBinErr
+	}
+
 	fullArgs := []string{"-m", p.moduleName}
 	hasRepoArg := false
 	for _, a := range args {

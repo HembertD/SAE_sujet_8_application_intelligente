@@ -8,7 +8,7 @@ Ce module constitue le point d'entrée exécutable sous forme de sous-processus 
 - interaction et extraction des statuts et diffs Git via `GitWrapper` ;
 - filtrage des fichiers et masquage des secrets ;
 - interrogation du LLM via `generate_commit_message` ;
-- synthèse des release notes au format Markdown ;
+- synthèse des release notes au format Markdown via `generate_release_notes` ;
 - diagnostic et joignabilité du serveur Ollama.
 
 ## Contrat d'interface (Règle d'or Go / Python)
@@ -36,7 +36,7 @@ Ce module constitue le point d'entrée exécutable sous forme de sous-processus 
 - `action_status(repo_path)` : vérifie la validité du dépôt, gère les branches orphelines (detached HEAD) et dénombre les modifications.
 - `action_diff(repo_path)` : expose chaque fichier avec son patch, ses compteurs `added`/`removed`, le drapeau `binary` et la détection `has_secrets_masked`.
 - `action_generate_commit(repo_path, feedback)` : extrait le diff staged textuel, teste la joignabilité d'Ollama via `check_ollama_reachable()` pour échouer rapidement en cas de problème réseau, et le transmet au module LLM avec la consigne optionnelle utilisateur (ou renvoie le commit statique si `MOCK_AI=True`).
-- `action_release_notes(repo_path, from_tag, to_tag)` : extrait l'historique, teste la joignabilité d'Ollama via `check_ollama_reachable()` (échoue immédiatement avec `success=False` si injoignable, à l'identique de `action_generate_commit`) et génère une synthèse catégorisée (Features, Fixes, Refactoring, Docs) via le LLM avec repli déterministe si l'appel chat échoue (ou renvoie la synthèse statique si `MOCK_AI=True`).
+- `action_release_notes(repo_path, from_tag, to_tag)` : extrait l'historique, teste la joignabilité d'Ollama via `check_ollama_reachable()` (échoue immédiatement avec `success=False` si injoignable, à l'identique de `action_generate_commit`) et délègue la génération à `ollama_client.release_notes.generate_release_notes()` (moteur unifié avec `action_generate_commit` : même socle `call_chat_json`, mêmes règles de retry/validation, mode `MOCK_AI` géré en interne par cette fonction), avec repli sur le formateur déterministe si l'appel échoue pour quelque raison que ce soit.
 - `action_ping_ollama()` : teste la joignabilité, mesure la latence et liste les modèles installés en déléguant à la fonction unifiée `check_ollama_reachable(fetch_models=True)`.
 
 ## Détails déplacés du code source
@@ -44,7 +44,7 @@ Ce module constitue le point d'entrée exécutable sous forme de sous-processus 
 - Exécution en sous-processus : `python -m git_commit_release_notes_generator.service.core --action <NOM> [args]`, appelé par `src/cli/bridge/python_client.go`. Le processus sort toujours en code 0, même pour une action inconnue, car le client Go ignore entièrement `stdout` si le code de sortie est non nul.
 - `action_status` : la branche courante gère le `detached HEAD` et le commit initial (repli sur les 7 premiers caractères du SHA, sinon `"HEAD"`). `staged_count` compte les lignes non vides de `git diff --cached --name-only`, `unstaged_count` additionne `git diff --name-only` et `untracked_files`.
 - `action_diff` : chaque fichier expose `has_secrets_masked` (vrai si le `patch` contient `[REDACTED_SECRET]`).
-- `action_release_notes` : valeurs par défaut `from_tag="v0.1.0"`, `to_tag="HEAD"`. Vérification stricte de joignabilité avant toute génération (échec immédiat si injoignable), puis tentative d'inférence LLM avec invite imposant les sections Markdown, et repli sur le formateur déterministe `_format_release_notes_fallback` si le contenu est vide ou inexploitable.
+- `action_release_notes` : valeurs par défaut `from_tag="v0.1.0"`, `to_tag="HEAD"`. Vérification stricte de joignabilité avant toute génération (échec immédiat si injoignable), puis tentative d'inférence LLM via `generate_release_notes()` (module `ollama_client`, plus de second appel HTTP Ollama dupliqué localement), et repli sur le formateur déterministe `_format_release_notes_fallback` si cet appel lève une exception quelconque.
 - `_format_release_notes_fallback` : catégorise chaque première ligne de commit via une expression Conventional Commits (`feat|fix|docs|refactor|perf|chore|test|ci|build|revert`, `scope` optionnel) en sections `feat`, `fix`, `refactor`, `perf`, `docs`, `other`, avec le SHA court entre backticks ; ajoute la date du jour et `Aucun changement notable.` si aucune section n'est remplie.
 - `action_save_config` : simple notification, renvoie toujours un succès sans écrire de fichier.
 

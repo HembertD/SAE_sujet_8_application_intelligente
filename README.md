@@ -93,6 +93,24 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
      cd test/cli && go test -v ./...
      ```
 
+6. **Serveur Ollama local via Docker (optionnel) :**
+   Pour utiliser un serveur Ollama local déployé avec Docker Compose plutôt que le serveur distant de l'IUT :
+   ```bash
+   # Construire et lancer le conteneur Ollama (modèle gemma4:26b)
+   docker compose up -d
+   ```
+   Puis, dans le TUI de l'application, allez dans **Configuration > Modifier** et activez `LLM via Docker (true/false) : true`. Le conteneur Ollama sera démarré automatiquement avec une barre de progression, et le backend Python communiquera avec `http://localhost:11434`.
+   
+   Pour revenir au serveur distant de l'IUT, désactivez l'option et arrêtez le conteneur :
+   ```bash
+   docker compose down
+   ```
+   
+   Documentation détaillée :
+   - [docs/doc_src_files/docker-compose.md](docs/doc_src_files/docker-compose.md) : orchestration du serveur Ollama
+   - [docs/doc_src_files/Dockerfile.md](docs/doc_src_files/Dockerfile.md) : image Docker du serveur Ollama
+   - [docs/doc_src_files/entrypoint.md](docs/doc_src_files/entrypoint.md) : script d'initialisation du conteneur
+
 
 ## Technologies
 
@@ -169,6 +187,8 @@ Elle contient les comptes-rendus de sprint et le suivi d’avancement du projet.
 - [docs/deploiement_documentation.md](docs/deploiement_documentation.md) : documentation du déploiement de la doc
 - [docs/deploiement_tests_workflows.md](docs/deploiement_tests_workflows.md) : documentation de la CI / tests GitHub Actions
 - [docs/explication_go_cli.md](docs/explication_go_cli.md) : explication du CLI Go
+- [docs/doc_src_files/docker-compose.md](docs/doc_src_files/docker-compose.md) : serveur Ollama local via Docker
+- [docs/doc_src_files/Dockerfile.md](docs/doc_src_files/Dockerfile.md) : image Docker du serveur Ollama
 
 ### 6. Documentation générée en PDF
 
@@ -225,6 +245,7 @@ La documentation suit cette convention :
 - [Architecture de documentation](doc_architecture.md)
 - [Déploiement de la documentation](docs/deploiement_documentation.md)
 - [Tests automatisés](docs/deploiement_tests_workflows.md)
+- [Serveur Ollama local via Docker](docs/doc_src_files/docker-compose.md)
 - [Projet GitHub](https://github.com/hembertd/SAE_sujet_8_application_intelligente)
 
 ## Trello

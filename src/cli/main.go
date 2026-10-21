@@ -19,6 +19,7 @@ func main() {
 	devFlag := flag.Bool("dev", false, "Active le mode développement (débloque les options de mock et leur modification)")
 	mockInterfaceFlag := flag.Bool("mockInterface", false, "Force la simulation complète de l'interface (mode démo sans Git ni Python, requiert --dev)")
 	mockIAFlag := flag.Bool("mockIA", false, "Force la simulation de l'IA hors-ligne sans serveur Ollama (requiert --dev)")
+	dockerLLMFlag := flag.Bool("docker-llm", false, "Force l'usage du serveur Ollama local via Docker")
 	repoFlag := flag.String("repo", ".", "Chemin du dépôt Git à analyser")
 	appFlag := flag.String("app-dir", "", "Chemin vers l'application Gitelligence (dossier contenant le .env applicatif)")
 	flag.Parse()
@@ -50,6 +51,7 @@ func main() {
 
 	forceMockInterface := *mockInterfaceFlag
 	forceMockIA := *mockIAFlag
+	forceDockerLLM := *dockerLLMFlag
 
 	// Détermination du répertoire racine du dépôt cible à analyser
 	absRepoPath, err := filepath.Abs(*repoFlag)
@@ -72,7 +74,7 @@ func main() {
 	}
 
 	// Initialisation du client de pont (le .env reste prioritaire pour activer le mock même sans flag CLI)
-	client := bridge.NewBackendClientWithAppRoot(absRepoPath, appRoot, forceMockInterface, forceMockIA)
+	client := bridge.NewBackendClientWithAppRoot(absRepoPath, appRoot, forceMockInterface, forceMockIA, forceDockerLLM)
 	reader := bufio.NewReader(os.Stdin)
 
 	// Boucle principale du TUI

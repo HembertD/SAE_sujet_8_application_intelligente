@@ -64,7 +64,10 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 				ToTag:   toTag,
 			}
 		}
+
+		ui.NotifyError(fmt.Sprintf("Échec de la génération des release notes : %s", errMsg))
 	} else {
+		ui.NotifySuccess("Release notes générées avec succès !")
 		fmt.Println()
 		var lines []string
 		for _, l := range strings.Split(notes.Markdown, "\n") {

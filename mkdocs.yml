@@ -30,6 +30,7 @@ nav:
               - Modèles: doc_src_files/cli/models/types.md
               - UI:
                   - Boîtes: doc_src_files/cli/ui/box.md
+                  - Notifications: doc_src_files/cli/ui/notification.md
                   - Spinner: doc_src_files/cli/ui/spinner.md
                   - Styles: doc_src_files/cli/ui/styles.md
               - Vues:
@@ -78,6 +79,7 @@ nav:
           - Golden diffs (slow, réseau réel): doc_test_files/test_golden_diffs_slow.md
           - CLI Go:
               - Bridge: doc_test_files/cli/bridge_test.md
+              - Notifications: doc_test_files/cli/notification_test.md
               - Module Go: doc_test_files/cli/go_mod.md
           - Tests de situation:
               - Initialisation: doc_test_files/situation_test/init_test.md

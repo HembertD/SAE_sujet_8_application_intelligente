@@ -60,6 +60,7 @@ nav:
                   - utils: doc_src_files/git_commit_release_notes_generator/service/utils.md
           - Scripts:
               - Métriques: doc_scripts_files/run_metrics.md
+              - Environnement Python: doc_scripts_files/setup_python_env.md
               - PDF: doc_scripts_files/generate_documentation_pdf.md
       - CLI Go (guide): explication_go_cli.md
 

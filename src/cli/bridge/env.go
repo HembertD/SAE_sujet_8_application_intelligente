@@ -211,6 +211,37 @@ func ReadMockAISettingFromEnv(appRoot string) bool {
 	return false
 }
 
+// ReadPythonBinFromEnv lit la variable PYTHON_BIN dans l'environnement système ou le fichier .env applicatif.
+// Retourne une chaîne vide si rien n'est configuré explicitement (détection automatique à faire par l'appelant).
+func ReadPythonBinFromEnv(appRoot string) string {
+	if envVal := os.Getenv("PYTHON_BIN"); envVal != "" {
+		return envVal
+	}
+
+	envPath := FindAppEnvPath(appRoot)
+	data, err := os.ReadFile(envPath)
+	if err != nil {
+		return ""
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			k := strings.TrimSpace(parts[0])
+			v := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+			if k == "PYTHON_BIN" && v != "" {
+				return v
+			}
+		}
+	}
+	return ""
+}
+
 // LoadConfigFromEnv lit la configuration depuis le fichier .env applicatif et renvoie une structure ConfigResponse.
 func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse {
 	cfg := &models.ConfigResponse{
@@ -287,8 +318,30 @@ func WriteEnvFile(envPath string, baseURL, model string, timeout float64, mockIn
 		mockAI = mockAIArgs[0]
 	}
 
+	// Préserve les paramètres non gérés par cet écran de configuration (ex:
+	// OLLAMA_NUM_CTX, PYTHON_BIN) : sans ça, ils disparaissaient
+	// silencieusement du .env à chaque sauvegarde depuis l'interface.
+	managedKeys := map[string]bool{
+		"OLLAMA_BASE_URL": true, "OLLAMA_MODEL": true, "OLLAMA_TIMEOUT_S": true,
+		"MOCK_INTERFACE": true, "MOCKAGE_INTERFACE": true, "MOCK_AI": true,
+	}
+	var preserved []string
+	if existing, errRead := os.ReadFile(cleanPath); errRead == nil {
+		scanner := bufio.NewScanner(bytes.NewReader(existing))
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 && !managedKeys[strings.TrimSpace(parts[0])] {
+				preserved = append(preserved, line)
+			}
+		}
+	}
+
 	content := fmt.Sprintf(`# ==============================================================================
-# Configuration Générale 
+# Configuration Générale
 # ==============================================================================
 
 # Configuration du serveur Ollama IUT
@@ -302,6 +355,10 @@ MOCK_INTERFACE=%t
 # Simulation de l'IA hors-ligne (true / false)
 MOCK_AI=%t
 `, baseURL, model, timeout, mockInterface, mockAI)
+
+	if len(preserved) > 0 {
+		content += "\n# Autres paramètres (préservés automatiquement)\n" + strings.Join(preserved, "\n") + "\n"
+	}
 
 	if err := os.WriteFile(cleanPath, []byte(content), 0644); err != nil {
 		return err

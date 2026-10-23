@@ -9,6 +9,11 @@ import (
 	"sae-git-cli/models"
 )
 
+// DockerOllamaBaseURL est l'adresse locale exposée par le conteneur Ollama
+// lancé via docker compose. Elle est utilisée à la place de l'URL distante du
+// .env lorsque USE_DOCKER_LLM est actif.
+const DockerOllamaBaseURL = "http://localhost:11434"
+
 // BackendClient définit l'interface publique d'accès aux services du back-end.
 // Les vues front-end dépendent exclusivement de cette interface.
 type BackendClient interface {

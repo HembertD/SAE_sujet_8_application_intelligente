@@ -90,7 +90,7 @@ func TestMockClientBasics(t *testing.T) {
 		t.Errorf("le body doit contenir le feedback '%s'", feedback)
 	}
 
-	// 5.b GenerateCommit avec type forcé 
+	// 5.b GenerateCommit avec type forcé
 	propFix, err := mock.GenerateCommit("type: fix")
 	if err != nil || propFix.Type != "fix" {
 		t.Errorf("attendu type 'fix', obtenu %s (err: %v)", propFix.Type, err)
@@ -359,6 +359,18 @@ func TestAppEnvNeverInSrc(t *testing.T) {
 	}
 
 	// Tenter d'écrire en forçant un chemin contenant /src/.env
+	// Sauvegarde/restauration du .env réel : ce test écrit volontairement à la
+	// racine de l'application, il ne doit pas écraser la configuration locale.
+	realRootEnv := filepath.Join(root, ".env")
+	originalEnv, errOriginal := os.ReadFile(realRootEnv)
+	t.Cleanup(func() {
+		if errOriginal == nil {
+			_ = os.WriteFile(realRootEnv, originalEnv, 0644)
+		} else {
+			_ = os.Remove(realRootEnv)
+		}
+	})
+
 	forcedSrcPath := filepath.Join(root, "src", ".env")
 	err := bridge.WriteEnvFile(forcedSrcPath, "http://localhost:11434", "gemma4:12b", 30.0, true)
 	if err != nil {
@@ -371,7 +383,6 @@ func TestAppEnvNeverInSrc(t *testing.T) {
 	}
 
 	// S'assurer que le fichier a bien été écrit à la racine
-	realRootEnv := filepath.Join(root, ".env")
 	if _, errStat := os.Stat(realRootEnv); errStat != nil {
 		t.Fatalf("Le fichier .env devrait exister à la racine (%s)", realRootEnv)
 	}
@@ -445,4 +456,3 @@ func TestBuildForcedTypeFeedback(t *testing.T) {
 		t.Errorf("attendu 'type: docs. ajoute des exemples d'utilisation', obtenu '%s'", fb3)
 	}
 }
-

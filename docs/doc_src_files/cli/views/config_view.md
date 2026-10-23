@@ -8,7 +8,7 @@ Ce module permet de visualiser et de modifier les paramètres opérationnels de 
 
 ## Responsabilités
 
-- afficher les paramètres actuellement appliqués issus du fichier d'environnement `.env` situé à la racine du projet (URL, Modèle, Timeout, Notifications IA, ainsi que les statuts distincts `Mock Interface`, `Mock IA` et `LLM via Docker`) ;
+- afficher les paramètres actuellement appliqués issus du fichier d'environnement `.env` situé à la racine du projet (URL, Modèle, Timeout, Notifications IA, ainsi que les statuts distincts `Mock Interface`, `Mock IA` et `LLM via Docker`) ; en mode Docker, l'URL affichée est l'adresse réellement utilisée (`http://localhost:11434`) ;
 - **Action [T] (Test Ping)** : exécuter un diagnostic réseau vers l'API Ollama (ou simulation instantanée si Mock IA actif), mesurer la latence en millisecondes et lister l'ensemble des modèles d'IA installés sur le serveur ;
 - **Action [M] (Modification)** : permettre la saisie de nouvelles valeurs et persister les modifications dans le fichier `.env` à la racine de l'application sans aucune recompilation du binaire (la présence et la modification interactive des options `Notifications IA`, de mock `Mock Interface`, `Mock IA` et `LLM via Docker`) ;
 - après sauvegarde, si `LLM via Docker` est activé : proposer de lancer le conteneur Ollama via `docker compose up -d` avec une barre de progression ;

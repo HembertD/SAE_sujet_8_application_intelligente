@@ -162,11 +162,21 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 	if cfg.MockAI {
 		mockAIStr = "true"
 	}
+
+	// En mode Docker, le serveur Ollama est exposé localement par le conteneur.
+	// L'URL distante reste stockée dans le .env pour pouvoir y revenir lorsque
+	// l'option est désactivée.
+	ollamaBaseURL := cfg.OllamaBaseURL
+	if cfg.DockerLLM {
+		ollamaBaseURL = DockerOllamaBaseURL
+	}
+
 	env = append(env,
-		fmt.Sprintf("OLLAMA_BASE_URL=%s", cfg.OllamaBaseURL),
+		fmt.Sprintf("OLLAMA_BASE_URL=%s", ollamaBaseURL),
 		fmt.Sprintf("OLLAMA_MODEL=%s", cfg.OllamaModel),
 		fmt.Sprintf("OLLAMA_TIMEOUT_S=%.0f", cfg.TimeoutS),
 		fmt.Sprintf("MOCK_AI=%s", mockAIStr),
+		fmt.Sprintf("USE_DOCKER_LLM=%t", cfg.DockerLLM),
 		fmt.Sprintf("GITELLIGENCE_APP_ROOT=%s", p.appRoot),
 		fmt.Sprintf("SMART_COMMIT_APP_ROOT=%s", p.appRoot),
 	)

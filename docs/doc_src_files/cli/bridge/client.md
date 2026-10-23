@@ -11,6 +11,7 @@ Ce fichier définit l'interface maîtresse `BackendClient` et le coordinateur ad
 - Définir le contrat d'interface haut niveau `BackendClient` regroupant les actions du domaine Git, Ollama et configuration.
 - Instancier le coordinateur via `NewBackendClientWithAppRoot(repoRoot, appRoot, forceMockInterface, forceMockIA, forceDockerLLM...)`.
 - Gérer le cycle de vie du conteneur Ollama Docker (`StartDockerOllama`, `StopDockerOllama`).
+- **Adresse effective du LLM** : lorsque `USE_DOCKER_LLM` est actif, le client Python utilise `DockerOllamaBaseURL` (`http://localhost:11434`) au lieu de l'URL distante du `.env` ; cette dernière reste conservée pour revenir au serveur de l'IUT après désactivation.
 - Maintenir la référence vers le dépôt cible (`repoRoot`) et la racine de l'application (`appRoot`).
 - Assurer le routage dynamique vers le délégué actif en fonction du drapeau `--mockInterface` ou du paramètre `MOCK_INTERFACE` du `.env`.
 - Fournir les méthodes de consultation et modification de la configuration (`GetConfig`, `SaveConfig`).

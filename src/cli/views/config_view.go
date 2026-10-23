@@ -32,7 +32,11 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 		var lines []string
 		lines = append(lines, "")
-		lines = append(lines, fmt.Sprintf("  • %sURL Serveur Ollama%s : %s%s%s", ui.Bold, ui.Reset, ui.Cyan, cfg.OllamaBaseURL, ui.Reset))
+		displayBaseURL := cfg.OllamaBaseURL
+		if cfg.DockerLLM {
+			displayBaseURL = bridge.DockerOllamaBaseURL
+		}
+		lines = append(lines, fmt.Sprintf("  • %sURL Serveur Ollama%s : %s%s%s", ui.Bold, ui.Reset, ui.Cyan, displayBaseURL, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sModèle LLM%s        : %s%s%s", ui.Bold, ui.Reset, ui.Yellow, cfg.OllamaModel, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sTimeout requête%s   : %.0fs", ui.Bold, ui.Reset, cfg.TimeoutS))
 
@@ -121,6 +125,9 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		case "M":
 			fmt.Println(ui.Bold + "\n  ✏️ Modification des paramètres (laisser vide pour conserver) :" + ui.Reset)
 
+			if cfg.DockerLLM {
+				fmt.Printf("  %s(LLM via Docker actif : le backend utilisera %s)%s\n", ui.Dim, bridge.DockerOllamaBaseURL, ui.Reset)
+			}
 			fmt.Printf("  URL Serveur [%s] : ", cfg.OllamaBaseURL)
 			newURL, _ := reader.ReadString('\n')
 			newURL = strings.TrimSpace(newURL)

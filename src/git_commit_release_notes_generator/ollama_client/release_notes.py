@@ -7,8 +7,9 @@ contrainte côté serveur, retry unique sur JSON malformé ou contenu vide.
 
 Périmètre : ce module ne lit ni n'écrit aucun fichier, ne résout pas les tags
 Git (rôle du GitWrapper) et n'écrit rien sur stdout. Le mode hors-ligne
-(MOCK_AI) et le repli déterministe en cas d'échec restent gérés par
-l'appelant (service/core.py), pas ici.
+(MOCK_AI) est géré en interne. L'appelant (service/core.py) ne doit PAS
+remplacer silencieusement un échec de cette fonction par un contenu généré
+autrement : une exception ici doit remonter comme un échec explicite.
 """
 from __future__ import annotations
 

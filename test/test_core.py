@@ -168,7 +168,27 @@ def test_action_push_no_remote(tmp_path):
     assert "remote" in result["error"].lower()
 
 
-def test_action_release_notes_formatting():
+def test_action_release_notes_success():
+    mock_commits = [
+        CommitInfo(sha="1a2b3c4", message="feat(auth): ajout du login OAuth2", author="Maxence", date="2026-09-22"),
+    ]
+    fake_markdown = "# Release Notes (v0.1.0 ➔ v1.0.0)\n\n### 🚀 Nouveautés (Features)\n- login OAuth2\n"
+
+    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_commits_between_tags", return_value=mock_commits):
+        with patch("git_commit_release_notes_generator.service.core.check_ollama_reachable", return_value=(True, None)):
+            with patch("git_commit_release_notes_generator.service.core.generate_release_notes", return_value=fake_markdown):
+                result = core.action_release_notes(str(ROOT), from_tag="v0.1.0", to_tag="v1.0.0")
+
+                assert result["success"] is True
+                assert result["commit_count"] == 1
+                assert result["markdown"] == fake_markdown
+
+
+def test_action_release_notes_fails_honestly_when_llm_call_errors():
+    """Un échec LLM (timeout, réponse invalide après retry...) doit remonter
+    comme une erreur explicite (success=False), jamais comme un succès
+    silencieusement rempli par un tri Regex statique présenté comme sortie
+    du modèle (cf. bug_relase_note.md)."""
     mock_commits = [
         CommitInfo(sha="1a2b3c4", message="feat(auth): ajout du login OAuth2", author="Maxence", date="2026-09-22"),
         CommitInfo(sha="5d6e7f8", message="fix: correction du bug de division par zéro", author="Dorian", date="2026-09-22"),
@@ -177,18 +197,15 @@ def test_action_release_notes_formatting():
 
     with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_commits_between_tags", return_value=mock_commits):
         with patch("git_commit_release_notes_generator.service.core.check_ollama_reachable", return_value=(True, None)):
-            # Force le fallback déterministe lors de l'appel chat
             with patch("urllib.request.urlopen", side_effect=Exception("Ollama chat error")):
                 result = core.action_release_notes(str(ROOT), from_tag="v0.1.0", to_tag="v1.0.0")
 
-                assert result["success"] is True
+                assert result["success"] is False
                 assert result["from_tag"] == "v0.1.0"
                 assert result["to_tag"] == "v1.0.0"
                 assert result["commit_count"] == 3
-                assert "### 🚀 Nouveautés (Features)" in result["markdown"]
-                assert "feat(auth)" in result["markdown"]
-                assert "### 🐛 Corrections de bogues (Fixes)" in result["markdown"]
-                assert "### 📚 Documentation" in result["markdown"]
+                assert result["markdown"] == ""
+                assert "Ollama chat error" in result["error"]
 
 
 def test_action_release_notes_ollama_unreachable():

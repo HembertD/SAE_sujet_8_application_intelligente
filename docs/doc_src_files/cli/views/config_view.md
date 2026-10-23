@@ -4,13 +4,13 @@ Fichier source associé : src/cli/views/config_view.go
 
 ## Description
 
-Ce module permet de visualiser et de modifier les paramètres opérationnels de l'application (URL Ollama, modèle LLM, timeout, option LLM via Docker) et de diagnostiquer la connectivité réseau avec le serveur de l'IUT.
+Ce module permet de visualiser et de modifier les paramètres opérationnels de l'application (URL Ollama, modèle LLM, timeout, notifications de bureau, option LLM via Docker) et de diagnostiquer la connectivité réseau avec le serveur de l'IUT.
 
 ## Responsabilités
 
-- afficher les paramètres actuellement appliqués issus du fichier d'environnement `.env` situé à la racine du projet (URL, Modèle, Timeout, ainsi que les statuts distincts `Mock Interface`, `Mock IA` et `LLM via Docker`) ;
+- afficher les paramètres actuellement appliqués issus du fichier d'environnement `.env` situé à la racine du projet (URL, Modèle, Timeout, Notifications IA, ainsi que les statuts distincts `Mock Interface`, `Mock IA` et `LLM via Docker`) ;
 - **Action [T] (Test Ping)** : exécuter un diagnostic réseau vers l'API Ollama (ou simulation instantanée si Mock IA actif), mesurer la latence en millisecondes et lister l'ensemble des modèles d'IA installés sur le serveur ;
-- **Action [M] (Modification)** : permettre la saisie de nouvelles valeurs et persister les modifications dans le fichier `.env` à la racine de l'application sans aucune recompilation du binaire (la présence et la modification interactive des options de mock `Mock Interface`, `Mock IA` et `LLM via Docker`) ;
+- **Action [M] (Modification)** : permettre la saisie de nouvelles valeurs et persister les modifications dans le fichier `.env` à la racine de l'application sans aucune recompilation du binaire (la présence et la modification interactive des options `Notifications IA`, de mock `Mock Interface`, `Mock IA` et `LLM via Docker`) ;
 - après sauvegarde, si `LLM via Docker` est activé : proposer de lancer le conteneur Ollama via `docker compose up -d` avec une barre de progression ;
 - après sauvegarde, si `LLM via Docker` est désactivé : proposer d'arrêter le conteneur Ollama via `docker compose down` ;
 - **Action [R]** : retour au menu principal.

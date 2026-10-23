@@ -8,7 +8,7 @@ Ce module génère le Markdown des release notes entre deux tags, via Ollama, en
 
 ## Périmètre
 
-Ce module ne lit ni n'écrit aucun fichier, ne résout pas les tags Git (rôle du `GitWrapper`, module B) et n'écrit rien sur `stdout`. Le mode hors-ligne (`MOCK_AI`) et le repli déterministe en cas d'échec de génération restent gérés par l'appelant (`service/core.py::action_release_notes`), pas ici.
+Ce module ne lit ni n'écrit aucun fichier, ne résout pas les tags Git (rôle du `GitWrapper`, module B) et n'écrit rien sur `stdout`. Le mode hors-ligne (`MOCK_AI`) est géré en interne. L'appelant (`service/core.py::action_release_notes`) ne doit **pas** remplacer silencieusement un échec de cette fonction par un contenu généré autrement (cf. `bug_relase_note.md`) : toute exception doit remonter comme un échec explicite.
 
 ## Flux de travail
 

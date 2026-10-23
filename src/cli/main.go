@@ -62,6 +62,9 @@ func main() {
 	// Détermination de la racine de l'application (où réside le .env applicatif)
 	appRoot := bridge.FindAppRoot(*appFlag)
 
+	// Initialisation des notifications de bureau selon la configuration .env
+	ui.SetNotificationsEnabled(bridge.ReadEnableNotificationsFromEnv(appRoot))
+
 	// Échec immédiat et explicite si aucun environnement Python valide n'est
 	// configuré (ni PYTHON_BIN, ni .venv/ créé par scripts/setup_python_env.py).
 	// Inutile en mode mock-interface : Python n'y est jamais appelé.

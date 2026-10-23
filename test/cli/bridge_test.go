@@ -224,13 +224,13 @@ func TestBridgeClientSwitching(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Initialisation en forçant le mode démo
-	bridgeDemo := bridge.NewBackendClient(tempDir, true)
+	bridgeDemo := bridge.NewBackendClient(tempDir, true, false)
 	if !bridgeDemo.IsMock() {
 		t.Errorf("attendu bridgeDemo.IsMock() == true avec forceDemo=true")
 	}
 
 	// Initialisation normale
-	bridgeNormal := bridge.NewBackendClient(tempDir, false)
+	bridgeNormal := bridge.NewBackendClient(tempDir, false, false)
 	// Sans configuration, le mode démo est inactif
 	if bridgeNormal.IsMock() {
 		t.Errorf("attendu bridgeNormal.IsMock() == false par défaut sans variable d'env")
@@ -313,7 +313,7 @@ func TestAppEnvIsolationFromTargetRepo(t *testing.T) {
 	targetRepo := t.TempDir() // Répertoire du projet cible analysé
 	appRoot := t.TempDir()    // Répertoire où est installée l'application
 
-	client := bridge.NewBackendClientWithAppRoot(targetRepo, appRoot, true)
+	client := bridge.NewBackendClientWithAppRoot(targetRepo, appRoot, true, false)
 
 	// Sauvegarde d'une configuration
 	_, err := client.SaveConfig("http://10.22.28.190:11434", "qwen3.8:27b", 250.0, true)

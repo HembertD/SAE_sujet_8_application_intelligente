@@ -44,6 +44,14 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		}
 		lines = append(lines, fmt.Sprintf("  • %sLLM via Docker%s      : %s%s%s", ui.Bold, ui.Reset, dockerLLMColor, dockerLLMStatus, ui.Reset))
 
+		notifColor := ui.Green
+		notifStatus := "Désactivé"
+		if cfg.EnableNotifications {
+			notifColor = ui.Yellow
+			notifStatus = "Activé"
+		}
+		lines = append(lines, fmt.Sprintf("  • %sNotifications IA%s  : %s%s%s", ui.Bold, ui.Reset, notifColor, notifStatus, ui.Reset))
+
 		if devMode {
 			mockInterfaceColor := ui.Green
 			mockInterfaceStatus := "Désactivé"
@@ -134,6 +142,16 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				if t, errConv := strconv.ParseFloat(newTimeoutStr, 64); errConv == nil {
 					cfg.TimeoutS = t
 				}
+			}
+
+			fmt.Printf("  Notifications IA (true/false) [%t] : ", cfg.EnableNotifications)
+			newNotifStr, _ := reader.ReadString('\n')
+			newNotifStr = strings.TrimSpace(newNotifStr)
+			if newNotifStr != "" {
+				lower := strings.ToLower(newNotifStr)
+				cfg.EnableNotifications = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
+				ui.SetNotificationsEnabled(cfg.EnableNotifications)
+				_ = bridge.WriteNotificationsSetting("", cfg.EnableNotifications)
 			}
 
 			if devMode {

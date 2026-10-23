@@ -10,10 +10,8 @@ Règles impératives :
 from __future__ import annotations
 
 import argparse
-import datetime
 import json
 import logging
-import re
 import sys
 import time
 
@@ -252,69 +250,6 @@ def action_push(repo_path: str = ".") -> dict:
         }
 
 
-def _format_release_notes_fallback(commits: list, from_tag: str, to_tag: str) -> str:
-    """Formate et catégorise les commits en Markdown structuré selon Conventional Commits."""
-    categories: dict[str, list[str]] = {
-        "feat": [],
-        "fix": [],
-        "docs": [],
-        "refactor": [],
-        "perf": [],
-        "other": [],
-    }
-
-    pattern = re.compile(
-        r"^(?P<type>feat|fix|docs|refactor|perf|chore|test|ci|build|revert)(?:\((?P<scope>[^)]+)\))?:\s*(?P<subject>.+)$",
-        re.IGNORECASE,
-    )
-
-    for c in commits:
-        first_line = c.message.splitlines()[0].strip() if c.message else ""
-        match = pattern.match(first_line)
-        if match:
-            ctype = match.group("type").lower()
-            scope = match.group("scope")
-            subject = match.group("subject")
-            scope_part = f"({scope})" if scope else ""
-            line = f"- **{ctype}{scope_part}**: {subject} (`{c.sha}`)"
-            if ctype in categories:
-                categories[ctype].append(line)
-            else:
-                categories["other"].append(line)
-        else:
-            categories["other"].append(f"- {first_line} (`{c.sha}`)")
-
-    today = datetime.date.today().strftime("%Y-%m-%d")
-    lines = [
-        f"# Release Notes ({from_tag} ➔ {to_tag})",
-        f"Date : {today}",
-        "",
-    ]
-
-    sections = [
-        ("feat", "### 🚀 Nouveautés (Features)"),
-        ("fix", "### 🐛 Corrections de bogues (Fixes)"),
-        ("refactor", "### ⚡ Refactoring & Améliorations"),
-        ("perf", "### 🏎️ Performances"),
-        ("docs", "### 📚 Documentation"),
-        ("other", "### 🛠️ Autres changements"),
-    ]
-
-    has_any = False
-    for key, title in sections:
-        items = categories.get(key, [])
-        if items:
-            has_any = True
-            lines.append(title)
-            lines.extend(items)
-            lines.append("")
-
-    if not has_any:
-        lines.append("Aucun changement notable.")
-
-    return "\n".join(lines).strip()
-
-
 def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str = "") -> dict:
     """Génère les notes de version entre deux tags.
 
@@ -364,12 +299,22 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
         }
 
     # Tentative d'inférence LLM (moteur unifié avec action_generate_commit,
-    # cf. ollama_client.release_notes) ; repli déterministe en cas d'échec.
+    # cf. ollama_client.release_notes). Aucun repli silencieux : un échec
+    # (timeout, réponse invalide après retry) doit se voir, pas se faire
+    # discrètement remplacer par un tri Regex statique présenté comme une
+    # sortie du LLM (success=True sur un contenu qui n'en vient pas).
     try:
         md_content = generate_release_notes(commits, from_tag, to_tag)
     except Exception as e:
-        logger.info(f"Ollama indisponible pour release-notes ({e}), repli sur le formateur déterministe.")
-        md_content = _format_release_notes_fallback(commits, from_tag, to_tag)
+        logger.warning(f"Échec de génération des release notes par Ollama : {e}")
+        return {
+            "success": False,
+            "error": f"Le serveur LLM n'a pas répondu ou a retourné une réponse invalide : {e}",
+            "from_tag": from_tag,
+            "to_tag": to_tag,
+            "markdown": "",
+            "commit_count": len(commits),
+        }
 
     return {
         "success": True,

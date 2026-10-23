@@ -272,16 +272,85 @@ func ReadPythonBinFromEnv(appRoot string) string {
 	return ""
 }
 
+// ReadEnableNotificationsFromEnv lit la variable ENABLE_NOTIFICATIONS dans l'environnement ou le fichier .env applicatif.
+// Par défaut, renvoie true si le paramètre n'est pas explicité.
+func ReadEnableNotificationsFromEnv(appRoot string) bool {
+	if envVal := os.Getenv("ENABLE_NOTIFICATIONS"); envVal != "" {
+		return ParseBoolFromString(envVal)
+	}
+
+	envPath := FindAppEnvPath(appRoot)
+	data, err := os.ReadFile(envPath)
+	if err != nil {
+		return true
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			k := strings.TrimSpace(parts[0])
+			v := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+			if k == "ENABLE_NOTIFICATIONS" {
+				return ParseBoolFromString(v)
+			}
+		}
+	}
+	return true
+}
+
+// WriteNotificationsSetting met à jour la variable ENABLE_NOTIFICATIONS dans le fichier .env applicatif.
+func WriteNotificationsSetting(appRoot string, enabled bool) error {
+	cleanPath := FindAppEnvPath(appRoot)
+	dir := filepath.Dir(cleanPath)
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	found := false
+	var newLines []string
+	if existing, errRead := os.ReadFile(cleanPath); errRead == nil {
+		scanner := bufio.NewScanner(bytes.NewReader(existing))
+		for scanner.Scan() {
+			line := scanner.Text()
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "ENABLE_NOTIFICATIONS=") {
+				newLines = append(newLines, fmt.Sprintf("ENABLE_NOTIFICATIONS=%t", enabled))
+				found = true
+			} else {
+				newLines = append(newLines, line)
+			}
+		}
+	}
+
+	if !found {
+		newLines = append(newLines, fmt.Sprintf("\n# Notifications de fin d'inférence (true / false)\nENABLE_NOTIFICATIONS=%t", enabled))
+	}
+
+	content := strings.Join(newLines, "\n")
+	if !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+
+	return os.WriteFile(cleanPath, []byte(content), 0644)
+}
+
 // LoadConfigFromEnv lit la configuration depuis le fichier .env applicatif et renvoie une structure ConfigResponse.
 func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse {
 	cfg := &models.ConfigResponse{
-		Success:       true,
-		OllamaBaseURL: "http://10.22.28.190:11434",
-		OllamaModel:   "gemma4:26b",
-		TimeoutS:      300.0,
-		MockInterface: isMockActive,
-		MockAI:        ReadMockAISettingFromEnv(appRoot),
-		DockerLLM:     ReadDockerLLMSettingFromEnv(appRoot),
+		Success:             true,
+		OllamaBaseURL:       "http://10.22.28.190:11434",
+		OllamaModel:         "gemma4:26b",
+		TimeoutS:            300.0,
+		MockInterface:       isMockActive,
+		MockAI:              ReadMockAISettingFromEnv(appRoot),
+		DockerLLM:           ReadDockerLLMSettingFromEnv(appRoot),
+		EnableNotifications: ReadEnableNotificationsFromEnv(appRoot),
 	}
 
 	envPath := FindAppEnvPath(appRoot)
@@ -326,6 +395,10 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 				case "USE_DOCKER_LLM":
 					if os.Getenv("USE_DOCKER_LLM") == "" {
 						cfg.DockerLLM = ParseBoolFromString(v)
+					}
+				case "ENABLE_NOTIFICATIONS":
+					if os.Getenv("ENABLE_NOTIFICATIONS") == "" {
+						cfg.EnableNotifications = ParseBoolFromString(v)
 					}
 				}
 			}

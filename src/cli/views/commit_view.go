@@ -215,6 +215,10 @@ func generateCommit(client bridge.BackendClient, feedback string) (*models.Commi
 				Error:   errMsg,
 			}
 		}
+
+		ui.NotifyError(fmt.Sprintf("Échec de la génération du commit : %s", errMsg))
+	} else {
+		ui.NotifySuccess("Message de commit généré avec succès !")
 	}
 
 	return proposal, isError

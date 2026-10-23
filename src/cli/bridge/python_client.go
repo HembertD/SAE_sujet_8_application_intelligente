@@ -162,11 +162,21 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 	if cfg.MockAI {
 		mockAIStr = "true"
 	}
+
+	// En mode Docker, le serveur Ollama est exposé localement par le conteneur.
+	// L'URL distante reste stockée dans le .env pour pouvoir y revenir lorsque
+	// l'option est désactivée.
+	ollamaBaseURL := cfg.OllamaBaseURL
+	if cfg.DockerLLM {
+		ollamaBaseURL = DockerOllamaBaseURL
+	}
+
 	env = append(env,
-		fmt.Sprintf("OLLAMA_BASE_URL=%s", cfg.OllamaBaseURL),
+		fmt.Sprintf("OLLAMA_BASE_URL=%s", ollamaBaseURL),
 		fmt.Sprintf("OLLAMA_MODEL=%s", cfg.OllamaModel),
 		fmt.Sprintf("OLLAMA_TIMEOUT_S=%.0f", cfg.TimeoutS),
 		fmt.Sprintf("MOCK_AI=%s", mockAIStr),
+		fmt.Sprintf("USE_DOCKER_LLM=%t", cfg.DockerLLM),
 		fmt.Sprintf("GITELLIGENCE_APP_ROOT=%s", p.appRoot),
 		fmt.Sprintf("SMART_COMMIT_APP_ROOT=%s", p.appRoot),
 	)
@@ -348,4 +358,73 @@ func (p *PythonClient) PingOllama() (*models.PingResponse, error) {
 func (p *PythonClient) SaveMarkdownFile(filename, content string) error {
 	path := filepath.Join(p.repoRoot, filename)
 	return os.WriteFile(path, []byte(content), 0644)
+}
+
+// IsDockerLLM indique si le mode Docker LLM est activé.
+func (p *PythonClient) IsDockerLLM() bool {
+	return false
+}
+
+// StartDockerOllama lance le conteneur Ollama via docker compose.
+func (p *PythonClient) StartDockerOllama() (*models.ActionResult, error) {
+	composeFile := filepath.Join(p.appRoot, "docker-compose.yml")
+	if _, err := os.Stat(composeFile); err != nil {
+		return nil, fmt.Errorf("fichier docker-compose.yml introuvable à la racine de l'application : %s", composeFile)
+	}
+
+	cmd := exec.Command("docker", "compose", "-f", composeFile, "up", "-d")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return &models.ActionResult{
+			Success: false,
+			Error:   fmt.Sprintf("échec du lancement du conteneur Ollama : %s", string(output)),
+		}, err
+	}
+
+	return &models.ActionResult{
+		Success: true,
+		Message: "Conteneur Ollama démarré avec succès via docker compose.",
+	}, nil
+}
+
+// StopDockerOllama arrête le conteneur Ollama via docker compose.
+func (p *PythonClient) StopDockerOllama() (*models.ActionResult, error) {
+	composeFile := filepath.Join(p.appRoot, "docker-compose.yml")
+	if _, err := os.Stat(composeFile); err != nil {
+		return nil, fmt.Errorf("fichier docker-compose.yml introuvable à la racine de l'application : %s", composeFile)
+	}
+
+	cmd := exec.Command("docker", "compose", "-f", composeFile, "down")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return &models.ActionResult{
+			Success: false,
+			Error:   fmt.Sprintf("échec de l'arrêt du conteneur Ollama : %s", string(output)),
+		}, err
+	}
+
+	return &models.ActionResult{
+		Success: true,
+		Message: "Conteneur Ollama arrêté.",
+	}, nil
+}
+
+// SaveConfigWithDockerLLM persiste la configuration avec l'option USE_DOCKER_LLM explicite.
+func (p *PythonClient) SaveConfigWithDockerLLM(baseURL, model string, timeout float64, mockInterface bool, dockerLLM bool, mockAI ...bool) (*models.ActionResult, error) {
+	envPath := FindAppEnvPath(p.appRoot)
+	if err := WriteEnvFileWithDockerLLM(envPath, baseURL, model, timeout, mockInterface, dockerLLM, mockAI...); err != nil {
+		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
+	}
+
+	_, _ = p.runPythonCommand(
+		"--action", "save-config",
+		"--base-url", baseURL,
+		"--model", model,
+		"--timeout", fmt.Sprintf("%f", timeout),
+	)
+
+	return &models.ActionResult{
+		Success: true,
+		Message: fmt.Sprintf("Configuration sauvegardée dans %s (USE_DOCKER_LLM=%t).", filepath.Base(envPath), dockerLLM),
+	}, nil
 }

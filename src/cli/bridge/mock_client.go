@@ -289,3 +289,36 @@ func (m *MockClient) SaveMarkdownFile(filename, content string) error {
 	path := filepath.Join(m.repoRoot, filename)
 	return os.WriteFile(path, []byte(content), 0644)
 }
+
+// IsDockerLLM indique si le mode Docker LLM est actif (toujours false en mock).
+func (m *MockClient) IsDockerLLM() bool {
+	return false
+}
+
+// StartDockerOllama lance le conteneur Ollama (opération no-op en mock).
+func (m *MockClient) StartDockerOllama() (*models.ActionResult, error) {
+	return &models.ActionResult{
+		Success: true,
+		Message: "Mode mock : démarrage du conteneur Ollama simulé.",
+	}, nil
+}
+
+// StopDockerOllama arrête le conteneur Ollama (opération no-op en mock).
+func (m *MockClient) StopDockerOllama() (*models.ActionResult, error) {
+	return &models.ActionResult{
+		Success: true,
+		Message: "Mode mock : arrêt du conteneur Ollama simulé.",
+	}, nil
+}
+
+// SaveConfigWithDockerLLM persiste la configuration avec l'option USE_DOCKER_LLM (mock).
+func (m *MockClient) SaveConfigWithDockerLLM(baseURL, model string, timeout float64, mockInterface bool, dockerLLM bool, mockAI ...bool) (*models.ActionResult, error) {
+	envPath := FindAppEnvPath(m.appRoot)
+	if err := WriteEnvFileWithDockerLLM(envPath, baseURL, model, timeout, mockInterface, dockerLLM, mockAI...); err != nil {
+		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
+	}
+	return &models.ActionResult{
+		Success: true,
+		Message: fmt.Sprintf("Configuration sauvegardée dans %s (USE_DOCKER_LLM=%t).", filepath.Base(envPath), dockerLLM),
+	}, nil
+}

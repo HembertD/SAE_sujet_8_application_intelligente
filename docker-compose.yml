@@ -1,0 +1,30 @@
+# docker-compose.yml - Orchestration du serveur Ollama local pour Gitelligence
+#
+# Usage :
+#   docker compose up -d          # Lance le serveur Ollama avec le modèle gemma4:26b
+#   docker compose down           # Arrête et supprime le conteneur
+#
+# Variables d'environnement utiles :
+#   OLLAMA_HOST   Adresse du serveur Ollama (défaut : http://localhost:11434)
+#   USE_DOCKER_LLM active/desactive l'usage du LLM via Docker depuis l'application
+
+services:
+  ollama:
+    build: .
+    container_name: gitelligence-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  ollama_data:
+    driver: local

@@ -32,9 +32,21 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 		var lines []string
 		lines = append(lines, "")
-		lines = append(lines, fmt.Sprintf("  • %sURL Serveur Ollama%s : %s%s%s", ui.Bold, ui.Reset, ui.Cyan, cfg.OllamaBaseURL, ui.Reset))
+		displayBaseURL := cfg.OllamaBaseURL
+		if cfg.DockerLLM {
+			displayBaseURL = bridge.DockerOllamaBaseURL
+		}
+		lines = append(lines, fmt.Sprintf("  • %sURL Serveur Ollama%s : %s%s%s", ui.Bold, ui.Reset, ui.Cyan, displayBaseURL, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sModèle LLM%s        : %s%s%s", ui.Bold, ui.Reset, ui.Yellow, cfg.OllamaModel, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sTimeout requête%s   : %.0fs", ui.Bold, ui.Reset, cfg.TimeoutS))
+
+		dockerLLMColor := ui.Green
+		dockerLLMStatus := "Désactivé"
+		if cfg.DockerLLM {
+			dockerLLMColor = ui.Yellow
+			dockerLLMStatus = "Activé"
+		}
+		lines = append(lines, fmt.Sprintf("  • %sLLM via Docker%s      : %s%s%s", ui.Bold, ui.Reset, dockerLLMColor, dockerLLMStatus, ui.Reset))
 
 		notifColor := ui.Green
 		notifStatus := "Désactivé"
@@ -113,6 +125,9 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		case "M":
 			fmt.Println(ui.Bold + "\n  ✏️ Modification des paramètres (laisser vide pour conserver) :" + ui.Reset)
 
+			if cfg.DockerLLM {
+				fmt.Printf("  %s(LLM via Docker actif : le backend utilisera %s)%s\n", ui.Dim, bridge.DockerOllamaBaseURL, ui.Reset)
+			}
 			fmt.Printf("  URL Serveur [%s] : ", cfg.OllamaBaseURL)
 			newURL, _ := reader.ReadString('\n')
 			newURL = strings.TrimSpace(newURL)
@@ -164,15 +179,60 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				}
 			}
 
+			fmt.Printf("  LLM via Docker (true/false) [%t] : ", cfg.DockerLLM)
+			newDockerLLMStr, _ := reader.ReadString('\n')
+			newDockerLLMStr = strings.TrimSpace(newDockerLLMStr)
+			if newDockerLLMStr != "" {
+				lower := strings.ToLower(newDockerLLMStr)
+				cfg.DockerLLM = (lower == "true" || lower == "1" || lower == "yes" || lower == "oui")
+			}
+
 			spinnerSave := ui.NewSpinner("Sauvegarde des paramètres dans le .env...")
 			spinnerSave.Start()
-			res, saveErr := client.SaveConfig(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.MockInterface, cfg.MockAI)
+			res, saveErr := client.SaveConfigWithDockerLLM(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.MockInterface, cfg.DockerLLM, cfg.MockAI)
 			spinnerSave.Stop("")
 
 			if saveErr != nil {
 				ui.PrintErrorCard("Sauvegarde Impossible", fmt.Sprintf("Échec de la sauvegarde dans le fichier .env : %v", saveErr))
 			} else {
 				ui.PrintSuccess(res.Message)
+
+				// Gestion du conteneur Ollama Docker selon l'option USE_DOCKER_LLM
+				if cfg.DockerLLM {
+					fmt.Println()
+					fmt.Print(ui.Bold + "  🐳 Le serveur Ollama via Docker est activé." + ui.Reset)
+					fmt.Printf("  %s👉 Démarrer le conteneur maintenant ? (o/N) :%s ", ui.Bold+ui.Yellow, ui.Reset)
+					startAns, _ := reader.ReadString('\n')
+					startAns = strings.ToLower(strings.TrimSpace(startAns))
+					if startAns == "o" || startAns == "oui" {
+						spinnerDocker := ui.NewSpinner("Lancement du conteneur Ollama via docker compose...")
+						spinnerDocker.Start()
+						resDocker, dockerErr := client.StartDockerOllama()
+						spinnerDocker.Stop("")
+						if dockerErr != nil || !resDocker.Success {
+							ui.PrintErrorCard("Erreur Docker", fmt.Sprintf("Impossible de démarrer le conteneur Ollama : %v", dockerErr))
+						} else {
+							ui.PrintSuccess(resDocker.Message)
+						}
+					}
+				} else {
+					fmt.Println()
+					fmt.Print(ui.Bold + "  🐳 Le serveur Ollama via Docker est désactivé." + ui.Reset)
+					fmt.Printf("  %s👉 Arrêter le conteneur Ollama si actif ? (o/N) :%s ", ui.Bold+ui.Yellow, ui.Reset)
+					stopAns, _ := reader.ReadString('\n')
+					stopAns = strings.ToLower(strings.TrimSpace(stopAns))
+					if stopAns == "o" || stopAns == "oui" {
+						spinnerDocker := ui.NewSpinner("Arrêt du conteneur Ollama via docker compose...")
+						spinnerDocker.Start()
+						resDocker, dockerErr := client.StopDockerOllama()
+						spinnerDocker.Stop("")
+						if dockerErr != nil || !resDocker.Success {
+							ui.PrintErrorCard("Erreur Docker", fmt.Sprintf("Impossible d'arrêter le conteneur Ollama : %v", dockerErr))
+						} else {
+							ui.PrintSuccess(resDocker.Message)
+						}
+					}
+				}
 			}
 			waitForEnter(reader)
 

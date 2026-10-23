@@ -60,6 +60,20 @@ func main() {
 	// Détermination de la racine de l'application (où réside le .env applicatif)
 	appRoot := bridge.FindAppRoot(*appFlag)
 
+	// Initialisation des notifications de bureau selon la configuration .env
+	ui.SetNotificationsEnabled(bridge.ReadEnableNotificationsFromEnv(appRoot))
+
+	// Échec immédiat et explicite si aucun environnement Python valide n'est
+	// configuré (ni PYTHON_BIN, ni .venv/ créé par scripts/setup_python_env.py).
+	// Inutile en mode mock-interface : Python n'y est jamais appelé.
+	mockInterfaceActive := forceMockInterface || bridge.ReadMockSettingFromEnv(appRoot)
+	if !mockInterfaceActive {
+		if pyErr := bridge.CheckPythonEnvironment(appRoot); pyErr != nil {
+			ui.PrintErrorCard("Environnement Python non initialisé", pyErr.Error())
+			os.Exit(1)
+		}
+	}
+
 	// Initialisation du client de pont (le .env reste prioritaire pour activer le mock même sans flag CLI)
 	client := bridge.NewBackendClientWithAppRoot(absRepoPath, appRoot, forceMockInterface, forceMockIA)
 	reader := bufio.NewReader(os.Stdin)

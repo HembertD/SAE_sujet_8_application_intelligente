@@ -10,21 +10,11 @@ Règles impératives :
 from __future__ import annotations
 
 import argparse
-import datetime
 import json
 import logging
-import re
 import sys
 import time
-import urllib.error
-import urllib.request
 
-from git_commit_release_notes_generator import config
-from git_commit_release_notes_generator.config import (
-    OLLAMA_BASE_URL,
-    OLLAMA_MODEL,
-    OLLAMA_TIMEOUT_S,
-)
 from git_commit_release_notes_generator.ollama_client.exceptions import (
     CommitMessageValidationError,
     OllamaCallError,
@@ -34,8 +24,8 @@ from git_commit_release_notes_generator.ollama_client.llm import (
     generate_commit_message,
     ping_ollama,
 )
-from git_commit_release_notes_generator.ollama_client.mock_llm import (
-    mock_release_notes,
+from git_commit_release_notes_generator.ollama_client.release_notes import (
+    generate_release_notes,
 )
 from git_commit_release_notes_generator.service.git_wrapper import GitWrapper
 
@@ -260,69 +250,6 @@ def action_push(repo_path: str = ".") -> dict:
         }
 
 
-def _format_release_notes_fallback(commits: list, from_tag: str, to_tag: str) -> str:
-    """Formate et catégorise les commits en Markdown structuré selon Conventional Commits."""
-    categories: dict[str, list[str]] = {
-        "feat": [],
-        "fix": [],
-        "docs": [],
-        "refactor": [],
-        "perf": [],
-        "other": [],
-    }
-
-    pattern = re.compile(
-        r"^(?P<type>feat|fix|docs|refactor|perf|chore|test|ci|build|revert)(?:\((?P<scope>[^)]+)\))?:\s*(?P<subject>.+)$",
-        re.IGNORECASE,
-    )
-
-    for c in commits:
-        first_line = c.message.splitlines()[0].strip() if c.message else ""
-        match = pattern.match(first_line)
-        if match:
-            ctype = match.group("type").lower()
-            scope = match.group("scope")
-            subject = match.group("subject")
-            scope_part = f"({scope})" if scope else ""
-            line = f"- **{ctype}{scope_part}**: {subject} (`{c.sha}`)"
-            if ctype in categories:
-                categories[ctype].append(line)
-            else:
-                categories["other"].append(line)
-        else:
-            categories["other"].append(f"- {first_line} (`{c.sha}`)")
-
-    today = datetime.date.today().strftime("%Y-%m-%d")
-    lines = [
-        f"# Release Notes ({from_tag} ➔ {to_tag})",
-        f"Date : {today}",
-        "",
-    ]
-
-    sections = [
-        ("feat", "### 🚀 Nouveautés (Features)"),
-        ("fix", "### 🐛 Corrections de bogues (Fixes)"),
-        ("refactor", "### ⚡ Refactoring & Améliorations"),
-        ("perf", "### 🏎️ Performances"),
-        ("docs", "### 📚 Documentation"),
-        ("other", "### 🛠️ Autres changements"),
-    ]
-
-    has_any = False
-    for key, title in sections:
-        items = categories.get(key, [])
-        if items:
-            has_any = True
-            lines.append(title)
-            lines.extend(items)
-            lines.append("")
-
-    if not has_any:
-        lines.append("Aucun changement notable.")
-
-    return "\n".join(lines).strip()
-
-
 def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str = "") -> dict:
     """Génère les notes de version entre deux tags.
 
@@ -357,16 +284,8 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
             "commit_count": 0,
         }
 
-    if config.MOCK_AI:
-        return {
-            "success": True,
-            "from_tag": from_tag,
-            "to_tag": to_tag,
-            "markdown": mock_release_notes(commits, from_tag, to_tag),
-            "commit_count": len(commits),
-        }
-
-    # Vérification stricte de joignabilité d'Ollama avant génération
+    # Vérification stricte de joignabilité d'Ollama avant génération (no-op
+    # côté réseau en mode MOCK_AI, géré en interne par check_ollama_reachable).
     reachable, ping_error = check_ollama_reachable(timeout=3.0)
     if not reachable:
         logger.warning(f"Serveur Ollama non joignable pour release-notes : {ping_error}")
@@ -379,44 +298,23 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
             "commit_count": 0,
         }
 
-    # Tentative d'inférence LLM
-    md_content: str | None = None
+    # Tentative d'inférence LLM (moteur unifié avec action_generate_commit,
+    # cf. ollama_client.release_notes). Aucun repli silencieux : un échec
+    # (timeout, réponse invalide après retry) doit se voir, pas se faire
+    # discrètement remplacer par un tri Regex statique présenté comme une
+    # sortie du LLM (success=True sur un contenu qui n'en vient pas).
     try:
-        commits_summary = "\n".join([f"- [{c.sha}] {c.message.splitlines()[0]}" for c in commits])
-        prompt = (
-            f"Rédige des Release Notes professionnelles au format Markdown en français pour la version {from_tag} -> {to_tag}.\n"
-            f"Voici la liste des commits :\n{commits_summary}\n\n"
-            "Organise la réponse avec les sections Markdown :\n"
-            f"# Release Notes ({from_tag} ➔ {to_tag})\n"
-            "### 🚀 Nouveautés (Features)\n"
-            "### 🐛 Corrections de bogues (Fixes)\n"
-            "### 📚 Documentation & Maintenance\n"
-            "Ne renvoie que le Markdown pur, sans balises ```markdown englobantes."
-        )
-        body = {
-            "model": OLLAMA_MODEL,
-            "messages": [
-                {"role": "system", "content": "Tu es un expert Git qui rédige des release notes claires et concises en Markdown."},
-                {"role": "user", "content": prompt},
-            ],
-            "stream": False,
-        }
-        req = urllib.request.Request(
-            url=f"{OLLAMA_BASE_URL.rstrip('/')}/api/chat",
-            data=json.dumps(body).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=min(OLLAMA_TIMEOUT_S, 20.0)) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-            content = payload.get("message", {}).get("content")
-            if content and isinstance(content, str) and content.strip():
-                md_content = content.strip()
+        md_content = generate_release_notes(commits, from_tag, to_tag)
     except Exception as e:
-        logger.info(f"Ollama indisponible pour release-notes ({e}), repli sur le formateur déterministe.")
-
-    if not md_content:
-        md_content = _format_release_notes_fallback(commits, from_tag, to_tag)
+        logger.warning(f"Échec de génération des release notes par Ollama : {e}")
+        return {
+            "success": False,
+            "error": f"Le serveur LLM n'a pas répondu ou a retourné une réponse invalide : {e}",
+            "from_tag": from_tag,
+            "to_tag": to_tag,
+            "markdown": "",
+            "commit_count": len(commits),
+        }
 
     return {
         "success": True,

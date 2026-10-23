@@ -20,7 +20,7 @@ Ce module gère la génération du message de commit via Ollama. Il construit le
 
 - format : le modèle répond avec un schéma JSON strict ;
 - validation : le code refuse les messages trop longs, absents ou non conformes ;
-- robustesse : un retry est tenté pour corriger une réponse invalide ;
+- robustesse : un retry est tenté pour corriger une réponse invalide — y compris si le contenu renvoyé n'est carrément pas du JSON (`MalformedResponseError`), pas seulement en cas d'échec des règles métier (`_validate`) ;
 - fenêtre de contexte : `options.num_ctx` est fixé explicitement dans la requête (`OLLAMA_NUM_CTX`, config.py) car Ollama utilise sinon une fenêtre par défaut bien plus petite que celle annoncée pour le modèle, ce qui tronquait silencieusement les diffs volumineux ;
 - disponibilité : `check_ollama_reachable()` permet de vérifier rapidement (quelques secondes) si le serveur répond, avant de lancer une génération qui pourrait sinon attendre le timeout complet ;
 - simulation hors-ligne : si `config.MOCK_AI` est activé, `generate_commit_message` et `check_ollama_reachable` délèguent immédiatement au module `mock_llm` sans aucune requête réseau ;
@@ -43,7 +43,7 @@ Ce module gère la génération du message de commit via Ollama. Il construit le
 
 - `PingResult` : outre l'accès par attributs (`.reachable`, `.latency_ms`, `.error`, `.installed_models`), il supporte le déballage en tuple (`reachable, error = check_ollama_reachable()`) via `__iter__`/`__getitem__`, et la comparaison directe à un tuple de 2 éléments via `__eq__`. `to_dict()` renvoie `success`, `reachable`, `latency_ms`, `installed_models`, et n'ajoute la clé `error` que si elle est non vide.
 - `check_ollama_reachable()` : ne lève jamais d'exception ; mesure la latence via `/api/version`, et n'interroge `/api/tags` que si `fetch_models=True` (échec de récupération des modèles seulement tracé en `debug`).
-- `generate_commit_message()` : un seul retry est tenté ; la réponse invalide est réinjectée comme message `assistant` sérialisé en JSON, suivie d'un message `user` signalant l'erreur constatée et exigeant un JSON conforme. Si le second essai échoue, lève `CommitMessageValidationError` plutôt que de renvoyer un message bancal.
+- `generate_commit_message()` : un seul retry est tenté, pour deux causes possibles — échec de `_validate()` (réponse JSON mais non conforme aux règles métier) ou `MalformedResponseError` (réponse pas du tout JSON malgré le format contraint). Dans les deux cas, la réponse invalide est réinjectée comme message `assistant` (JSON sérialisé, ou contenu brut si non-JSON), suivie d'un message `user` signalant l'erreur constatée et exigeant un JSON conforme. Si le second essai échoue aussi (pour l'une ou l'autre des deux causes), lève `CommitMessageValidationError` plutôt que de renvoyer un message bancal.
 - `_build_diff_summary()` : assemble un résumé textuel `Fichier: {path} (statut={status}, +{added}/-{removed})` suivi du `patch`, fichiers joints par une double newline.
 - `_validate(raw)` : retourne `None` si valide, sinon un message explicite (`type` hors liste autorisée, `subject` manquant ou vide, `subject` de plus de 72 caractères, `subject` se terminant par un point).
 - `_to_commit_message(raw)` : mappe `type`, `scope`, `subject`, `body` du dictionnaire validé vers `CommitMessage`.

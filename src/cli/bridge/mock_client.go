@@ -4,11 +4,33 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"sae-git-cli/models"
 )
+
+var forcedTypePattern = regexp.MustCompile(`(?i)(?:c'est|c'était|il faut que ce soit|je veux|je voudrais|mets(?: ça)?(?: en)?|type\s*[:=])\s*(?:un\s+|une\s+|du\s+|de\s+)?(feat|fix|chore|docs|refactor|test|perf|build|ci)\b`)
+
+func extractForcedType(feedback string) string {
+	matches := forcedTypePattern.FindAllStringSubmatch(feedback, -1)
+	if len(matches) == 0 {
+		return ""
+	}
+	typesFound := make(map[string]bool)
+	for _, m := range matches {
+		if len(m) > 1 {
+			typesFound[strings.ToLower(m[1])] = true
+		}
+	}
+	if len(typesFound) == 1 {
+		for t := range typesFound {
+			return t
+		}
+	}
+	return ""
+}
 
 // MockClient fournit une implémentation de BackendClient pour les tests et le mode hors-ligne.
 type MockClient struct {
@@ -136,14 +158,19 @@ func (m *MockClient) GenerateCommit(feedback string) (*models.CommitProposal, er
 
 	m.sleep(1400 * time.Millisecond)
 
+	commitType := "refactor"
+	if forced := extractForcedType(feedback); forced != "" {
+		commitType = forced
+	}
+
 	if strings.TrimSpace(feedback) != "" {
 		return &models.CommitProposal{
-			Success: true,
-			Type:    "refactor",
-			Scope:   "auth",
-			Subject: "simplification du flux d'authentification et masquage des secrets",
-			Body: fmt.Sprintf("Ajusté suite à la consigne : \"%s\".\nRevue des fonctions de token et séparation des couches.", feedback),
-			RawFormatted: "refactor(auth): simplification du flux d'authentification et masquage des secrets",
+			Success:      true,
+			Type:         commitType,
+			Scope:        "auth",
+			Subject:      "simplification du flux d'authentification et masquage des secrets",
+			Body:         fmt.Sprintf("Ajusté suite à la consigne : \"%s\".\nRevue des fonctions de token et séparation des couches.", feedback),
+			RawFormatted: fmt.Sprintf("%s(auth): simplification du flux d'authentification et masquage des secrets", commitType),
 		}, nil
 	}
 

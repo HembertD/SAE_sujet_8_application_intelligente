@@ -9,6 +9,7 @@ import (
 
 	"sae-git-cli/bridge"
 	"sae-git-cli/models"
+	"sae-git-cli/views"
 )
 
 // Vérifications de conformité d'interface à la compilation
@@ -87,6 +88,29 @@ func TestMockClientBasics(t *testing.T) {
 	}
 	if !strings.Contains(propRefactor.Body, feedback) {
 		t.Errorf("le body doit contenir le feedback '%s'", feedback)
+	}
+
+	// 5.b GenerateCommit avec type forcé 
+	propFix, err := mock.GenerateCommit("type: fix")
+	if err != nil || propFix.Type != "fix" {
+		t.Errorf("attendu type 'fix', obtenu %s (err: %v)", propFix.Type, err)
+	}
+
+	propChore, err := mock.GenerateCommit("c'est un chore pour ranger les fichiers")
+	if err != nil || propChore.Type != "chore" {
+		t.Errorf("attendu type 'chore', obtenu %s (err: %v)", propChore.Type, err)
+	}
+
+	// Piège classique : 'test' sans mot d'intention ne doit pas être imposé comme type
+	propNoOverride, err := mock.GenerateCommit("Consigne de test pour l'IA")
+	if err != nil || propNoOverride.Type != "refactor" {
+		t.Errorf("aucun override attendu sur 'Consigne de test', obtenu %s", propNoOverride.Type)
+	}
+
+	// Types contradictoires : aucun override
+	propContradiction, err := mock.GenerateCommit("c'est un fix ou c'est un feat")
+	if err != nil || propContradiction.Type != "refactor" {
+		t.Errorf("aucun override attendu en cas de contradiction, obtenu %s", propContradiction.Type)
 	}
 
 	// 6. ApplyCommit
@@ -352,3 +376,73 @@ func TestAppEnvNeverInSrc(t *testing.T) {
 		t.Fatalf("Le fichier .env devrait exister à la racine (%s)", realRootEnv)
 	}
 }
+
+func TestResolveForcedType(t *testing.T) {
+	// 1. Tests par numéro
+	numTests := map[string]string{
+		"1": "feat",
+		"2": "fix",
+		"3": "chore",
+		"4": "docs",
+		"5": "refactor",
+		"6": "perf",
+		"7": "test",
+		"8": "build",
+		"9": "ci",
+	}
+	for in, expected := range numTests {
+		res, ok := views.ResolveForcedType(in)
+		if !ok || res != expected {
+			t.Errorf("ResolveForcedType(%s) = (%s, %v), attendu (%s, true)", in, res, ok, expected)
+		}
+	}
+
+	// 2. Tests par nom direct (insensible à la casse et aux espaces)
+	nameTests := map[string]string{
+		"feat":     "feat",
+		"FIX":      "fix",
+		"  Docs  ": "docs",
+		"Chore":    "chore",
+		"refactor": "refactor",
+		"Perf":     "perf",
+		"test":     "test",
+		"build":    "build",
+		"CI":       "ci",
+	}
+	for in, expected := range nameTests {
+		res, ok := views.ResolveForcedType(in)
+		if !ok || res != expected {
+			t.Errorf("ResolveForcedType(%s) = (%s, %v), attendu (%s, true)", in, res, ok, expected)
+		}
+	}
+
+	// 3. Tests d'entrées invalides
+	invalidInputs := []string{"", "0", "10", "unknown", "invalid", "feat2", "style"}
+	for _, in := range invalidInputs {
+		res, ok := views.ResolveForcedType(in)
+		if ok {
+			t.Errorf("ResolveForcedType(%s) = (%s, true), attendu false", in, res)
+		}
+	}
+}
+
+func TestBuildForcedTypeFeedback(t *testing.T) {
+	// Sans consigne additionnelle
+	fb1 := views.BuildForcedTypeFeedback("fix", "")
+	if fb1 != "type: fix" {
+		t.Errorf("attendu 'type: fix', obtenu '%s'", fb1)
+	}
+
+	// Avec espaces seuls
+	fb2 := views.BuildForcedTypeFeedback("feat", "   ")
+	if fb2 != "type: feat" {
+		t.Errorf("attendu 'type: feat', obtenu '%s'", fb2)
+	}
+
+	// Avec consigne additionnelle
+	fb3 := views.BuildForcedTypeFeedback("docs", "ajoute des exemples d'utilisation")
+	if fb3 != "type: docs. ajoute des exemples d'utilisation" {
+		t.Errorf("attendu 'type: docs. ajoute des exemples d'utilisation', obtenu '%s'", fb3)
+	}
+}
+

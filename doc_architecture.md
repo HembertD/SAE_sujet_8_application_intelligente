@@ -64,6 +64,7 @@ Exemples :
 │  │  │  └─ types.go
 │  │  ├─ ui/
 │  │  │  ├─ box.go
+│  │  │  ├─ notification.go
 │  │  │  ├─ spinner.go
 │  │  │  └─ styles.go
 │  │  └─ views/
@@ -110,6 +111,7 @@ Exemples :
 │  │  │  │  └─ types.md
 │  │  │  ├─ ui/
 │  │  │  │  ├─ box.md
+│  │  │  │  ├─ notification.md
 │  │  │  │  ├─ spinner.md
 │  │  │  │  └─ styles.md
 │  │  │  └─ views/
@@ -138,7 +140,8 @@ Exemples :
 │  └─ doc_test_files/
 │     ├─ cli/
 │     │  ├─ go_mod.md
-│     │  └─ bridge_test.md
+│     │  ├─ bridge_test.md
+│     │  └─ notification_test.md
 │     ├─ test_core.md
 │     ├─ test_git_wrapper.md
 │     ├─ test_ollama_llm.md
@@ -157,7 +160,8 @@ Exemples :
 │  ├─ README_situation_test.md
 │  ├─ cli/
 │  │  ├─ go.mod
-│  │  └─ bridge_test.go
+│  │  ├─ bridge_test.go
+│  │  └─ notification_test.go
 │  ├─ test_core.py
 │  ├─ test_git_wrapper.py
 │  ├─ test_ollama_llm.py

@@ -12,8 +12,9 @@ Ce module orchestre le workflow interactif de génération, de validation et d'a
 2. **Génération par le LLM** : déclenche le spinner d'attente pendant que Python interroge le modèle distant.
 3. **Restitution structurée** : affiche la carte du message proposé au format Conventional Commits.
 4. **Boucle de décision utilisateur** :
-   - `[V]` **Valider** : applique le commit via Git et propose d'enchaîner sur un `git push` (option masquée et bloquée si le message est en erreur, jusqu'à modification manuelle [M] ou régénération [R]) ;
-   - `[R]` **Régénérer avec consigne** : demande à l'utilisateur un texte de feedback (ex: "sois plus concis", "c'est un fix") et relance l'inférence LLM avec ce contexte ;
+   - `[V]` **Valider** : applique le commit via Git et propose d'enchaîner sur un `git push` (option masquée et bloquée si le message est en erreur, jusqu'à modification manuelle [M], régénération [R] ou imposition d'un type [T]) ;
+   - `[R]` **Régénérer avec consigne** : demande à l'utilisateur un texte de feedback libre (avec astuce pour imposer un type ex: "type: fix", "c'est un feat") et relance l'inférence LLM avec ce contexte ;
+   - `[T]` **Imposer un type Conventional Commit** : affiche la liste numérotée des 9 types standards supportés (`feat`, `fix`, `chore`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`) et permet d'en imposer un à l'IA avec consigne optionnelle (raccordement carte #58 / #42) ;
    - `[M]` **Modifier manuellement** : permet d'ajuster le type, le scope, le sujet ou le corps directement dans le terminal avant validation ;
    - `[A]` **Annuler** : abandonne l'opération sans impacter le dépôt Git.
 
@@ -22,7 +23,8 @@ Ce module orchestre le workflow interactif de génération, de validation et d'a
 - **Respect absolu du rôle front-end** : aucune commande Git directe n'est exécutée depuis ce fichier ; toutes les requêtes (`stage`, `commit`, `push`, `llm`) sont transmises au `BackendClient` ;
 - **Contrôle utilisateur total** : l'utilisateur reste maître absolu de la validation finale du commit ;
 - **Fonction `ReadChoice`** : utilitaire de saisie partagé absorbant les appuis sur Entrée à vide in-situ via des séquences ANSI (`\033[1A\r` + `\033[K`) avec préservation de l'espace après l'emoji, sans générer de sauts de ligne intempestifs ;
-- **Architecture Event Loop (Clean Code)** : découplage strict entre la génération initiale et la boucle d'interaction utilisateur, avec appel direct du LLM dans le choix `[R]` et édition manuelle dédiée (`promptManualEdit`).
+- **Architecture Event Loop (Clean Code)** : découplage strict entre la génération initiale et la boucle d'interaction utilisateur, avec appel direct du LLM dans les choix `[R]` et `[T]`, et édition manuelle dédiée (`promptManualEdit`) ;
+- **Raccordement du type imposé (carte #58 / #42)** : interfaçage avec `_extract_forced_type()` du backend via `BuildForcedTypeFeedback()` et `ResolveForcedType()`, garantissant l'alignement strict du type retenu.
 
 ## Rôle dans l’architecture
 
@@ -37,3 +39,7 @@ Anciens commentaires internes de `ShowCommitFlow` (supprimés du `.go`, conserv�
 - `ShowCommitFlow()` : Orchestre le flux interactif de génération et validation du commit.
 - `formatCommit()` : Formate un message de commit conventionnel à partir de ses parties.
 - `waitForEnter()` : Attend l'appui sur Entrée avant de continuer.
+- `ResolveForcedType()` : Valide et normalise le choix de type saisi par numéro (1-9) ou par nom.
+- `BuildForcedTypeFeedback()` : Construit la consigne de feedback respectant le motif attendu par le LLM (carte #58 / #42).
+- `promptForcedType()` : Guide l'utilisateur pour sélectionner explicitement un type Conventional Commits à imposer à l'IA.
+

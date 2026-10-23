@@ -14,7 +14,8 @@ Ce module couvre la logique de validation et d’interaction avec le client Olla
 - les règles de validation du message (`type`, `scope`, `subject`) ;
 - la vérification de joignabilité rapide et extraction des modèles via `check_ollama_reachable()` / `ping_ollama()` (succès, échec réseau, mesure de latence, récupération des modèles avec `fetch_models`, sérialisation `to_dict`, compatibilité tuple) ;
 - la compatibilité avec les anciennes structures de données binaires ;
-- l'override déterministe du type via `feedback` : une consigne contenant une formulation d'intention explicite ("c'est un fix, je veux un fix") force le type final même si le modèle en propose un autre ; une consigne sans mot-clé de type, ou avec deux types contradictoires, ne déclenche aucun override ; la simple présence du mot "test" (homonyme d'un type et d'un mot français courant) sans formulation d'intention ne doit pas non plus déclencher d'override ; `_extract_forced_type()` est aussi testée directement, isolément de la génération.
+- l'override déterministe du type via `feedback` : une consigne contenant une formulation d'intention explicite ("c'est un fix, je veux un fix") force le type final même si le modèle en propose un autre ; une consigne sans mot-clé de type, ou avec deux types contradictoires, ne déclenche aucun override ; la simple présence du mot "test" (homonyme d'un type et d'un mot français courant) sans formulation d'intention ne doit pas non plus déclencher d'override ; `_extract_forced_type()` est aussi testée directement, isolément de la génération ;
+- le retry sur réponse non-JSON (`MalformedResponseError`) : une première réponse dont le `content` n'est pas du JSON déclenche le même mécanisme de retry que pour une réponse invalide côté règles métier ; si les deux essais échouent avec du contenu non-JSON, `CommitMessageValidationError` est levée au lieu de propager l'erreur brute.
 
 ## Stratégie de test
 

@@ -18,10 +18,11 @@ Ce fichier de test valide le comportement du module `git_commit_release_notes_ge
 8. **`test_action_apply_commit_validation`** : rejette les messages de commit vides.
 9. **`test_action_apply_commit_success`** : simule l'application d'un commit Git et vérifie la présence du SHA.
 10. **`test_action_push_no_remote`** : gère l'absence de remote Git configuré sans plantage.
-11. **`test_action_release_notes_formatting`** : teste le formateur déterministe Conventional Commits (catégorisation Features, Fixes, Docs) lorsque le ping réussit mais que le chat LLM échoue.
-12. **`test_action_release_notes_ollama_unreachable`** : vérifie que la génération des release notes échoue immédiatement si le serveur Ollama est injoignable au ping (`check_ollama_reachable = False`), à l'identique des commits.
-13. **`test_action_release_notes_empty`** : vérifie la réponse lors d'un historique vide entre deux bornes identiques.
-14. **`test_unknown_action_exits_zero_with_error_json`** : vérifie que le process sort avec le code 0 et renvoie une erreur JSON propre sur action inconnue.
-15. **`test_action_save_config`** : vérifie la prise en compte de la notification de configuration.
-16. **`test_action_ping_ollama_reachable`** : simule une réponse positive d'Ollama avec latence et modèles installés.
-17. **`test_action_ping_ollama_unreachable`** : vérifie le retour propre en cas de défaillance réseau (`reachable = False`).
+11. **`test_action_release_notes_success`** : simule une génération LLM réussie (`generate_release_notes` patché) et vérifie le Markdown renvoyé.
+12. **`test_action_release_notes_fails_honestly_when_llm_call_errors`** : vérifie qu'un échec de l'appel LLM (ping OK mais erreur réseau lors du chat) remonte comme `success=False` avec un message d'erreur explicite, **jamais** comme un succès silencieusement rempli par un formateur Regex local présenté comme une sortie du modèle (anomalie corrigée, cf. `bug_relase_note.md`).
+13. **`test_action_release_notes_ollama_unreachable`** : vérifie que la génération des release notes échoue immédiatement si le serveur Ollama est injoignable au ping (`check_ollama_reachable = False`), à l'identique des commits.
+14. **`test_action_release_notes_empty`** : vérifie la réponse lors d'un historique vide entre deux bornes identiques.
+15. **`test_unknown_action_exits_zero_with_error_json`** : vérifie que le process sort avec le code 0 et renvoie une erreur JSON propre sur action inconnue.
+16. **`test_action_save_config`** : vérifie la prise en compte de la notification de configuration.
+17. **`test_action_ping_ollama_reachable`** : simule une réponse positive d'Ollama avec latence et modèles installés.
+18. **`test_action_ping_ollama_unreachable`** : vérifie le retour propre en cas de défaillance réseau (`reachable = False`).

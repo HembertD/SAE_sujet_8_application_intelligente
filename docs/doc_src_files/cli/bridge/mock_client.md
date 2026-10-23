@@ -37,7 +37,7 @@ Précisions issues des commentaires retirés de `mock_client.go` :
 - `MockClient.GetRepoStatus()` : Retourne un statut de dépôt simulé.
 - `MockClient.GetDiff()` : Retourne un diff simulé avec secrets et binaires.
 - `MockClient.StageAll()` : Simule l'indexation de tous les fichiers.
-- `MockClient.GenerateCommit()` : Génère une proposition de commit simulée adaptée au retour.
+- `MockClient.GenerateCommit()` : Génère une proposition de commit simulée adaptée au retour (avec détection déterministe d'un type forcé via `extractForcedType` si une intention explicite est formulée).
 - `MockClient.ApplyCommit()` : Simule l'application du commit sur la branche courante.
 - `MockClient.Push()` : Simule la poussée vers la branche distante.
 - `MockClient.GetReleaseNotes()` : Génère des notes de version simulées entre deux tags.
@@ -45,3 +45,5 @@ Précisions issues des commentaires retirés de `mock_client.go` :
 - `MockClient.SaveConfig()` : Persiste la configuration simulée dans le .env applicatif.
 - `MockClient.PingOllama()` : Retourne un diagnostic Ollama simulé.
 - `MockClient.SaveMarkdownFile()` : Sauvegarde le contenu Markdown dans le dépôt simulé.
+- `extractForcedType()` : Détecte un type forcé dans la consigne de feedback via regex d'intention explicite (aligné sur `_extract_forced_type` de `llm.py`).
+

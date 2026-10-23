@@ -39,12 +39,22 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
    ```
    Ajustez au besoin l'URL du serveur Ollama (`OLLAMA_BASE_URL`), le modèle (`OLLAMA_MODEL`) ou le timeout (`OLLAMA_TIMEOUT_S`).
 
-2. **Compilation du CLI :**
+2. **Initialisation de l'environnement Python :**
+   Le backend Python a besoin d'un interpréteur dédié avec ses dépendances (`requirements.txt`). Créez l'environnement virtuel autonome du projet :
+   ```bash
+   python scripts/setup_python_env.py
+   ```
+   Cela crée `.venv/` à la racine du projet et y installe toutes les dépendances. C'est l'étape standard attendue par le CLI Go : sans elle (et sans `PYTHON_BIN` renseigné dans le `.env`), le CLI refuse de démarrer et affiche un message guidé pour corriger la situation.
+
+   > [!NOTE]
+   > Pour utiliser un interpréteur déjà existant (CI, conteneur, venv personnel) plutôt que ce `.venv` dédié, renseignez `PYTHON_BIN=/chemin/vers/votre/python` dans le `.env` à la place de cette étape.
+
+3. **Compilation du CLI :**
    ```bash
    cd src/cli && go build -o git-generator .
    ```
 
-3. **Exécution :**
+4. **Exécution :**
    ```bash
    # Lancement standard (utilise les paramètres du .env à la racine) :
    ./git-generator
@@ -72,7 +82,7 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
    > [!CAUTION]
    > L'utilisation de `--mockInterface` ou `--mockIA` sans le flag `--dev` lève une erreur bloquante et interrompt immédiatement l'exécution.
 
-4. **Exécution des tests :**
+5. **Exécution des tests :**
    Tous les tests sont centralisés dans le dossier `test/` :
    - **Tests Python (backend & wrapper Git)** :
      ```bash

@@ -18,6 +18,7 @@ type BackendClient interface {
 	ApplyCommit(message string) (*models.ActionResult, error)
 	Push() (*models.ActionResult, error)
 	GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNotesResponse, error)
+	GetRecentCommits(limit int) (*models.CommitsResponse, error)
 	GetConfig() (*models.ConfigResponse, error)
 	SaveConfig(baseURL, model string, timeout float64, mockInterface bool, mockAI ...bool) (*models.ActionResult, error)
 	PingOllama() (*models.PingResponse, error)
@@ -121,6 +122,11 @@ func (b *BridgeClient) Push() (*models.ActionResult, error) {
 // GetReleaseNotes délègue la génération des release notes au client actif
 func (b *BridgeClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNotesResponse, error) {
 	return b.activeDelegate().GetReleaseNotes(fromTag, toTag)
+}
+
+// GetRecentCommits délègue la récupération des commits récents au client actif
+func (b *BridgeClient) GetRecentCommits(limit int) (*models.CommitsResponse, error) {
+	return b.activeDelegate().GetRecentCommits(limit)
 }
 
 // PingOllama délègue le ping du serveur Ollama au client actif

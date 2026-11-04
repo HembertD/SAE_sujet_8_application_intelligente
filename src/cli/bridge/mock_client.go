@@ -21,6 +21,7 @@ type MockClient struct {
 	CustomDiff           *models.DiffResponse
 	CustomCommitProposal *models.CommitProposal
 	CustomReleaseNotes   *models.ReleaseNotesResponse
+	CustomCommits        *models.CommitsResponse
 	CustomPing           *models.PingResponse
 	CustomError          error
 }
@@ -213,6 +214,40 @@ Date : %s
 		ToTag:       toTag,
 		Markdown:    md,
 		CommitCount: 14,
+	}, nil
+}
+
+// GetRecentCommits renvoie une liste simulée de commits pour l'interface de sélection
+func (m *MockClient) GetRecentCommits(limit int) (*models.CommitsResponse, error) {
+	if m.CustomError != nil {
+		return nil, m.CustomError
+	}
+	if m.CustomCommits != nil {
+		return m.CustomCommits, nil
+	}
+
+	m.sleep(200 * time.Millisecond)
+
+	mockCommits := []models.CommitItem{
+		{Sha: "02b90a2", Message: "fix(cli): fiabiliser la saisie utilisateur et restructurer le flux", Author: "Maxence", Date: "2026-10-16", Tag: "HEAD"},
+		{Sha: "76f5c21", Message: "feat(cli): masquer et interdire la validation en cas d'erreur", Author: "Maxence", Date: "2026-10-16"},
+		{Sha: "10fd08c", Message: "refactor(cli): supprimer la fonction obsolète PrintError", Author: "Maxence", Date: "2026-10-16"},
+		{Sha: "b171f48", Message: "refactor: renommer l'application et l'interface en gitelligence", Author: "Maxence", Date: "2026-10-14", Tag: "v1.1.0"},
+		{Sha: "752dd9c", Message: "feat(cli): restreindre les options de mock derrière un flag dev", Author: "Maxence", Date: "2026-10-13"},
+		{Sha: "ec99b12", Message: "refactor(config): supprimer le paramètre langue de la configuration", Author: "Maxence", Date: "2026-10-12"},
+		{Sha: "d4ef987", Message: "Ajout du sprint N°5  (#41)", Author: "Maxence", Date: "2026-10-12"},
+		{Sha: "8af691d", Message: "feat(llm-client): force deterministiquement le type Conventional Commit", Author: "Enzo", Date: "2026-10-12", Tag: "v1.0.0"},
+		{Sha: "63cdd60", Message: "ci: retire l'activation auto de Pages (scope admin)", Author: "Dorian", Date: "2026-10-12"},
+		{Sha: "ca5118e", Message: "Merge branch 'main' into dev", Author: "Dorian", Date: "2026-10-09"},
+	}
+
+	if limit > 0 && limit < len(mockCommits) {
+		mockCommits = mockCommits[:limit]
+	}
+
+	return &models.CommitsResponse{
+		Success: true,
+		Commits: mockCommits,
 	}, nil
 }
 

@@ -33,8 +33,12 @@ Exception métier utilisée pour signaler un échec de lecture Git ou un problè
 
 ### `CommitInfo`
 
-Représente un commit de l'historique Git, avec son SHA, message, auteur et date.
+Représente un commit de l'historique Git, avec son SHA, message, auteur, date et éventuel tag associé (`tag`).
+
+### `get_recent_commits`
+
+Récupère l'historique complet ou récent des commits avec leurs tags associés pour alimenter le sélecteur interactif TUI.
 
 ## Rôle dans le flux
 
-Le wrapper est le point d'entrée entre le dépôt Git et les composants de génération. Il constitue le contrat technique qui alimente ensuite le module de génération de messages via les objets `DiffFile`.
+Le wrapper est le point d'entrée entre le dépôt Git et les composants de génération. Il constitue le contrat technique qui alimente le module de génération de commits et de release notes.

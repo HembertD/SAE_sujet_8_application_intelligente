@@ -277,7 +277,6 @@ func (m *MockClient) PingOllama() (*models.PingResponse, error) {
 		LatencyMs: 42,
 		InstalledModels: []string{
 			"gemma4:12b",
-			"gemma4:26b",
 			"mistral:latest",
 			"codellama:7b",
 		},

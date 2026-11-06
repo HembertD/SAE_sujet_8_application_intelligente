@@ -345,7 +345,7 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 	cfg := &models.ConfigResponse{
 		Success:             true,
 		OllamaBaseURL:       "http://10.22.28.190:11434",
-		OllamaModel:         "gemma4:26b",
+		OllamaModel:         "gemma4:12b",
 		TimeoutS:            300.0,
 		MockInterface:       isMockActive,
 		MockAI:              ReadMockAISettingFromEnv(appRoot),

@@ -73,7 +73,7 @@ ENV = load_env()
 if "OLLAMA_BASE_URL" not in ENV:
     ENV["OLLAMA_BASE_URL"] = "http://10.22.28.190:11434"
 if "OLLAMA_MODEL" not in ENV:
-    ENV["OLLAMA_MODEL"] = "gemma4:26b"
+    ENV["OLLAMA_MODEL"] = "gemma4:12b"
 if "OLLAMA_TIMEOUT_S" not in ENV:
     ENV["OLLAMA_TIMEOUT_S"] = "300"
 if "OLLAMA_NUM_CTX" not in ENV:

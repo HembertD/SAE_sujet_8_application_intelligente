@@ -67,6 +67,7 @@ type ConfigResponse struct {
 	TimeoutS      float64 `json:"timeout_s"`
 	MockInterface       bool    `json:"mock_interface"`
 	MockAI              bool    `json:"mock_ai"`
+	DockerLLM           bool    `json:"docker_llm"`
 	EnableNotifications bool    `json:"enable_notifications"`
 }
 

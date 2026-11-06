@@ -283,7 +283,7 @@ def call_chat_json(messages: list[dict], json_schema: dict) -> dict:
         "stream": False,
         "format": json_schema,
         # Sans ça, Ollama utilise sa fenêtre de contexte par défaut (souvent
-        # bien plus petite que les 262K annoncés pour gemma4:26b) et tronque
+        # bien plus petite que la fenêtre native du modèle) et tronque
         # silencieusement le début du diff sur les cas volumineux.
         "options": {"num_ctx": OLLAMA_NUM_CTX},
     }

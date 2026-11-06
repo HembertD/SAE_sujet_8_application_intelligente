@@ -9,7 +9,7 @@ Ce module contient les paramètres globaux utilisés par le client Ollama et le 
 ## Variables principales
 
 - `OLLAMA_BASE_URL` : URL du serveur Ollama (ex: `http://10.22.28.190:11434` ou local).
-- `OLLAMA_MODEL` : modèle utilisé pour la génération des messages de commit (ex: `gemma4:26b`, `gemma4:12b`).
+- `OLLAMA_MODEL` : modèle utilisé pour la génération des messages de commit (ex: `gemma4:12b`, `mistral:latest`).
 - `OLLAMA_TIMEOUT_S` : délai de requête avant timeout en secondes.
 - `MOCK_INTERFACE` : activation du mode simulation complète de l'interface en Go (`true` ou `false`).
 - `MOCK_AI` : activation de la simulation des réponses de l'IA Ollama hors-ligne (`true` ou `false`).

@@ -262,7 +262,7 @@ C'est le cœur de l'outil :
 Cet écran répond directement aux **consignes impératives de contrôle de l'IUT** :
 * Affiche les variables lues par Python et Go :
   * `OLLAMA_BASE_URL` (par défaut `http://10.22.28.190:11434`)
-  * `OLLAMA_MODEL` (par défaut `gemma4:26b`)
+  * `OLLAMA_MODEL` (par défaut `gemma4:12b`)
   * `OLLAMA_TIMEOUT_S` (300s)
   * `MOCK_INTERFACE` et `MOCK_AI` (visibles et modifiables uniquement si le mode `--dev` est actif)
 * **Action `[T]` (Test Ping)** : Go demande à Python d'effectuer une requête rapide vers le serveur Ollama. S'il répond, l'écran affiche en vert la latence en millisecondes et la liste réelle des modèles installés sur le serveur !

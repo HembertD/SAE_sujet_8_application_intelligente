@@ -1,15 +1,15 @@
-# Dockerfile - Serveur Ollama avec modèle gemma4:26b
+# Dockerfile - Serveur Ollama pour Gitelligence
 
 Fichier source associé : `Dockerfile` (à la racine du projet)
 
 ## Description
 
-Ce fichier définit l'image Docker du serveur Ollama préconfiguré avec le modèle de langage `gemma4:26b`. Il est utilisé par l'application Gitelligence quand l'option `USE_DOCKER_LLM` est activée : le front-end Go pilote le lancement et l'arrêt de ce conteneur via `docker compose`.
+Ce fichier définit l'image Docker du serveur Ollama utilisé par Gitelligence quand l'option `USE_DOCKER_LLM` est activée : le front-end Go pilote le lancement et l'arrêt de ce conteneur via `docker compose`.
 
 ## Contenu
 
 - **Image de base** : `ollama/ollama:latest` (serveur Ollama officiel)
-- **Modèle pré-téléchargé** : `gemma4:26b` (téléchargé automatiquement au premier démarrage via `entrypoint.sh`)
+- **Modèle par défaut** : `gemma4:12b` via `ENV OLLAMA_MODEL`, qui peut être remplacé par la valeur du `.env` applicatif (docker compose)
 - **Port exposé** : `11434` (API Ollama standard)
 - **Volume de persistance** : `/root/.ollama` (les modèles survivent aux redémarrages du conteneur)
 
@@ -18,9 +18,10 @@ Ce fichier définit l'image Docker du serveur Ollama préconfiguré avec le mod�
 L'image exécute `/entrypoint.sh` au lancement :
 
 1. Démarre le serveur Ollama en arrière-plan (`ollama serve`)
-2. Attend que l'API `http://localhost:11434/api/version` réponde (timeout 30s)
-3. Vérifie si `gemma4:26b` est déjà présent ; sinon le télécharge (`ollama pull gemma4:26b`)
-4. Maintient le conteneur en vie (`wait`)
+2. Installe un `trap` `SIGTERM`/`SIGINT` pour un arrêt propre du serveur
+3. Attend que l'API Ollama réponde via `ollama list` (timeout 30s), sans dépendre de `curl`
+4. Vérifie si le modèle `OLLAMA_MODEL` est déjà présent ; sinon le télécharge (`ollama pull`)
+5. Maintient le conteneur en vie (`wait`)
 
 ## Utilisation
 

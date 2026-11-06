@@ -63,6 +63,10 @@ nav:
               - Métriques: doc_scripts_files/run_metrics.md
               - Environnement Python: doc_scripts_files/setup_python_env.md
               - PDF: doc_scripts_files/generate_documentation_pdf.md
+      - Docker:
+          - Dockerfile: doc_src_files/Dockerfile.md
+          - Docker Compose: doc_src_files/docker-compose.md
+          - Entrypoint: doc_src_files/entrypoint.md
       - CLI Go (guide): explication_go_cli.md
 
       - Tests:

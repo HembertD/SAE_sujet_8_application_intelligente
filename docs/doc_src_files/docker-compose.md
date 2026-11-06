@@ -14,8 +14,10 @@ Ce fichier définit le service `ollama` qui fournit un serveur LLM local pour Gi
 | Nom du conteneur | `gitelligence-ollama` |
 | Port hôte | `11434` → `11434` (conteneur) |
 | Volume | `ollama_data` → `/root/.ollama` |
-| Variable d'environnement | `OLLAMA_HOST=0.0.0.0:11434` |
-| Healthcheck | `curl -f http://localhost:11434/api/version` (toutes les 10s) |
+| Variables d'environnement | `OLLAMA_HOST=0.0.0.0:11434`, `OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4:12b}` |
+| Healthcheck | `ollama list` (toutes les 10s) — `curl` n'existe pas dans l'image officielle |
+
+Le modèle utilisé est celui défini dans le `.env` applicatif (`OLLAMA_MODEL`), ce qui évite de télécharger inutilement `gemma4:12b` quand l'utilisateur a choisi un modèle plus léger.
 
 ## Volumes
 
@@ -27,7 +29,7 @@ Ce fichier définit le service `ollama` qui fournit un serveur LLM local pour Gi
 # Lancer le serveur Ollama en arrière-plan
 docker compose up -d
 
-# Voir les logs
+# Voir les logs (utile lors du premier téléchargement du modèle)
 docker compose logs -f ollama
 
 # Arrêter et supprimer le conteneur

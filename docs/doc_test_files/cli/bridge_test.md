@@ -19,6 +19,10 @@ Ce fichier contient la suite de tests automatisés validant le pont Go ↔ Pytho
 9. **`TestSaveConfigBothMocks`** : valide l'enregistrement conjoint et la relecture distincte des réglages `MOCK_INTERFACE` et `MOCK_AI` dans le fichier `.env`.
 10. **`TestResolveForcedType`** : valide la résolution des 9 types Conventional Commits par index numérique (1 à 9), par nom exact insensible à la casse et le rejet des saisies invalides.
 11. **`TestBuildForcedTypeFeedback`** : valide la construction formatée du feedback (`type: <type>` ou `type: <type>. <consigne>`) conforme à l'extraction d'intention du backend.
+12. **`TestBridgeClientMockNeExecutePasDocker`** : garantit qu'en mode mock, `StartDockerOllama` / `StopDockerOllama` renvoient une réponse simulée sans exécuter de commande Docker réelle.
+13. **`TestEffectiveOllamaBaseURL`** : vérifie le choix de l'URL Ollama (`localhost:11434` en mode Docker, URL du `.env` sinon, chaîne vide pour une config nulle).
+14. **`TestReadDockerLLMSettingFromEnvPriorite`** : valide la priorité variable d'environnement > `.env` pour `USE_DOCKER_LLM`, ainsi que la lecture par `PythonClient.IsDockerLLM`.
+15. **`TestWriteEnvFilePreserveDockerLLM`** : vérifie l'écriture explicite de `USE_DOCKER_LLM` (true/false) et sa préservation par l'ancienne signature `WriteEnvFile`.
 
 ## Exécution des tests
 

@@ -96,11 +96,13 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
 6. **Serveur Ollama local via Docker (optionnel) :**
    Pour utiliser un serveur Ollama local déployé avec Docker Compose plutôt que le serveur distant de l'IUT :
    ```bash
-   # Construire et lancer le conteneur Ollama (modèle gemma4:26b)
+   # Construire et lancer le conteneur Ollama (modèle défini par OLLAMA_MODEL, gemma4:12b par défaut)
    docker compose up -d
    ```
    Puis, dans le TUI de l'application, allez dans **Configuration > Modifier** et activez `LLM via Docker (true/false) : true`. Le conteneur Ollama sera démarré automatiquement avec une barre de progression, et le backend Python communiquera avec `http://localhost:11434`.
-   
+
+   Le modèle téléchargé est celui de `OLLAMA_MODEL` dans le `.env` (par défaut `gemma4:12b`, environ 8 Go). Le premier lancement peut être long ; suivez la progression avec `docker compose logs -f ollama`. Adaptez `OLLAMA_MODEL` si votre machine dispose de moins de ressources.
+
    Pour revenir au serveur distant de l'IUT, désactivez l'option et arrêtez le conteneur :
    ```bash
    docker compose down

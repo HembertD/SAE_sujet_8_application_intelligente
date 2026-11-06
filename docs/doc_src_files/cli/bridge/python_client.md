@@ -10,6 +10,8 @@ Ce module implémente l'interface `BackendClient` en exécutant le backend Pytho
 
 - Résoudre dynamiquement l'interpréteur Python (`resolvePythonBin`), par ordre de priorité : `PYTHON_BIN` (variable système ou `.env` applicatif) → environnement virtuel autonome `<appRoot>/.venv` (créé par `scripts/setup_python_env.py`). Aucun repli sur l'interpréteur système (ni `python3` ni `python`) : si aucun des deux n'est trouvé, l'erreur est conservée sur le client et renvoyée au premier appel réel plutôt que de démarrer avec un interpréteur non maîtrisé (voir `CheckPythonEnvironment`, utilisé par `main.go` pour un échec immédiat au lancement).
 - Configurer les variables d'environnement du sous-processus : `PYTHONPATH` pointant sur `<appRoot>/src` (séparateur `os.PathListSeparator`, portable Windows/Unix), et transmission de `GITELLIGENCE_APP_ROOT` (avec maintien de `SMART_COMMIT_APP_ROOT` pour rétrocompatibilité).
+- Choisir l'URL Ollama effective via `EffectiveOllamaBaseURL` : `http://localhost:11434` quand `USE_DOCKER_LLM=true`, sinon l'URL distante du `.env`. La variable `USE_DOCKER_LLM` est également transmise au sous-processus Python.
+- Piloter le conteneur Ollama local (`StartDockerOllama` / `StopDockerOllama`) via `docker compose`, avec `cmd.Dir` fixé à la racine applicative et des messages d'erreur explicites (binaire Docker absent, sortie vide).
 - Exécuter les commandes métier (`--action status`, `diff`, `stage-all`, `generate-commit`, `apply-commit`, `push`, `release-notes`, `ping-ollama`).
 - Isoler les flux : capture du JSON strict sur `stdout` et redirection des logs/traces sur `stderr`.
 - Désérialiser les réponses JSON dans des structures Go fortement typées (`models`).
@@ -28,6 +30,8 @@ Précisions issues des commentaires retirés de `python_client.go` :
 - `CheckPythonEnvironment(appRoot)` : expose cette même résolution sans construire de client, pour un contrôle explicite au démarrage du CLI (`main.go`), ignoré en mode mock-interface puisque Python n'y est jamais appelé.
 - `runPythonCommand` exécute la commande Python et récupère `stdout`, après avoir vérifié qu'aucune erreur de résolution d'interpréteur n'est en attente (`pythonBinErr`) ; `PYTHONPATH` pointe sur le dossier `src` de l'application, avec candidats de secours si `appSrc` n'est pas résolu ; la configuration est chargée exclusivement depuis l'application (`p.appRoot`, JAMAIS `p.repoRoot`).
 - `IsMock` retourne toujours `false` ; chaque méthode (`GetRepoStatus`, `GetDiff`, `StageAll`, `GenerateCommit`, `ApplyCommit`, `Push`, `GetReleaseNotes`, `GetConfig`, `SaveConfig`, `PingOllama`, `SaveMarkdownFile`) interroge le backend Python pour l'action correspondante, `SaveConfig` notifiant Python après écriture du `.env` applicatif et `SaveMarkdownFile` écrivant localement le changelog exporté.
+- `IsDockerLLM` lit `USE_DOCKER_LLM` via `ReadDockerLLMSettingFromEnv(p.appRoot)` (variable d'environnement prioritaire, puis `.env`).
+- `runDockerCompose` factorise `docker compose up -d` / `down` : vérification de la présence de `docker-compose.yml`, exécution depuis `p.appRoot`, et repli sur `err.Error()` si `CombinedOutput` ne renvoie aucune sortie (ex: binaire `docker` introuvable).
 
 ## Commentaires de fonction (dupliqués du code source)
 
@@ -46,3 +50,6 @@ Précisions issues des commentaires retirés de `python_client.go` :
 - `PythonClient.SaveConfig()` : Persiste la configuration puis notifie le backend Python.
 - `PythonClient.PingOllama()` : Interroge le backend Python sur l'état d'Ollama.
 - `PythonClient.SaveMarkdownFile()` : Sauvegarde le contenu Markdown dans le dépôt cible.
+- `PythonClient.IsDockerLLM()` : Lit l'activation du mode Docker depuis l'environnement ou le `.env`.
+- `PythonClient.StartDockerOllama()` : Lance le conteneur Ollama via `docker compose up -d`.
+- `PythonClient.StopDockerOllama()` : Arrête le conteneur Ollama via `docker compose down`.

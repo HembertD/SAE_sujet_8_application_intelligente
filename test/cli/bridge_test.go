@@ -456,3 +456,115 @@ func TestBuildForcedTypeFeedback(t *testing.T) {
 		t.Errorf("attendu 'type: docs. ajoute des exemples d'utilisation', obtenu '%s'", fb3)
 	}
 }
+
+func TestBridgeClientMockNeExecutePasDocker(t *testing.T) {
+	tempDir := t.TempDir()
+	client := bridge.NewBackendClient(tempDir, true, false)
+
+	resStart, err := client.StartDockerOllama()
+	if err != nil {
+		t.Fatalf("StartDockerOllama en mode mock ne doit pas échouer : %v", err)
+	}
+	if resStart == nil || !resStart.Success || !strings.Contains(strings.ToLower(resStart.Message), "mock") {
+		t.Errorf("attendu un démarrage simulé en mode mock, obtenu : %+v", resStart)
+	}
+
+	resStop, err := client.StopDockerOllama()
+	if err != nil {
+		t.Fatalf("StopDockerOllama en mode mock ne doit pas échouer : %v", err)
+	}
+	if resStop == nil || !resStop.Success || !strings.Contains(strings.ToLower(resStop.Message), "mock") {
+		t.Errorf("attendu un arrêt simulé en mode mock, obtenu : %+v", resStop)
+	}
+}
+
+func TestEffectiveOllamaBaseURL(t *testing.T) {
+	const remote = "http://10.22.28.190:11434"
+
+	if got := bridge.EffectiveOllamaBaseURL(&models.ConfigResponse{OllamaBaseURL: remote}); got != remote {
+		t.Errorf("hors Docker, URL attendue %q, obtenu %q", remote, got)
+	}
+	if got := bridge.EffectiveOllamaBaseURL(&models.ConfigResponse{OllamaBaseURL: remote, DockerLLM: true}); got != bridge.DockerOllamaBaseURL {
+		t.Errorf("en Docker, URL attendue %q, obtenu %q", bridge.DockerOllamaBaseURL, got)
+	}
+	if got := bridge.EffectiveOllamaBaseURL(nil); got != "" {
+		t.Errorf("config nil : URL attendue vide, obtenu %q", got)
+	}
+}
+
+func TestReadDockerLLMSettingFromEnvPriorite(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	if err := os.WriteFile(envPath, []byte("USE_DOCKER_LLM=true\n"), 0644); err != nil {
+		t.Fatalf("écriture .env : %v", err)
+	}
+
+	// Fichier seul
+	t.Setenv("USE_DOCKER_LLM", "")
+	if !bridge.ReadDockerLLMSettingFromEnv(dir) {
+		t.Errorf("attendu true depuis le .env")
+	}
+
+	// Variable d'environnement prioritaire sur le fichier
+	t.Setenv("USE_DOCKER_LLM", "false")
+	if bridge.ReadDockerLLMSettingFromEnv(dir) {
+		t.Errorf("attendu false depuis la variable d'environnement")
+	}
+	t.Setenv("USE_DOCKER_LLM", "true")
+	if err := os.WriteFile(envPath, []byte("USE_DOCKER_LLM=false\n"), 0644); err != nil {
+		t.Fatalf("écriture .env : %v", err)
+	}
+	if !bridge.ReadDockerLLMSettingFromEnv(dir) {
+		t.Errorf("attendu true depuis la variable d'environnement prioritaire")
+	}
+
+	// PythonClient doit refléter la configuration
+	t.Setenv("USE_DOCKER_LLM", "")
+	if err := os.WriteFile(envPath, []byte("USE_DOCKER_LLM=true\n"), 0644); err != nil {
+		t.Fatalf("écriture .env : %v", err)
+	}
+	pyClient := bridge.NewPythonClientWithAppRoot(dir, dir)
+	if !pyClient.IsDockerLLM() {
+		t.Errorf("PythonClient.IsDockerLLM() doit lire USE_DOCKER_LLM")
+	}
+}
+
+func TestWriteEnvFilePreserveDockerLLM(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+
+	if err := bridge.WriteEnvFileWithDockerLLM(envPath, "http://remote:11434", "gemma4:12b", 300, false, true); err != nil {
+		t.Fatalf("WriteEnvFileWithDockerLLM(true) : %v", err)
+	}
+	content, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("lecture .env : %v", err)
+	}
+	if !strings.Contains(string(content), "USE_DOCKER_LLM=true") {
+		t.Errorf("attendu USE_DOCKER_LLM=true, contenu :\n%s", content)
+	}
+
+	// L'ancienne signature WriteEnvFile ne doit pas écraser le réglage existant
+	if err := bridge.WriteEnvFile(envPath, "http://remote:11434", "gemma4:12b", 300, false); err != nil {
+		t.Fatalf("WriteEnvFile : %v", err)
+	}
+	content, err = os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("lecture .env : %v", err)
+	}
+	if !strings.Contains(string(content), "USE_DOCKER_LLM=true") {
+		t.Errorf("WriteEnvFile a écrasé USE_DOCKER_LLM, contenu :\n%s", content)
+	}
+
+	// La variante explicite doit pouvoir le désactiver
+	if err := bridge.WriteEnvFileWithDockerLLM(envPath, "http://remote:11434", "gemma4:12b", 300, false, false); err != nil {
+		t.Fatalf("WriteEnvFileWithDockerLLM(false) : %v", err)
+	}
+	content, err = os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("lecture .env : %v", err)
+	}
+	if !strings.Contains(string(content), "USE_DOCKER_LLM=false") {
+		t.Errorf("attendu USE_DOCKER_LLM=false, contenu :\n%s", content)
+	}
+}

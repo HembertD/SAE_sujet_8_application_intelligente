@@ -3,7 +3,6 @@ package bridge
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"sae-git-cli/models"
@@ -13,6 +12,19 @@ import (
 // lancé via docker compose. Elle est utilisée à la place de l'URL distante du
 // .env lorsque USE_DOCKER_LLM est actif.
 const DockerOllamaBaseURL = "http://localhost:11434"
+
+// EffectiveOllamaBaseURL renvoie l'URL réellement utilisée pour joindre Ollama.
+// En mode Docker, le conteneur local expose le service sur localhost ; sinon,
+// l'URL configurée dans le .env (serveur de l'IUT) est conservée.
+func EffectiveOllamaBaseURL(cfg *models.ConfigResponse) string {
+	if cfg == nil {
+		return ""
+	}
+	if cfg.DockerLLM {
+		return DockerOllamaBaseURL
+	}
+	return cfg.OllamaBaseURL
+}
 
 // BackendClient définit l'interface publique d'accès aux services du back-end.
 // Les vues front-end dépendent exclusivement de cette interface.
@@ -205,60 +217,14 @@ func (b *BridgeClient) SaveConfigWithDockerLLM(baseURL, model string, timeout fl
 	}, nil
 }
 
-// StartDockerOllama lance le conteneur Ollama via docker compose et affiche une progression.
+// StartDockerOllama lance le conteneur Ollama via docker compose en déléguant
+// au client actif : le mode mock reste ainsi totalement isolé du système hôte.
 func (b *BridgeClient) StartDockerOllama() (*models.ActionResult, error) {
-	appRoot := b.appRoot
-	if appRoot == "" {
-		appRoot = FindAppRoot(b.repoRoot)
-	}
-	composeFile := filepath.Join(appRoot, "docker-compose.yml")
-	if _, err := os.Stat(composeFile); err != nil {
-		return nil, fmt.Errorf("fichier docker-compose.yml introuvable à la racine de l'application : %s", composeFile)
-	}
-
-	cmd := exec.Command("docker", "compose", "-f", composeFile, "up", "-d")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return &models.ActionResult{
-			Success: false,
-			Error:   fmt.Sprintf("échec du lancement du conteneur Ollama : %s", string(output)),
-		}, err
-	}
-
-	b.isDockerLLM = true
-	_ = os.Setenv("USE_DOCKER_LLM", "true")
-
-	return &models.ActionResult{
-		Success: true,
-		Message: "Conteneur Ollama démarré avec succès via docker compose.",
-	}, nil
+	return b.activeDelegate().StartDockerOllama()
 }
 
-// StopDockerOllama arrête le conteneur Ollama via docker compose.
+// StopDockerOllama arrête le conteneur Ollama via docker compose en déléguant
+// au client actif (no-op en mode mock).
 func (b *BridgeClient) StopDockerOllama() (*models.ActionResult, error) {
-	appRoot := b.appRoot
-	if appRoot == "" {
-		appRoot = FindAppRoot(b.repoRoot)
-	}
-	composeFile := filepath.Join(appRoot, "docker-compose.yml")
-	if _, err := os.Stat(composeFile); err != nil {
-		return nil, fmt.Errorf("fichier docker-compose.yml introuvable à la racine de l'application : %s", composeFile)
-	}
-
-	cmd := exec.Command("docker", "compose", "-f", composeFile, "down")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return &models.ActionResult{
-			Success: false,
-			Error:   fmt.Sprintf("échec de l'arrêt du conteneur Ollama : %s", string(output)),
-		}, err
-	}
-
-	b.isDockerLLM = false
-	_ = os.Setenv("USE_DOCKER_LLM", "false")
-
-	return &models.ActionResult{
-		Success: true,
-		Message: "Conteneur Ollama arrêté.",
-	}, nil
+	return b.activeDelegate().StopDockerOllama()
 }

@@ -32,10 +32,7 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 		var lines []string
 		lines = append(lines, "")
-		displayBaseURL := cfg.OllamaBaseURL
-		if cfg.DockerLLM {
-			displayBaseURL = bridge.DockerOllamaBaseURL
-		}
+		displayBaseURL := bridge.EffectiveOllamaBaseURL(cfg)
 		lines = append(lines, fmt.Sprintf("  • %sURL Serveur Ollama%s : %s%s%s", ui.Bold, ui.Reset, ui.Cyan, displayBaseURL, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sModèle LLM%s        : %s%s%s", ui.Bold, ui.Reset, ui.Yellow, cfg.OllamaModel, ui.Reset))
 		lines = append(lines, fmt.Sprintf("  • %sTimeout requête%s   : %.0fs", ui.Bold, ui.Reset, cfg.TimeoutS))
@@ -93,7 +90,7 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 		switch choice {
 		case "T":
-			spinner := ui.NewSpinner(fmt.Sprintf("Ping de %s...", cfg.OllamaBaseURL))
+			spinner := ui.NewSpinner(fmt.Sprintf("Ping de %s...", displayBaseURL))
 			spinner.Start()
 			ping, pingErr := client.PingOllama()
 			spinner.Stop("")
@@ -105,7 +102,7 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				} else if ping != nil && ping.Error != "" {
 					errMsg = ping.Error
 				}
-				ui.PrintErrorCard("Diagnostic Connexion Ollama", fmt.Sprintf("Le serveur Ollama à l'adresse %s est injoignable.", cfg.OllamaBaseURL),
+				ui.PrintErrorCard("Diagnostic Connexion Ollama", fmt.Sprintf("Le serveur Ollama à l'adresse %s est injoignable.", displayBaseURL),
 					fmt.Sprintf("Détail technique : %s", errMsg),
 					"Vérifiez l'URL du serveur et le port avec l'option [M] Modifier",
 					"Assurez-vous qu'Ollama est bien démarré sur la machine hôte",
@@ -209,10 +206,15 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 						spinnerDocker.Start()
 						resDocker, dockerErr := client.StartDockerOllama()
 						spinnerDocker.Stop("")
-						if dockerErr != nil || !resDocker.Success {
-							ui.PrintErrorCard("Erreur Docker", fmt.Sprintf("Impossible de démarrer le conteneur Ollama : %v", dockerErr))
+						if dockerErr != nil || resDocker == nil || !resDocker.Success {
+							detail := fmt.Sprintf("%v", dockerErr)
+							if resDocker != nil && resDocker.Error != "" {
+								detail = resDocker.Error
+							}
+							ui.PrintErrorCard("Erreur Docker", fmt.Sprintf("Impossible de démarrer le conteneur Ollama : %s", detail))
 						} else {
 							ui.PrintSuccess(resDocker.Message)
+							ui.PrintInfo(fmt.Sprintf("Premier lancement : le téléchargement du modèle %s peut prendre plusieurs minutes. Suivez la progression avec : docker compose logs -f ollama", cfg.OllamaModel))
 						}
 					}
 				} else {
@@ -226,8 +228,12 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 						spinnerDocker.Start()
 						resDocker, dockerErr := client.StopDockerOllama()
 						spinnerDocker.Stop("")
-						if dockerErr != nil || !resDocker.Success {
-							ui.PrintErrorCard("Erreur Docker", fmt.Sprintf("Impossible d'arrêter le conteneur Ollama : %v", dockerErr))
+						if dockerErr != nil || resDocker == nil || !resDocker.Success {
+							detail := fmt.Sprintf("%v", dockerErr)
+							if resDocker != nil && resDocker.Error != "" {
+								detail = resDocker.Error
+							}
+							ui.PrintErrorCard("Erreur Docker", fmt.Sprintf("Impossible d'arrêter le conteneur Ollama : %s", detail))
 						} else {
 							ui.PrintSuccess(resDocker.Message)
 						}

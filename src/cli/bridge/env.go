@@ -408,9 +408,39 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 	return cfg
 }
 
-// WriteEnvFile réécrit le fichier .env STRICTEMENT à la racine du projet.
+// readDockerLLMFromEnvFile lit USE_DOCKER_LLM dans le .env applicatif sans
+// consulter les variables d'environnement système. Utilisé par WriteEnvFile
+// (ancienne signature) pour ne pas écraser un réglage qu'elle ne reçoit pas.
+func readDockerLLMFromEnvFile(envPath string) bool {
+	cleanPath := filepath.Clean(envPath)
+	dir := filepath.Dir(cleanPath)
+	for filepath.Base(dir) == "src" || filepath.Base(dir) == "cli" {
+		dir = filepath.Dir(dir)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ".env"))
+	if err != nil {
+		return false
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 && strings.TrimSpace(parts[0]) == "USE_DOCKER_LLM" {
+			return ParseBoolFromString(strings.Trim(strings.TrimSpace(parts[1]), "\"'"))
+		}
+	}
+	return false
+}
+
+// WriteEnvFile réécrit le fichier .env STRICTEMENT à la racine du projet en
+// conservant la valeur existante de USE_DOCKER_LLM.
 func WriteEnvFile(envPath string, baseURL, model string, timeout float64, mockInterface bool, mockAIArgs ...bool) error {
-	return WriteEnvFileWithDockerLLM(envPath, baseURL, model, timeout, mockInterface, false, mockAIArgs...)
+	return WriteEnvFileWithDockerLLM(envPath, baseURL, model, timeout, mockInterface, readDockerLLMFromEnvFile(envPath), mockAIArgs...)
 }
 
 // WriteEnvFileWithDockerLLM réécrit le fichier .env STRICTEMENT à la racine du projet, avec prise en compte de USE_DOCKER_LLM.

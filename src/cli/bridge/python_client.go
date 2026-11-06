@@ -166,13 +166,8 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 	// En mode Docker, le serveur Ollama est exposé localement par le conteneur.
 	// L'URL distante reste stockée dans le .env pour pouvoir y revenir lorsque
 	// l'option est désactivée.
-	ollamaBaseURL := cfg.OllamaBaseURL
-	if cfg.DockerLLM {
-		ollamaBaseURL = DockerOllamaBaseURL
-	}
-
 	env = append(env,
-		fmt.Sprintf("OLLAMA_BASE_URL=%s", ollamaBaseURL),
+		fmt.Sprintf("OLLAMA_BASE_URL=%s", EffectiveOllamaBaseURL(cfg)),
 		fmt.Sprintf("OLLAMA_MODEL=%s", cfg.OllamaModel),
 		fmt.Sprintf("OLLAMA_TIMEOUT_S=%.0f", cfg.TimeoutS),
 		fmt.Sprintf("MOCK_AI=%s", mockAIStr),
@@ -362,23 +357,41 @@ func (p *PythonClient) SaveMarkdownFile(filename, content string) error {
 
 // IsDockerLLM indique si le mode Docker LLM est activé.
 func (p *PythonClient) IsDockerLLM() bool {
-	return false
+	return ReadDockerLLMSettingFromEnv(p.appRoot)
 }
 
-// StartDockerOllama lance le conteneur Ollama via docker compose.
-func (p *PythonClient) StartDockerOllama() (*models.ActionResult, error) {
+// runDockerCompose exécute une commande docker compose depuis la racine de
+// l'application et normalise les erreurs (binaire absent, sortie vide, etc.).
+func (p *PythonClient) runDockerCompose(args ...string) (*models.ActionResult, error) {
 	composeFile := filepath.Join(p.appRoot, "docker-compose.yml")
 	if _, err := os.Stat(composeFile); err != nil {
 		return nil, fmt.Errorf("fichier docker-compose.yml introuvable à la racine de l'application : %s", composeFile)
 	}
 
-	cmd := exec.Command("docker", "compose", "-f", composeFile, "up", "-d")
+	cmdArgs := append([]string{"compose", "-f", composeFile}, args...)
+	cmd := exec.Command("docker", cmdArgs...)
+	cmd.Dir = p.appRoot
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		detail := strings.TrimSpace(string(output))
+		if detail == "" {
+			detail = err.Error()
+		}
+		action := "lancement"
+		if len(args) > 0 && args[0] == "down" {
+			action = "arrêt"
+		}
 		return &models.ActionResult{
 			Success: false,
-			Error:   fmt.Sprintf("échec du lancement du conteneur Ollama : %s", string(output)),
+			Error:   fmt.Sprintf("échec du %s du conteneur Ollama : %s", action, detail),
 		}, err
+	}
+
+	if len(args) > 0 && args[0] == "down" {
+		return &models.ActionResult{
+			Success: true,
+			Message: "Conteneur Ollama arrêté.",
+		}, nil
 	}
 
 	return &models.ActionResult{
@@ -387,26 +400,14 @@ func (p *PythonClient) StartDockerOllama() (*models.ActionResult, error) {
 	}, nil
 }
 
+// StartDockerOllama lance le conteneur Ollama via docker compose.
+func (p *PythonClient) StartDockerOllama() (*models.ActionResult, error) {
+	return p.runDockerCompose("up", "-d")
+}
+
 // StopDockerOllama arrête le conteneur Ollama via docker compose.
 func (p *PythonClient) StopDockerOllama() (*models.ActionResult, error) {
-	composeFile := filepath.Join(p.appRoot, "docker-compose.yml")
-	if _, err := os.Stat(composeFile); err != nil {
-		return nil, fmt.Errorf("fichier docker-compose.yml introuvable à la racine de l'application : %s", composeFile)
-	}
-
-	cmd := exec.Command("docker", "compose", "-f", composeFile, "down")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return &models.ActionResult{
-			Success: false,
-			Error:   fmt.Sprintf("échec de l'arrêt du conteneur Ollama : %s", string(output)),
-		}, err
-	}
-
-	return &models.ActionResult{
-		Success: true,
-		Message: "Conteneur Ollama arrêté.",
-	}, nil
+	return p.runDockerCompose("down")
 }
 
 // SaveConfigWithDockerLLM persiste la configuration avec l'option USE_DOCKER_LLM explicite.

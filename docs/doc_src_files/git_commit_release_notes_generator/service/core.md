@@ -17,7 +17,7 @@ Ce module constitue le point d'entrée exécutable sous forme de sous-processus 
 2. **Logs et diagnostics sur `stderr`** : toutes les traces, messages d'information et erreurs passent exclusivement par le module `logging` sur `sys.stderr`.
 3. **Résilience sans crash** : toutes les exceptions sont interceptées pour renvoyer un JSON d'erreur propre `{"success": false, "error": "..."}`.
 
-## Les 9 actions gérées (`--action <NOM>`)
+## Les 10 actions gérées (`--action <NOM>`)
 
 | `--action` | Arguments | Format de sortie JSON | Rôle et source des données |
 |---|---|---|---|
@@ -30,6 +30,7 @@ Ce module constitue le point d'entrée exécutable sous forme de sous-processus 
 | `release-notes` | `--repo`, `--from`, `--to` | `{"success", "from_tag", "to_tag", "markdown", "commit_count"}` | Synthèse Markdown des commits entre deux révisions via le LLM ; échec explicite (`success=False`) si l'appel échoue, aucun repli silencieux |
 | `save-config` | `--base-url`, `--model`, `--timeout`, `--language` | `{"success", "message"}` | Notification de sauvegarde de configuration |
 | `ping-ollama` | — | `{"success", "reachable", "latency_ms", "installed_models"}` | Vérification HTTP de joignabilité et des modèles disponibles sur Ollama |
+| `check-env` | — | `{"success", "version", "executable", "status"}` | Vérification de l'intégrité de l'environnement Python et du module applicatif |
 
 ## Fonctions clés
 

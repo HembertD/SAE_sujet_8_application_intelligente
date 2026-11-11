@@ -283,3 +283,11 @@ def test_action_ping_ollama_unreachable():
         assert result["reachable"] is False
         assert result["installed_models"] == []
         assert "error" in result
+
+
+def test_action_check_env():
+    result = core.action_check_env()
+    assert result["success"] is True
+    assert "version" in result
+    assert "executable" in result
+    assert result["status"] == "ready"

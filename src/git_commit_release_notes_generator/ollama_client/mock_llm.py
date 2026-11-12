@@ -73,6 +73,7 @@ def mock_ping() -> dict:
         "reachable": True,
         "latency_ms": 10,
         "installed_models": [
+            "gemma4:26b",
             "gemma4:12b",
             "mistral:latest",
             "codellama:7b",

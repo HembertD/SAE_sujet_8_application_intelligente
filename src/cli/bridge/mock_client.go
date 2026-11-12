@@ -175,11 +175,11 @@ func (m *MockClient) GenerateCommit(feedback string) (*models.CommitProposal, er
 	}
 
 	return &models.CommitProposal{
-		Success: true,
-		Type:    "feat",
-		Scope:   "auth",
-		Subject: "ajout de l'authentification OAuth2 sécurisée",
-		Body:    "Intègre la gestion des jetons d'accès et filtre automatiquement les variables d'environnement sensibles.",
+		Success:      true,
+		Type:         "feat",
+		Scope:        "auth",
+		Subject:      "ajout de l'authentification OAuth2 sécurisée",
+		Body:         "Intègre la gestion des jetons d'accès et filtre automatiquement les variables d'environnement sensibles.",
 		RawFormatted: "feat(auth): ajout de l'authentification OAuth2 sécurisée\n\nIntègre la gestion des jetons d'accès et filtre automatiquement les variables d'environnement sensibles.",
 	}, nil
 }
@@ -276,6 +276,7 @@ func (m *MockClient) PingOllama() (*models.PingResponse, error) {
 		Reachable: true,
 		LatencyMs: 42,
 		InstalledModels: []string{
+			"gemma4:26b",
 			"gemma4:12b",
 			"mistral:latest",
 			"codellama:7b",

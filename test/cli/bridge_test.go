@@ -237,7 +237,7 @@ func TestBridgeClientSwitching(t *testing.T) {
 	}
 
 	// Activation du mode démo
-	res, err := bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, true)
+	res, err := bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:26b", 60, true)
 	if err != nil || !res.Success {
 		t.Fatalf("SaveConfig échoué : %v", err)
 	}
@@ -248,7 +248,7 @@ func TestBridgeClientSwitching(t *testing.T) {
 	}
 
 	// Bascule inverse
-	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, false)
+	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:26b", 60, false)
 	if err != nil {
 		t.Fatalf("SaveConfig échoué : %v", err)
 	}
@@ -257,7 +257,7 @@ func TestBridgeClientSwitching(t *testing.T) {
 	}
 
 	// Test de sauvegarde conjointe de MockInterface et MockAI
-	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, false, true)
+	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:26b", 60, false, true)
 	if err != nil {
 		t.Fatalf("SaveConfig échoué avec MockAI : %v", err)
 	}
@@ -372,7 +372,7 @@ func TestAppEnvNeverInSrc(t *testing.T) {
 	})
 
 	forcedSrcPath := filepath.Join(root, "src", ".env")
-	err := bridge.WriteEnvFile(forcedSrcPath, "http://localhost:11434", "gemma4:12b", 30.0, true)
+	err := bridge.WriteEnvFile(forcedSrcPath, "http://localhost:11434", "gemma4:26b", 30.0, true)
 	if err != nil {
 		t.Fatalf("WriteEnvFile a échoué: %v", err)
 	}
@@ -533,7 +533,7 @@ func TestWriteEnvFilePreserveDockerLLM(t *testing.T) {
 	dir := t.TempDir()
 	envPath := filepath.Join(dir, ".env")
 
-	if err := bridge.WriteEnvFileWithDockerLLM(envPath, "http://remote:11434", "gemma4:12b", 300, false, true); err != nil {
+	if err := bridge.WriteEnvFileWithDockerLLM(envPath, "http://remote:11434", "gemma4:26b", 300, false, true); err != nil {
 		t.Fatalf("WriteEnvFileWithDockerLLM(true) : %v", err)
 	}
 	content, err := os.ReadFile(envPath)
@@ -545,7 +545,7 @@ func TestWriteEnvFilePreserveDockerLLM(t *testing.T) {
 	}
 
 	// L'ancienne signature WriteEnvFile ne doit pas écraser le réglage existant
-	if err := bridge.WriteEnvFile(envPath, "http://remote:11434", "gemma4:12b", 300, false); err != nil {
+	if err := bridge.WriteEnvFile(envPath, "http://remote:11434", "gemma4:26b", 300, false); err != nil {
 		t.Fatalf("WriteEnvFile : %v", err)
 	}
 	content, err = os.ReadFile(envPath)
@@ -557,7 +557,7 @@ func TestWriteEnvFilePreserveDockerLLM(t *testing.T) {
 	}
 
 	// La variante explicite doit pouvoir le désactiver
-	if err := bridge.WriteEnvFileWithDockerLLM(envPath, "http://remote:11434", "gemma4:12b", 300, false, false); err != nil {
+	if err := bridge.WriteEnvFileWithDockerLLM(envPath, "http://remote:11434", "gemma4:26b", 300, false, false); err != nil {
 		t.Fatalf("WriteEnvFileWithDockerLLM(false) : %v", err)
 	}
 	content, err = os.ReadFile(envPath)

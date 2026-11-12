@@ -25,8 +25,8 @@ for i in $(seq 1 30); do
 done
 
 # Modèle cible : celui du .env applicatif (propagé par docker compose),
-# sinon gemma4:12b par défaut.
-TARGET_MODEL="${OLLAMA_MODEL:-gemma4:12b}"
+# sinon gemma4:26b (modèle de référence IUT) par défaut.
+TARGET_MODEL="${OLLAMA_MODEL:-gemma4:26b}"
 
 # Télécharge le modèle configuré s'il n'est pas déjà présent
 if ! ollama list | awk 'NR > 1 {print $1}' | grep -qx "$TARGET_MODEL"; then

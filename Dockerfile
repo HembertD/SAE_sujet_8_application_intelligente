@@ -4,9 +4,10 @@
 
 FROM ollama/ollama:latest
 
-# Modèle par défaut si OLLAMA_MODEL n'est pas fourni (docker compose le
-# surcharge avec la valeur du .env applicatif).
-ENV OLLAMA_MODEL=gemma4:12b
+# Modèle de référence par défaut si OLLAMA_MODEL n'est pas fourni. Docker
+# Compose le surcharge avec la valeur du .env applicatif ; pour un mode Docker
+# local sur une machine limitée, utiliser par exemple gemma4:12b dans le .env.
+ENV OLLAMA_MODEL=gemma4:26b
 
 # Copie le script d'initialisation qui démarre Ollama et télécharge le modèle
 COPY entrypoint.sh /entrypoint.sh

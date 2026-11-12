@@ -188,7 +188,7 @@ func TestReadWriteNotificationsSetting(t *testing.T) {
 
 	// 4. Préservation lors de WriteEnvFile
 	envPath := filepath.Join(tempDir, ".env")
-	err = bridge.WriteEnvFile(envPath, "http://localhost:11434", "gemma4:12b", 120.0, false)
+	err = bridge.WriteEnvFile(envPath, "http://localhost:11434", "gemma4:26b", 120.0, false)
 	if err != nil {
 		t.Fatalf("WriteEnvFile échoué : %v", err)
 	}

@@ -171,4 +171,4 @@ def test_core_action_ping_ollama_with_mock_ai():
         res = core.action_ping_ollama()
         assert res["success"] is True
         assert res["reachable"] is True
-        assert "gemma4:12b" in res["installed_models"]
+        assert "gemma4:26b" in res["installed_models"]

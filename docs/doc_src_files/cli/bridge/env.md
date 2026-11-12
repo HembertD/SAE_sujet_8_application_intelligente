@@ -10,8 +10,8 @@ Ce module isole l'ensemble de la logique de localisation, de lecture et d'écrit
 
 - **Localisation stricte de la racine applicative (`FindAppRoot`)** : exploration hiérarchique ascendante combinant `runtime.Caller`, `os.Executable` et `os.Getwd` pour déterminer l'emplacement physique du dépôt applicatif, indépendamment du dépôt Git cible analysé (`--repo`).
 - **Garantie d'emplacement (`FindAppEnvPath`)** : renvoie l'emplacement unique `<racine_projet>/.env`. Élimine tout sous-chemin `src/` ou `cli/` pour empêcher la création ou lecture d'un `.env` dans les sous-dossiers.
-- **Lecture typée (`LoadConfigFromEnv`)** : parse les variables `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT_S`, `MOCK_INTERFACE`, `MOCK_AI`, `USE_DOCKER_LLM` et `ENABLE_NOTIFICATIONS` avec valeurs par défaut de repli sécurisées.
-- **Résolution de l'interpréteur Python (`ReadPythonBinFromEnv`)** : lit `PYTHON_BIN` (variable système prioritaire, puis `.env` applicatif), consommée par `python_client.go` pour choisir l'interpréteur sans dépendre d'un chemin codé en dur.
+- **Lecture typée (`LoadConfigFromEnv`)** : parse les variables `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT_S`, `MOCK_INTERFACE`, `MOCK_AI`, `USE_DOCKER_LLM` et `ENABLE_NOTIFICATIONS`, ainsi que `PYTHON_BIN`, et résout l'interpréteur actif (`ResolvedPythonBin`).
+- **Résolution et mise à jour de l'interpréteur Python (`ReadPythonBinFromEnv`, `WritePythonBinSetting`)** : lit et écrit `PYTHON_BIN` dans le fichier `.env` applicatif et synchronise la variable d'environnement du processus (`os.Setenv`/`os.Unsetenv`). Permet de basculer à chaud entre un interpréteur dédié et la détection automatique du `.venv`.
 - **Persistance atomique (`WriteEnvFile` / `WriteEnvFileWithDockerLLM` / `WriteNotificationsSetting`)** : sauvegarde à chaud les réglages dans le `.env` à la racine de l'application (y compris `MOCK_INTERFACE`, `MOCK_AI`, `USE_DOCKER_LLM` et `ENABLE_NOTIFICATIONS`), purge préventivement tout fichier `.env` ou `.env.exemple` résiduel dans `src/`, et **préserve** les paramètres non gérés par cet écran (ex: `OLLAMA_NUM_CTX`, `PYTHON_BIN`) au lieu de les écraser silencieusement. `WriteEnvFile` (ancienne signature sans paramètre Docker) relit la valeur existante de `USE_DOCKER_LLM` et la conserve au lieu de la forcer à `false`.
 - **Parsing booléen robuste (`ParseBoolFromString`)** : interprète les représentations usuelles (`true`, `1`, `yes`, `oui`, `false`, `0`, etc.).
 
@@ -45,6 +45,7 @@ Précisions issues des commentaires retirés de `env.go` :
 - `ReadMockAISettingFromEnv()` : Lit l'activation de la simulation IA depuis l'environnement.
 - `LoadConfigFromEnv()` : Charge la configuration complète depuis le .env applicatif.
 - `ReadPythonBinFromEnv()` : Lit l'interpréteur Python explicitement configuré, sinon chaîne vide.
+- `WritePythonBinSetting()` : Enregistre ou réinitialise la variable PYTHON_BIN dans le .env applicatif.
 - `WriteEnvFile()` : Écrit la configuration dans le fichier .env applicatif en **conservant** la valeur existante de `USE_DOCKER_LLM` (le mode Docker ou le serveur IUT n'est donc pas changé par une simple sauvegarde de configuration).
 - `WriteEnvFileWithDockerLLM()` : Écrit la configuration avec la valeur explicite de USE_DOCKER_LLM.
 - `ReadDockerLLMSettingFromEnv()` : Lit l'activation du serveur Ollama via Docker depuis l'environnement.

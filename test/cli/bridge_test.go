@@ -2,8 +2,10 @@ package cli_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -138,6 +140,15 @@ func TestMockClientBasics(t *testing.T) {
 	ping, err := mock.PingOllama()
 	if err != nil || !ping.Reachable || len(ping.InstalledModels) == 0 {
 		t.Errorf("erreur PingOllama : %v, ping: %+v", err, ping)
+	}
+
+	// 10. GetRecentCommits
+	commits, err := mock.GetRecentCommits(0)
+	if err != nil || !commits.Success || len(commits.Commits) == 0 {
+		t.Fatalf("erreur GetRecentCommits : %v, commits: %+v", err, commits)
+	}
+	if commits.Commits[0].Sha != "02b90a2" {
+		t.Errorf("premier commit inattendu : %+v", commits.Commits[0])
 	}
 }
 
@@ -306,6 +317,15 @@ func TestPythonClientRealIntegration(t *testing.T) {
 	}
 	if !ping.Success {
 		t.Errorf("attendu ping.Success == true")
+	}
+
+	// GetRecentCommits
+	commitsResp, errCommits := client.GetRecentCommits(5)
+	if errCommits != nil {
+		t.Fatalf("GetRecentCommits a échoué : %v", errCommits)
+	}
+	if !commitsResp.Success || len(commitsResp.Commits) == 0 {
+		t.Errorf("attendu liste de commits non vide, obtenu %+v", commitsResp)
 	}
 }
 
@@ -566,5 +586,270 @@ func TestWriteEnvFilePreserveDockerLLM(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "USE_DOCKER_LLM=false") {
 		t.Errorf("attendu USE_DOCKER_LLM=false, contenu :\n%s", content)
+	}
+}
+func TestReadWritePythonBinSetting(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Nettoyage préventif de toute variable d'environnement système
+	oldEnv := os.Getenv("PYTHON_BIN")
+	_ = os.Unsetenv("PYTHON_BIN")
+	defer func() {
+		if oldEnv != "" {
+			_ = os.Setenv("PYTHON_BIN", oldEnv)
+		} else {
+			_ = os.Unsetenv("PYTHON_BIN")
+		}
+	}()
+
+	// 1. Initialement vide
+	initial := bridge.ReadPythonBinFromEnv(tempDir)
+	if initial != "" {
+		t.Errorf("attendu PythonBin initial vide, obtenu '%s'", initial)
+	}
+
+	// 2. Écriture d'un chemin d'interpréteur
+	targetBin := "/opt/custom/python3"
+	err := bridge.WritePythonBinSetting(tempDir, targetBin)
+	if err != nil {
+		t.Fatalf("WritePythonBinSetting a échoué : %v", err)
+	}
+
+	readVal := bridge.ReadPythonBinFromEnv(tempDir)
+	if readVal != targetBin {
+		t.Errorf("ReadPythonBinFromEnv attendu '%s', obtenu '%s'", targetBin, readVal)
+	}
+
+	cfg := bridge.LoadConfigFromEnv(tempDir, false)
+	if cfg.PythonBin != targetBin {
+		t.Errorf("LoadConfigFromEnv.PythonBin attendu '%s', obtenu '%s'", targetBin, cfg.PythonBin)
+	}
+
+	// 3. Réinitialisation vers vide (détection auto)
+	err = bridge.WritePythonBinSetting(tempDir, "")
+	if err != nil {
+		t.Fatalf("WritePythonBinSetting(vide) a échoué : %v", err)
+	}
+
+	readAfterReset := bridge.ReadPythonBinFromEnv(tempDir)
+	if readAfterReset != "" {
+		t.Errorf("attendu PythonBin vide après réinitialisation, obtenu '%s'", readAfterReset)
+	}
+}
+
+func TestResolvePythonBinPriority(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Nettoyage préventif de toute variable d'environnement système
+	oldEnv := os.Getenv("PYTHON_BIN")
+	_ = os.Unsetenv("PYTHON_BIN")
+	defer func() {
+		if oldEnv != "" {
+			_ = os.Setenv("PYTHON_BIN", oldEnv)
+		} else {
+			_ = os.Unsetenv("PYTHON_BIN")
+		}
+	}()
+
+	// 1. Sans .venv ni PYTHON_BIN : échec explicite
+	_, err := bridge.ResolvePythonBin(tempDir)
+	if err == nil {
+		t.Errorf("attendu erreur lorsque aucun environnement Python n'est présent")
+	}
+
+	// 2. Avec un faux .venv créé
+	venvDir := filepath.Join(tempDir, ".venv", "bin")
+	if runtime.GOOS == "windows" {
+		venvDir = filepath.Join(tempDir, ".venv", "Scripts")
+	}
+	if errMkdir := os.MkdirAll(venvDir, 0755); errMkdir != nil {
+		t.Fatalf("MkdirAll a échoué : %v", errMkdir)
+	}
+	fakePy := filepath.Join(venvDir, "python")
+	if runtime.GOOS == "windows" {
+		fakePy = filepath.Join(venvDir, "python.exe")
+	}
+	if errWrite := os.WriteFile(fakePy, []byte("#!/bin/sh\n"), 0755); errWrite != nil {
+		t.Fatalf("WriteFile faux python a échoué : %v", errWrite)
+	}
+
+	resolved, errResolved := bridge.ResolvePythonBin(tempDir)
+	if errResolved != nil {
+		t.Fatalf("ResolvePythonBin avec .venv a échoué : %v", errResolved)
+	}
+	if resolved != fakePy {
+		t.Errorf("ResolvePythonBin attendu '%s', obtenu '%s'", fakePy, resolved)
+	}
+
+	// 3. Avec PYTHON_BIN explicite qui surcharge le .venv
+	customBin := "/usr/local/bin/python3-custom"
+	if errWriteEnv := bridge.WritePythonBinSetting(tempDir, customBin); errWriteEnv != nil {
+		t.Fatalf("WritePythonBinSetting a échoué : %v", errWriteEnv)
+	}
+
+	resolvedCustom, errCustom := bridge.ResolvePythonBin(tempDir)
+	if errCustom != nil {
+		t.Fatalf("ResolvePythonBin avec customBin a échoué : %v", errCustom)
+	}
+	if resolvedCustom != customBin {
+		t.Errorf("attendu customBin prioritaire '%s', obtenu '%s'", customBin, resolvedCustom)
+	}
+}
+
+func TestVerifyPythonEnvironmentReal(t *testing.T) {
+	appRoot := bridge.FindAppRoot()
+
+	report, err := bridge.VerifyPythonEnvironment(appRoot)
+	if err != nil {
+		t.Fatalf("VerifyPythonEnvironment a échoué sur appRoot : %v", err)
+	}
+
+	if !report.Success {
+		t.Errorf("attendu report.Success == true, obtenu false (missing: %v, appLoadError: %s)", report.MissingDeps, report.AppLoadError)
+	}
+	if report.Version == "" {
+		t.Errorf("attendu version Python non vide")
+	}
+	if report.Executable == "" {
+		t.Errorf("attendu executable Python non vide")
+	}
+
+	// CheckPythonEnvironment doit réussir sans erreur
+	if errCheck := bridge.CheckPythonEnvironment(appRoot); errCheck != nil {
+		t.Errorf("CheckPythonEnvironment a échoué inopinément : %v", errCheck)
+	}
+}
+
+func TestVerifyPythonEnvironmentInvalid(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Nettoyage préventif de toute variable d'environnement système
+	oldEnv := os.Getenv("PYTHON_BIN")
+	_ = os.Unsetenv("PYTHON_BIN")
+	defer func() {
+		if oldEnv != "" {
+			_ = os.Setenv("PYTHON_BIN", oldEnv)
+		} else {
+			_ = os.Unsetenv("PYTHON_BIN")
+		}
+	}()
+
+	// 1. Sans aucun environnement Python
+	_, err := bridge.VerifyPythonEnvironment(tempDir)
+	if err == nil {
+		t.Errorf("attendu erreur pour VerifyPythonEnvironment sans environnement")
+	}
+
+	// 2. Avec un faux exécutable qui échoue
+	venvDir := filepath.Join(tempDir, ".venv", "bin")
+	if runtime.GOOS == "windows" {
+		venvDir = filepath.Join(tempDir, ".venv", "Scripts")
+	}
+	_ = os.MkdirAll(venvDir, 0755)
+	fakePy := filepath.Join(venvDir, "python")
+	if runtime.GOOS == "windows" {
+		fakePy = filepath.Join(venvDir, "python.exe")
+	}
+	_ = os.WriteFile(fakePy, []byte("#!/bin/sh\necho 'crash'\nexit 1\n"), 0755)
+
+	_, errInvalid := bridge.VerifyPythonEnvironment(tempDir)
+	if errInvalid == nil {
+		t.Errorf("attendu erreur pour VerifyPythonEnvironment avec exécutable défaillant")
+	}
+}
+
+func TestVerifyPythonEnvironmentMissingDep(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Nettoyage préventif de toute variable d'environnement système
+	oldEnv := os.Getenv("PYTHON_BIN")
+	_ = os.Unsetenv("PYTHON_BIN")
+	defer func() {
+		if oldEnv != "" {
+			_ = os.Setenv("PYTHON_BIN", oldEnv)
+		} else {
+			_ = os.Unsetenv("PYTHON_BIN")
+		}
+	}()
+
+	// Simule un script python qui renvoie missing_deps: ["git"]
+	venvDir := filepath.Join(tempDir, ".venv", "bin")
+	if runtime.GOOS == "windows" {
+		venvDir = filepath.Join(tempDir, ".venv", "Scripts")
+	}
+	_ = os.MkdirAll(venvDir, 0755)
+	fakePy := filepath.Join(venvDir, "python")
+	if runtime.GOOS == "windows" {
+		fakePy = filepath.Join(venvDir, "python.exe")
+	}
+	mockOutput := `{"executable": "/bin/mock", "version": "3.12.0", "missing_deps": ["git"], "app_load_error": "", "success": false}`
+	_ = os.WriteFile(fakePy, []byte(fmt.Sprintf("#!/bin/sh\necho '%s'\n", mockOutput)), 0755)
+
+	report, err := bridge.VerifyPythonEnvironment(tempDir)
+	if err != nil {
+		t.Fatalf("VerifyPythonEnvironment inattendu err: %v", err)
+	}
+	if report.Success {
+		t.Errorf("attendu report.Success == false quand missing_deps est non vide")
+	}
+	if len(report.MissingDeps) != 1 || report.MissingDeps[0] != "git" {
+		t.Errorf("attendu missing_deps=[git], obtenu %v", report.MissingDeps)
+	}
+
+	// CheckPythonEnvironment doit échouer avec l'erreur explicite
+	errCheck := bridge.CheckPythonEnvironment(tempDir)
+	if errCheck == nil {
+		t.Errorf("attendu erreur pour CheckPythonEnvironment quand dépendances manquantes")
+	}
+}
+
+func TestVerifyPythonCandidate(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// 1. Candidat introuvable
+	_, errNotFound := bridge.VerifyPythonCandidate(tempDir, "/chemin/inexistant/vers/python", false)
+	if errNotFound == nil {
+		t.Errorf("attendu erreur pour binaire inexistant")
+	}
+
+	// 2. Mode auto sans .venv
+	_, errAutoNoVenv := bridge.VerifyPythonCandidate(tempDir, "", true)
+	if errAutoNoVenv == nil {
+		t.Errorf("attendu erreur pour mode auto sans .venv")
+	}
+
+	// 3. Candidat valide simulé
+	fakeValidPy := filepath.Join(tempDir, "fake_valid_python")
+	if runtime.GOOS == "windows" {
+		fakeValidPy = filepath.Join(tempDir, "fake_valid_python.exe")
+	}
+	validOutput := `{"executable": "/bin/python3", "version": "3.12.0", "missing_deps": [], "app_load_error": "", "success": true}`
+	_ = os.WriteFile(fakeValidPy, []byte(fmt.Sprintf("#!/bin/sh\necho '%s'\n", validOutput)), 0755)
+
+	reportValid, errValid := bridge.VerifyPythonCandidate(tempDir, fakeValidPy, false)
+	if errValid != nil {
+		t.Fatalf("VerifyPythonCandidate valide inattendu err : %v", errValid)
+	}
+	if !reportValid.Success {
+		t.Errorf("attendu Success == true pour candidat valide")
+	}
+
+	// 4. Candidat avec dépendances manquantes
+	fakeInvalidPy := filepath.Join(tempDir, "fake_invalid_python")
+	if runtime.GOOS == "windows" {
+		fakeInvalidPy = filepath.Join(tempDir, "fake_invalid_python.exe")
+	}
+	invalidOutput := `{"executable": "/bin/python3", "version": "3.12.0", "missing_deps": ["yaml", "git"], "app_load_error": "", "success": false}`
+	_ = os.WriteFile(fakeInvalidPy, []byte(fmt.Sprintf("#!/bin/sh\necho '%s'\n", invalidOutput)), 0755)
+
+	reportInvalid, errInvalid := bridge.VerifyPythonCandidate(tempDir, fakeInvalidPy, false)
+	if errInvalid != nil {
+		t.Fatalf("VerifyPythonCandidate invalide inattendu err : %v", errInvalid)
+	}
+	if reportInvalid.Success {
+		t.Errorf("attendu Success == false quand dépendances manquantes")
+	}
+	if len(reportInvalid.MissingDeps) != 2 {
+		t.Errorf("attendu 2 dépendances manquantes, obtenu %v", reportInvalid.MissingDeps)
 	}
 }

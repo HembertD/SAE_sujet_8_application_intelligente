@@ -23,6 +23,12 @@ Ce fichier contient la suite de tests automatisés validant le pont Go ↔ Pytho
 13. **`TestEffectiveOllamaBaseURL`** : vérifie le choix de l'URL Ollama (`localhost:11434` en mode Docker, URL du `.env` sinon, chaîne vide pour une config nulle).
 14. **`TestReadDockerLLMSettingFromEnvPriorite`** : valide la priorité variable d'environnement > `.env` pour `USE_DOCKER_LLM`, ainsi que la lecture par `PythonClient.IsDockerLLM`.
 15. **`TestWriteEnvFilePreserveDockerLLM`** : vérifie l'écriture explicite de `USE_DOCKER_LLM` (true/false) et sa préservation par l'ancienne signature `WriteEnvFile`.
+16. **`TestReadWritePythonBinSetting`** : valide l'écriture de `PYTHON_BIN`, sa relecture dans `ConfigResponse`, et sa réinitialisation vers la détection automatique.
+17. **`TestResolvePythonBinPriority`** : valide l'ordre de priorité strict de résolution (`PYTHON_BIN` surcharge `.venv`, et échec explicite sans repli silencieux si aucun environnement n'est configuré).
+18. **`TestVerifyPythonEnvironmentReal`** : valide l'exécution de la sonde complète sur l'environnement applicatif réel (présence des dépendances, absence d'erreur d'import et succès global).
+19. **`TestVerifyPythonEnvironmentInvalid`** : vérifie la détection d'erreur lorsqu'aucun environnement n'est configuré ou lorsqu'un binaire Python plante.
+20. **`TestVerifyPythonEnvironmentMissingDep`** : vérifie la détection explicite d'une dépendance manquante (`missing_deps`) et le blocage immédiat par `CheckPythonEnvironment`.
+21. **`TestVerifyPythonCandidate`** : vérifie la validation stricte d'un candidat avant modification de la configuration (rejet des binaires introuvables, des dépendances manquantes et validation des environnements intègres).
 
 ## Exécution des tests
 

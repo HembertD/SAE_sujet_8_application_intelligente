@@ -3,6 +3,9 @@ package views
 import (
 	"bufio"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -53,6 +56,21 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		}
 		lines = append(lines, fmt.Sprintf("  • %sNotifications IA%s  : %s%s%s", ui.Bold, ui.Reset, notifColor, notifStatus, ui.Reset))
 
+		pyInterpDisplay := "Non détecté"
+		if cfg.PythonBin != "" {
+			pyInterpDisplay = fmt.Sprintf("%s (PYTHON_BIN)", cfg.PythonBin)
+		} else if cfg.ResolvedPythonBin != "" {
+			appRoot := bridge.FindAppRoot()
+			displayPath := cfg.ResolvedPythonBin
+			if strings.HasPrefix(displayPath, appRoot) {
+				if rel, errRel := filepath.Rel(appRoot, displayPath); errRel == nil {
+					displayPath = "./" + rel
+				}
+			}
+			pyInterpDisplay = fmt.Sprintf("%s (auto .venv)", displayPath)
+		}
+		lines = append(lines, fmt.Sprintf("  • %sInterpréteur Python%s: %s%s%s", ui.Bold, ui.Reset, ui.Cyan, pyInterpDisplay, ui.Reset))
+
 		if devMode {
 			mockInterfaceColor := ui.Green
 			mockInterfaceStatus := "Désactivé"
@@ -79,10 +97,11 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 
 		fmt.Println(ui.Bold + "  Actions disponibles :" + ui.Reset)
 		fmt.Printf("    %s[T]%s 📡 Tester la connexion Ollama (Ping & modèles disponibles)\n", ui.Cyan+ui.Bold, ui.Reset)
+		fmt.Printf("    %s[P]%s 🐍 Vérification de l'environnement Python (dépendances & intégrité)\n", ui.Yellow+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[M]%s ✏️  Modifier les paramètres et sauvegarder dans le .env\n", ui.Green+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[R]%s 🚪 Retour au menu principal\n\n", ui.Red+ui.Bold, ui.Reset)
 
-		prompt := fmt.Sprintf("  %s👉 Votre choix (T/M/R) :%s ", ui.Bold+ui.Yellow, ui.Reset)
+		prompt := fmt.Sprintf("  %s👉 Votre choix (T/P/M/R) :%s ", ui.Bold+ui.Yellow, ui.Reset)
 		choice, err := ReadChoice(reader, prompt)
 		if err != nil {
 			return
@@ -116,6 +135,36 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 					}
 					fmt.Println()
 				}
+			}
+			waitForEnter(reader)
+
+		case "P":
+			spinner := ui.NewSpinner("Vérification approfondie de l'environnement Python et des dépendances...")
+			spinner.Start()
+			report, errVerify := bridge.VerifyPythonEnvironment("")
+			spinner.Stop("")
+
+			if errVerify != nil || (report != nil && !report.Success) {
+				mainMsg := "Environnement Python invalide."
+				var hints []string
+				if errVerify != nil {
+					mainMsg = fmt.Sprintf("Environnement Python invalide : %s", errVerify.Error())
+				} else if report != nil {
+					if len(report.MissingDeps) > 0 {
+						mainMsg = fmt.Sprintf("Environnement Python invalide : dépendance(s) manquante(s) : %s", strings.Join(report.MissingDeps, ", "))
+					} else if report.AppLoadError != "" {
+						mainMsg = fmt.Sprintf("Environnement Python invalide : %s", report.AppLoadError)
+					}
+				}
+				hints = append(hints, "Pour installer les dépendances requises : python scripts/setup_python_env.py")
+				hints = append(hints, "Pour modifier l'interpréteur ciblé : option [M] Modifier ou définir PYTHON_BIN dans le .env")
+				ui.PrintErrorCard("Environnement Python Invalide", mainMsg, hints...)
+			} else {
+				ui.PrintSuccess(fmt.Sprintf("Environnement Python opérationnel et complet (Python %s)", report.Version))
+				fmt.Printf("    %sBinaire exécutable :%s %s%s%s\n", ui.Bold, ui.Reset, ui.Cyan, report.Executable, ui.Reset)
+				fmt.Printf("    %sMode d'attribution :%s %s%s%s\n", ui.Bold, ui.Reset, ui.Yellow, report.Mode, ui.Reset)
+				fmt.Printf("    %sDépendances requises :%s %sToutes installées (GitPython, PyYAML)%s\n", ui.Bold, ui.Reset, ui.Green, ui.Reset)
+				fmt.Printf("    %sChargement du backend :%s %sSuccès (git_commit_release_notes_generator)%s\n\n", ui.Bold, ui.Reset, ui.Green, ui.Reset)
 			}
 			waitForEnter(reader)
 
@@ -158,6 +207,65 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 				_ = bridge.WriteNotificationsSetting("", cfg.EnableNotifications)
 			}
 
+			currentPyBinDisplay := cfg.PythonBin
+			if currentPyBinDisplay == "" {
+				currentPyBinDisplay = "auto"
+			}
+			fmt.Printf("  Interpréteur Python (PYTHON_BIN, 'auto' pour .venv) [%s] : ", currentPyBinDisplay)
+			newPyBin, _ := reader.ReadString('\n')
+			newPyBin = strings.TrimSpace(newPyBin)
+			pyBinUpdated := false
+			if newPyBin != "" {
+				isAuto := strings.ToLower(newPyBin) == "auto" || strings.ToLower(newPyBin) == "clear" || strings.ToLower(newPyBin) == "vide"
+				candidateBin := newPyBin
+				if isAuto {
+					candidateBin = ""
+				}
+
+				// Tolérance utilisateur : si le script d'activation 'activate' a été saisi
+				if !isAuto && filepath.Base(candidateBin) == "activate" {
+					companion := filepath.Join(filepath.Dir(candidateBin), "python")
+					if runtime.GOOS == "windows" {
+						companion = filepath.Join(filepath.Dir(candidateBin), "python.exe")
+					}
+					if fi, errStat := os.Stat(companion); errStat == nil && !fi.IsDir() {
+						candidateBin = companion
+					}
+				}
+
+				// Vérification préalable systématique avant acceptation de la modification
+				spinnerCheck := ui.NewSpinner("Vérification de l'interpréteur Python candidat...")
+				spinnerCheck.Start()
+				report, errCheck := bridge.VerifyPythonCandidate("", candidateBin, isAuto)
+				spinnerCheck.Stop("")
+
+				if errCheck != nil || (report != nil && !report.Success) {
+					mainMsg := "Environnement Python invalide."
+					if errCheck != nil {
+						mainMsg = fmt.Sprintf("Environnement Python invalide : %s", errCheck.Error())
+					} else if report != nil && len(report.MissingDeps) > 0 {
+						mainMsg = fmt.Sprintf("Environnement Python invalide : dépendance(s) manquante(s) : %s", strings.Join(report.MissingDeps, ", "))
+					} else if report != nil && report.AppLoadError != "" {
+						mainMsg = fmt.Sprintf("Environnement Python invalide : %s", report.AppLoadError)
+					}
+					ui.PrintErrorCard("Modification Python Refusée", mainMsg,
+						"L'interpréteur candidat ne respecte pas les prérequis applicatifs.",
+						"La modification est annulée : l'ancienne configuration Python est conservée sans modification.",
+					)
+				} else {
+					ui.PrintSuccess(fmt.Sprintf("Interpréteur candidat validé (Python %s) : prérequis satisfaits.", report.Version))
+					if isAuto {
+						if cfg.PythonBin != "" {
+							cfg.PythonBin = ""
+							pyBinUpdated = true
+						}
+					} else if candidateBin != cfg.PythonBin {
+						cfg.PythonBin = candidateBin
+						pyBinUpdated = true
+					}
+				}
+			}
+
 			if devMode {
 				fmt.Printf("  Mock Interface (true/false) [%t] : ", cfg.MockInterface)
 				newMockInterfaceStr, _ := reader.ReadString('\n')
@@ -187,6 +295,9 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			spinnerSave := ui.NewSpinner("Sauvegarde des paramètres dans le .env...")
 			spinnerSave.Start()
 			res, saveErr := client.SaveConfigWithDockerLLM(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.MockInterface, cfg.DockerLLM, cfg.MockAI)
+			if saveErr == nil && pyBinUpdated {
+				_ = bridge.WritePythonBinSetting("", cfg.PythonBin)
+			}
 			spinnerSave.Stop("")
 
 			if saveErr != nil {

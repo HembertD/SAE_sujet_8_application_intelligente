@@ -58,17 +58,35 @@ type ReleaseNotesResponse struct {
 	CommitCount int    `json:"commit_count"`
 }
 
+// CommitItem représente un commit dans l'historique Git.
+type CommitItem struct {
+	Sha     string `json:"sha"`
+	Message string `json:"message"`
+	Author  string `json:"author"`
+	Date    string `json:"date"`
+	Tag     string `json:"tag,omitempty"`
+}
+
+// CommitsResponse contient la liste des commits renvoyée par le backend Python.
+type CommitsResponse struct {
+	Success bool         `json:"success"`
+	Error   string       `json:"error,omitempty"`
+	Commits []CommitItem `json:"commits"`
+}
+
 // ConfigResponse contient les paramètres lus ou écrits dans le .env par Python.
 type ConfigResponse struct {
-	Success       bool    `json:"success"`
-	Error         string  `json:"error,omitempty"`
-	OllamaBaseURL string  `json:"ollama_base_url"`
-	OllamaModel   string  `json:"ollama_model"`
-	TimeoutS      float64 `json:"timeout_s"`
+	Success             bool    `json:"success"`
+	Error               string  `json:"error,omitempty"`
+	OllamaBaseURL       string  `json:"ollama_base_url"`
+	OllamaModel         string  `json:"ollama_model"`
+	TimeoutS            float64 `json:"timeout_s"`
 	MockInterface       bool    `json:"mock_interface"`
 	MockAI              bool    `json:"mock_ai"`
 	DockerLLM           bool    `json:"docker_llm"`
 	EnableNotifications bool    `json:"enable_notifications"`
+	PythonBin           string  `json:"python_bin,omitempty"`
+	ResolvedPythonBin   string  `json:"resolved_python_bin,omitempty"`
 }
 
 // PingResponse contient le diagnostic de joignabilité du serveur Ollama IUT.

@@ -285,6 +285,14 @@ def test_action_ping_ollama_unreachable():
         assert "error" in result
 
 
+def test_action_check_env():
+    result = core.action_check_env()
+    assert result["success"] is True
+    assert "version" in result
+    assert "executable" in result
+    assert result["status"] == "ready"
+
+
 def test_action_commits_success():
     mock_commits = [
         CommitInfo(sha="02b90a2", message="fix(cli): fiabiliser la saisie", author="Maxence", date="2026-10-16", tag="HEAD"),

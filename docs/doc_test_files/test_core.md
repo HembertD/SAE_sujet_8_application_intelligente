@@ -26,3 +26,4 @@ Ce fichier de test valide le comportement du module `git_commit_release_notes_ge
 16. **`test_action_save_config`** : vérifie la prise en compte de la notification de configuration.
 17. **`test_action_ping_ollama_reachable`** : simule une réponse positive d'Ollama avec latence et modèles installés.
 18. **`test_action_ping_ollama_unreachable`** : vérifie le retour propre en cas de défaillance réseau (`reachable = False`).
+19. **`test_action_check_env`** : vérifie la conformité de l'action de diagnostic d'intégrité de l'environnement (`version`, `executable`, statut `"ready"`).

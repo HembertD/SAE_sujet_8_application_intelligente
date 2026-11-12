@@ -325,6 +325,28 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
     }
 
 
+def action_commits(repo_path: str = ".", limit: int = 0) -> dict:
+    """Récupère l'historique complet ou récent des commits pour l'interface de sélection.
+
+    Format attendu côté Go :
+    {"success": bool, "commits": [{"sha", "message", "author", "date", "tag"}]}
+    """
+    try:
+        wrapper = GitWrapper(repo_path)
+        commits = wrapper.get_recent_commits(limit=limit)
+        return {
+            "success": True,
+            "commits": [c.to_dict() for c in commits],
+        }
+    except Exception as e:
+        logger.error(f"action_commits error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "commits": [],
+        }
+
+
 def action_save_config(base_url: str = "", model: str = "", timeout: str = "", language: str = "") -> dict:
     """Action de notification de la sauvegarde de configuration.
 
@@ -361,6 +383,7 @@ def main() -> None:
     parser.add_argument("--model", default="", help="Nom du modèle Ollama")
     parser.add_argument("--timeout", default="", help="Timeout en secondes")
     parser.add_argument("--language", default="", help="Langue de l'application")
+    parser.add_argument("--limit", type=int, default=0, help="Nombre maximal de commits à extraire (0 pour tous)")
 
     args = parser.parse_args()
 
@@ -371,6 +394,7 @@ def main() -> None:
         "generate-commit": lambda: action_generate_commit(args.repo, feedback=args.feedback),
         "apply-commit": lambda: action_apply_commit(args.repo, message=args.message),
         "push": lambda: action_push(args.repo),
+        "commits": lambda: action_commits(args.repo, limit=args.limit),
         "release-notes": lambda: action_release_notes(args.repo, from_tag=args.from_tag, to_tag=args.to_tag),
         "save-config": lambda: action_save_config(args.base_url, args.model, args.timeout),
         "ping-ollama": action_ping_ollama,

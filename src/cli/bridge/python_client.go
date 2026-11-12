@@ -541,9 +541,9 @@ func (p *PythonClient) IsDockerLLM() bool {
 	return ReadDockerLLMSettingFromEnv(p.appRoot)
 }
 
-// runDockerCompose exécute une commande docker compose depuis la racine de
-// l'application et normalise les erreurs (binaire absent, sortie vide, etc.).
-func (p *PythonClient) runDockerCompose(args ...string) (*models.ActionResult, error) {
+// dockerComposeOutput exécute une commande docker compose depuis la racine de
+// l'application et renvoie sa sortie brute.
+func (p *PythonClient) dockerComposeOutput(args ...string) ([]byte, error) {
 	composeFile := filepath.Join(p.appRoot, "docker-compose.yml")
 	if _, err := os.Stat(composeFile); err != nil {
 		return nil, fmt.Errorf("fichier docker-compose.yml introuvable à la racine de l'application : %s", composeFile)
@@ -552,7 +552,38 @@ func (p *PythonClient) runDockerCompose(args ...string) (*models.ActionResult, e
 	cmdArgs := append([]string{"compose", "-f", composeFile}, args...)
 	cmd := exec.Command("docker", cmdArgs...)
 	cmd.Dir = p.appRoot
-	output, err := cmd.CombinedOutput()
+	return cmd.CombinedOutput()
+}
+
+// DockerOllamaStatus vérifie si le conteneur Ollama du projet Compose est en
+// cours d'exécution. Une indisponibilité de Docker n'est pas une erreur fatale :
+// elle est exposée dans le champ Error pour que l'interface puisse l'afficher.
+func (p *PythonClient) DockerOllamaStatus() (*models.DockerStatusResponse, error) {
+	output, err := p.dockerComposeOutput("ps", "-q", "ollama")
+	if err != nil {
+		detail := strings.TrimSpace(string(output))
+		if detail == "" {
+			detail = err.Error()
+		}
+		return &models.DockerStatusResponse{
+			Success: false,
+			Running: false,
+			Error:   fmt.Sprintf("impossible de vérifier le conteneur Ollama : %s", detail),
+		}, nil
+	}
+
+	containerID := strings.TrimSpace(string(output))
+	return &models.DockerStatusResponse{
+		Success:     true,
+		Running:     containerID != "",
+		ContainerID: containerID,
+	}, nil
+}
+
+// runDockerCompose exécute une commande docker compose depuis la racine de
+// l'application et normalise les erreurs (binaire absent, sortie vide, etc.).
+func (p *PythonClient) runDockerCompose(args ...string) (*models.ActionResult, error) {
+	output, err := p.dockerComposeOutput(args...)
 	if err != nil {
 		detail := strings.TrimSpace(string(output))
 		if detail == "" {

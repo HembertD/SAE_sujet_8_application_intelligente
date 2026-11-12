@@ -44,6 +44,7 @@ type BackendClient interface {
 	SaveMarkdownFile(filename, content string) error
 	IsMock() bool
 	IsDockerLLM() bool
+	DockerOllamaStatus() (*models.DockerStatusResponse, error)
 	StartDockerOllama() (*models.ActionResult, error)
 	StopDockerOllama() (*models.ActionResult, error)
 }
@@ -224,6 +225,12 @@ func (b *BridgeClient) SaveConfigWithDockerLLM(baseURL, model string, timeout fl
 		Success: true,
 		Message: fmt.Sprintf("Configuration sauvegardée dans %s (USE_DOCKER_LLM=%t).", filepath.Base(envPath), dockerLLM),
 	}, nil
+}
+
+// DockerOllamaStatus interroge l'état du conteneur Ollama via le client actif.
+// En mode mock, l'état est simulé et aucune commande Docker n'est exécutée.
+func (b *BridgeClient) DockerOllamaStatus() (*models.DockerStatusResponse, error) {
+	return b.activeDelegate().DockerOllamaStatus()
 }
 
 // StartDockerOllama lance le conteneur Ollama via docker compose en déléguant

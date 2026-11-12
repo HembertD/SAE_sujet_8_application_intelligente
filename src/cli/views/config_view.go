@@ -32,6 +32,7 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			waitForEnter(reader)
 			return
 		}
+		dockerStatus, dockerStatusErr := client.DockerOllamaStatus()
 
 		var lines []string
 		lines = append(lines, "")
@@ -47,6 +48,17 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			dockerLLMStatus = "Activé"
 		}
 		lines = append(lines, fmt.Sprintf("  • %sLLM via Docker%s      : %s%s%s", ui.Bold, ui.Reset, dockerLLMColor, dockerLLMStatus, ui.Reset))
+
+		dockerContainerColor := ui.Dim
+		dockerContainerStatus := "Arrêté"
+		if dockerStatusErr != nil || dockerStatus == nil || !dockerStatus.Success {
+			dockerContainerColor = ui.Red
+			dockerContainerStatus = "Indisponible"
+		} else if dockerStatus.Running {
+			dockerContainerColor = ui.Green
+			dockerContainerStatus = "En cours"
+		}
+		lines = append(lines, fmt.Sprintf("  • %sConteneur Docker%s   : %s%s%s", ui.Bold, ui.Reset, dockerContainerColor, dockerContainerStatus, ui.Reset))
 
 		notifColor := ui.Green
 		notifStatus := "Désactivé"
@@ -99,9 +111,10 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		fmt.Printf("    %s[T]%s 📡 Tester la connexion Ollama (Ping & modèles disponibles)\n", ui.Cyan+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[P]%s 🐍 Vérification de l'environnement Python (dépendances & intégrité)\n", ui.Yellow+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[M]%s ✏️  Modifier les paramètres et sauvegarder dans le .env\n", ui.Green+ui.Bold, ui.Reset)
+		fmt.Printf("    %s[D]%s 🐳 Activer/Désactiver LLM Docker (démarre/arrête le conteneur)\n", ui.Magenta+ui.Bold, ui.Reset)
 		fmt.Printf("    %s[R]%s 🚪 Retour au menu principal\n\n", ui.Red+ui.Bold, ui.Reset)
 
-		prompt := fmt.Sprintf("  %s👉 Votre choix (T/P/M/R) :%s ", ui.Bold+ui.Yellow, ui.Reset)
+		prompt := fmt.Sprintf("  %s👉 Votre choix (T/P/M/D/R) :%s ", ui.Bold+ui.Yellow, ui.Reset)
 		choice, err := ReadChoice(reader, prompt)
 		if err != nil {
 			return
@@ -353,6 +366,10 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			}
 			waitForEnter(reader)
 
+		case "D":
+			toggleDockerLLM(reader, client, cfg)
+			waitForEnter(reader)
+
 		case "R":
 			return
 
@@ -361,4 +378,100 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			waitForEnter(reader)
 		}
 	}
+}
+
+// toggleDockerLLM active ou désactive le mode Docker et synchronise l'état du
+// conteneur Ollama sans passer par l'écran de modification [M].
+func toggleDockerLLM(reader *bufio.Reader, client bridge.BackendClient, cfg *models.ConfigResponse) {
+	targetEnabled := !cfg.DockerLLM
+
+	fmt.Println()
+	if targetEnabled {
+		fmt.Print(ui.Bold + "  🐳 Activer LLM via Docker et démarrer le conteneur Ollama ? (o/N) : " + ui.Reset)
+	} else {
+		fmt.Print(ui.Bold + "  🐳 Désactiver LLM via Docker et arrêter le conteneur Ollama ? (o/N) : " + ui.Reset)
+	}
+	answer, _ := reader.ReadString('\n')
+	answer = strings.ToLower(strings.TrimSpace(answer))
+	if answer != "o" && answer != "oui" {
+		return
+	}
+
+	status, statusErr := client.DockerOllamaStatus()
+	statusKnown := statusErr == nil && status != nil && status.Success
+
+	if targetEnabled {
+		if !statusKnown {
+			printDockerUnavailable(status, statusErr)
+			return
+		}
+		if !status.Running {
+			spinner := ui.NewSpinner("Lancement du conteneur Ollama via docker compose...")
+			spinner.Start()
+			res, dockerErr := client.StartDockerOllama()
+			spinner.Stop("")
+			if dockerErr != nil || res == nil || !res.Success {
+				ui.PrintErrorCard("Erreur Docker", fmt.Sprintf("Impossible de démarrer le conteneur Ollama : %s", dockerErrorDetail(res, dockerErr)))
+				return
+			}
+			ui.PrintSuccess(res.Message)
+		}
+	} else {
+		if statusKnown && status.Running {
+			spinner := ui.NewSpinner("Arrêt du conteneur Ollama via docker compose...")
+			spinner.Start()
+			res, dockerErr := client.StopDockerOllama()
+			spinner.Stop("")
+			if dockerErr != nil || res == nil || !res.Success {
+				ui.PrintErrorCard("Erreur Docker", fmt.Sprintf("Impossible d'arrêter le conteneur Ollama : %s", dockerErrorDetail(res, dockerErr)))
+				ui.PrintWarning("Le mode LLM via Docker reste activé car le conteneur n'a pas pu être arrêté.")
+				return
+			}
+			ui.PrintSuccess(res.Message)
+		} else if !statusKnown {
+			ui.PrintWarning("État du conteneur Docker indisponible : désactivation du mode sans arrêt du conteneur.")
+		}
+	}
+
+	resSave, saveErr := client.SaveConfigWithDockerLLM(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.MockInterface, targetEnabled, cfg.MockAI)
+	if saveErr != nil || resSave == nil {
+		detail := "réponse vide du backend"
+		if saveErr != nil {
+			detail = saveErr.Error()
+		}
+		ui.PrintErrorCard("Sauvegarde Impossible", fmt.Sprintf("Le conteneur a été mis à jour mais la configuration n'a pas pu être sauvegardée : %s", detail))
+		return
+	}
+	ui.PrintSuccess(resSave.Message)
+	if targetEnabled {
+		ui.PrintInfo(fmt.Sprintf("Premier lancement : le téléchargement du modèle %s peut prendre plusieurs minutes. Suivez la progression avec : docker compose logs -f ollama", cfg.OllamaModel))
+	}
+}
+
+// printDockerUnavailable affiche un diagnostic lorsque l'état du conteneur ne
+// peut pas être interrogé (Docker arrêté, binaire absent, compose manquant...).
+func printDockerUnavailable(status *models.DockerStatusResponse, statusErr error) {
+	detail := "Docker est peut-être arrêté ou non installé."
+	if statusErr != nil {
+		detail = statusErr.Error()
+	} else if status != nil && status.Error != "" {
+		detail = status.Error
+	}
+	ui.PrintErrorCard("Docker Indisponible",
+		"Impossible de vérifier l'état du conteneur Ollama.",
+		fmt.Sprintf("Détail technique : %s", detail),
+		"Vérifiez que Docker est installé et démarré : docker info",
+		"Vérifiez la présence de docker-compose.yml à la racine du projet",
+	)
+}
+
+// dockerErrorDetail extrait le message d'erreur le plus utile d'une action Docker.
+func dockerErrorDetail(res *models.ActionResult, err error) string {
+	if res != nil && res.Error != "" {
+		return res.Error
+	}
+	if err != nil {
+		return err.Error()
+	}
+	return "erreur inconnue"
 }

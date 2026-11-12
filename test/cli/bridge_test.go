@@ -481,6 +481,14 @@ func TestBridgeClientMockNeExecutePasDocker(t *testing.T) {
 	tempDir := t.TempDir()
 	client := bridge.NewBackendClient(tempDir, true, false)
 
+	status, err := client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus en mode mock ne doit pas échouer : %v", err)
+	}
+	if status == nil || !status.Success || status.Running {
+		t.Errorf("attendu un conteneur simulé arrêté, obtenu : %+v", status)
+	}
+
 	resStart, err := client.StartDockerOllama()
 	if err != nil {
 		t.Fatalf("StartDockerOllama en mode mock ne doit pas échouer : %v", err)
@@ -489,12 +497,70 @@ func TestBridgeClientMockNeExecutePasDocker(t *testing.T) {
 		t.Errorf("attendu un démarrage simulé en mode mock, obtenu : %+v", resStart)
 	}
 
+	status, err = client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus après démarrage : %v", err)
+	}
+	if status == nil || !status.Success || !status.Running {
+		t.Errorf("attendu un conteneur simulé en cours après démarrage, obtenu : %+v", status)
+	}
+
 	resStop, err := client.StopDockerOllama()
 	if err != nil {
 		t.Fatalf("StopDockerOllama en mode mock ne doit pas échouer : %v", err)
 	}
 	if resStop == nil || !resStop.Success || !strings.Contains(strings.ToLower(resStop.Message), "mock") {
 		t.Errorf("attendu un arrêt simulé en mode mock, obtenu : %+v", resStop)
+	}
+
+	status, err = client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus après arrêt : %v", err)
+	}
+	if status == nil || !status.Success || status.Running {
+		t.Errorf("attendu un conteneur simulé arrêté après arrêt, obtenu : %+v", status)
+	}
+}
+
+func TestPythonClientDockerOllamaStatus(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("script shell factice non portable sous Windows")
+	}
+
+	appRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(appRoot, "docker-compose.yml"), []byte("services: {}\n"), 0644); err != nil {
+		t.Fatalf("écriture docker-compose.yml : %v", err)
+	}
+
+	binDir := t.TempDir()
+	dockerScript := `#!/bin/sh
+if [ "$4" = "ps" ] && [ "$FAKE_DOCKER_RUNNING" = "1" ]; then
+  echo "abc123"
+fi
+`
+	if err := os.WriteFile(filepath.Join(binDir, "docker"), []byte(dockerScript), 0755); err != nil {
+		t.Fatalf("écriture faux docker : %v", err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	client := bridge.NewPythonClientWithAppRoot(appRoot, appRoot)
+
+	t.Setenv("FAKE_DOCKER_RUNNING", "1")
+	status, err := client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus (en cours) : %v", err)
+	}
+	if status == nil || !status.Success || !status.Running || status.ContainerID != "abc123" {
+		t.Errorf("attendu conteneur en cours avec ID abc123, obtenu : %+v", status)
+	}
+
+	t.Setenv("FAKE_DOCKER_RUNNING", "0")
+	status, err = client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus (arrêté) : %v", err)
+	}
+	if status == nil || !status.Success || status.Running {
+		t.Errorf("attendu conteneur arrêté, obtenu : %+v", status)
 	}
 }
 

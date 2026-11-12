@@ -37,6 +37,7 @@ type MockClient struct {
 	repoRoot      string
 	appRoot       string
 	SimulateDelay bool
+	dockerRunning bool
 
 	// Champs de surcharge pour les tests unitaires
 	CustomRepoStatus     *models.RepoStatus
@@ -330,8 +331,17 @@ func (m *MockClient) IsDockerLLM() bool {
 	return false
 }
 
+// DockerOllamaStatus renvoie l'état simulé du conteneur Ollama.
+func (m *MockClient) DockerOllamaStatus() (*models.DockerStatusResponse, error) {
+	return &models.DockerStatusResponse{
+		Success: true,
+		Running: m.dockerRunning,
+	}, nil
+}
+
 // StartDockerOllama lance le conteneur Ollama (opération no-op en mock).
 func (m *MockClient) StartDockerOllama() (*models.ActionResult, error) {
+	m.dockerRunning = true
 	return &models.ActionResult{
 		Success: true,
 		Message: "Mode mock : démarrage du conteneur Ollama simulé.",
@@ -340,6 +350,7 @@ func (m *MockClient) StartDockerOllama() (*models.ActionResult, error) {
 
 // StopDockerOllama arrête le conteneur Ollama (opération no-op en mock).
 func (m *MockClient) StopDockerOllama() (*models.ActionResult, error) {
+	m.dockerRunning = false
 	return &models.ActionResult{
 		Success: true,
 		Message: "Mode mock : arrêt du conteneur Ollama simulé.",

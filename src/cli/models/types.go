@@ -58,6 +58,22 @@ type ReleaseNotesResponse struct {
 	CommitCount int    `json:"commit_count"`
 }
 
+// CommitItem représente un commit dans l'historique Git.
+type CommitItem struct {
+	Sha     string `json:"sha"`
+	Message string `json:"message"`
+	Author  string `json:"author"`
+	Date    string `json:"date"`
+	Tag     string `json:"tag,omitempty"`
+}
+
+// CommitsResponse contient la liste des commits renvoyée par le backend Python.
+type CommitsResponse struct {
+	Success bool         `json:"success"`
+	Error   string       `json:"error,omitempty"`
+	Commits []CommitItem `json:"commits"`
+}
+
 // ConfigResponse contient les paramètres lus ou écrits dans le .env par Python.
 type ConfigResponse struct {
 	Success             bool    `json:"success"`

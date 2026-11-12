@@ -291,3 +291,25 @@ def test_action_check_env():
     assert "version" in result
     assert "executable" in result
     assert result["status"] == "ready"
+
+
+def test_action_commits_success():
+    mock_commits = [
+        CommitInfo(sha="02b90a2", message="fix(cli): fiabiliser la saisie", author="Maxence", date="2026-10-16", tag="HEAD"),
+        CommitInfo(sha="76f5c21", message="feat(cli): masquer le bouton", author="Maxence", date="2026-10-16"),
+    ]
+    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_recent_commits", return_value=mock_commits):
+        result = core.action_commits(str(ROOT), limit=10)
+        assert result["success"] is True
+        assert len(result["commits"]) == 2
+        assert result["commits"][0]["sha"] == "02b90a2"
+        assert result["commits"][0]["tag"] == "HEAD"
+        assert result["commits"][1]["sha"] == "76f5c21"
+
+
+def test_action_commits_error():
+    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_recent_commits", side_effect=Exception("Git repository unreadable")):
+        result = core.action_commits(str(ROOT))
+        assert result["success"] is False
+        assert "Git repository unreadable" in result["error"]
+        assert result["commits"] == []

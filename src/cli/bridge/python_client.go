@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"sae-git-cli/models"
@@ -457,6 +458,27 @@ func (p *PythonClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNo
 	var res models.ReleaseNotesResponse
 	if err := json.Unmarshal(out, &res); err != nil {
 		return nil, err
+	}
+	if !res.Success && res.Error != "" {
+		return &res, fmt.Errorf("%s", res.Error)
+	}
+	return &res, nil
+}
+
+// GetRecentCommits demande à Python de récupérer l'historique complet ou récent des commits
+func (p *PythonClient) GetRecentCommits(limit int) (*models.CommitsResponse, error) {
+	args := []string{"--action", "commits"}
+	if limit > 0 {
+		args = append(args, "--limit", strconv.Itoa(limit))
+	}
+	out, err := p.runPythonCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var res models.CommitsResponse
+	if err := json.Unmarshal(out, &res); err != nil {
+		return nil, fmt.Errorf("erreur de décodage des commits : %w", err)
 	}
 	if !res.Success && res.Error != "" {
 		return &res, fmt.Errorf("%s", res.Error)

@@ -141,6 +141,15 @@ func TestMockClientBasics(t *testing.T) {
 	if err != nil || !ping.Reachable || len(ping.InstalledModels) == 0 {
 		t.Errorf("erreur PingOllama : %v, ping: %+v", err, ping)
 	}
+
+	// 10. GetRecentCommits
+	commits, err := mock.GetRecentCommits(0)
+	if err != nil || !commits.Success || len(commits.Commits) == 0 {
+		t.Fatalf("erreur GetRecentCommits : %v, commits: %+v", err, commits)
+	}
+	if commits.Commits[0].Sha != "02b90a2" {
+		t.Errorf("premier commit inattendu : %+v", commits.Commits[0])
+	}
 }
 
 func TestMockClientOverrides(t *testing.T) {
@@ -308,6 +317,15 @@ func TestPythonClientRealIntegration(t *testing.T) {
 	}
 	if !ping.Success {
 		t.Errorf("attendu ping.Success == true")
+	}
+
+	// GetRecentCommits
+	commitsResp, errCommits := client.GetRecentCommits(5)
+	if errCommits != nil {
+		t.Fatalf("GetRecentCommits a échoué : %v", errCommits)
+	}
+	if !commitsResp.Success || len(commitsResp.Commits) == 0 {
+		t.Errorf("attendu liste de commits non vide, obtenu %+v", commitsResp)
 	}
 }
 

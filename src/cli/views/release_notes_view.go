@@ -10,7 +10,7 @@ import (
 	"sae-git-cli/ui"
 )
 
-// ShowReleaseNotesFlow orchestre l'écran de génération de changelog / release notes
+// ShowReleaseNotesFlow orchestre l'écran de génération de changelog / release notes avec sélection interactive des commits
 func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, status *models.RepoStatus) {
 	ui.ClearTerminal()
 	ui.PrintBanner(status)
@@ -20,25 +20,69 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 	fmt.Println(ui.Dim + "Synthèse automatique de l'historique Git catégorisée par le LLM." + ui.Reset)
 	fmt.Println()
 
-	// Saisie des bornes de révision
-	fmt.Printf("  %s• Tag ou révision de départ [v0.1.0] :%s ", ui.Bold, ui.Reset)
-	fromTag, _ := reader.ReadString('\n')
-	fromTag = strings.TrimSpace(fromTag)
-	if fromTag == "" {
-		fromTag = "v0.1.0"
+	// 1. Récupération de l'historique complet des commits
+	spinnerCommits := ui.NewSpinner("Chargement de l'historique complet des commits...")
+	spinnerCommits.Start()
+	commitsResp, errCommits := client.GetRecentCommits(0)
+	spinnerCommits.Stop("")
+
+	if errCommits != nil || commitsResp == nil || !commitsResp.Success || len(commitsResp.Commits) == 0 {
+		errMsg := "Aucun commit trouvé dans ce dépôt Git."
+		if errCommits != nil {
+			errMsg = errCommits.Error()
+		} else if commitsResp != nil && commitsResp.Error != "" {
+			errMsg = commitsResp.Error
+		}
+
+		ui.PrintErrorCard("Historique Git Inaccessible", errMsg,
+			"Assurez-vous que le dépôt Git contient au moins un commit",
+			"Vous pouvez retourner au menu principal avec [R]",
+		)
+		waitForEnter(reader)
+		return
 	}
 
-	fmt.Printf("  %s• Tag ou révision d'arrivée [HEAD]   :%s ", ui.Bold, ui.Reset)
-	toTag, _ := reader.ReadString('\n')
-	toTag = strings.TrimSpace(toTag)
-	if toTag == "" {
-		toTag = "HEAD"
+	commits := commitsResp.Commits
+
+	// 2. Sélection interactive du commit de DÉPART
+	fmt.Println(ui.Bold + "  Étape 1/2 : Sélection du point de départ" + ui.Reset)
+	startCommit, cancelled, err := ui.SelectCommit(commits, "Sélection du commit de DÉPART", 0)
+	if cancelled || err != nil {
+		ui.PrintInfo("Opération annulée par l'utilisateur.")
+		waitForEnter(reader)
+		return
 	}
 
-	fmt.Println()
-	spinner := ui.NewSpinner(fmt.Sprintf("Extraction des commits (%s ➔ %s) et rédaction par le LLM...", fromTag, toTag))
+	startTagBadge := ""
+	if startCommit.Tag != "" {
+		startTagBadge = fmt.Sprintf(" %s(%s)%s", ui.Magenta, startCommit.Tag, ui.Reset)
+	}
+	fmt.Printf("  %s✓ Point de départ sélectionné :%s %s[%s]%s%s %s\n\n",
+		ui.Green+ui.Bold, ui.Reset, ui.Cyan+ui.Bold, startCommit.Sha, ui.Reset, startTagBadge, startCommit.Message)
+
+	// 3. Sélection interactive du commit d'ARRIVÉE (pré-positionné sur le commit le plus récent / HEAD)
+	fmt.Println(ui.Bold + "  Étape 2/2 : Sélection du point d'arrivée" + ui.Reset)
+	arrivalCommit, cancelled, err := ui.SelectCommit(commits, "Sélection du commit d'ARRIVÉE", 0)
+	if cancelled || err != nil {
+		ui.PrintInfo("Opération annulée par l'utilisateur.")
+		waitForEnter(reader)
+		return
+	}
+
+	arrivalTagBadge := ""
+	if arrivalCommit.Tag != "" {
+		arrivalTagBadge = fmt.Sprintf(" %s(%s)%s", ui.Magenta, arrivalCommit.Tag, ui.Reset)
+	}
+	fmt.Printf("  %s✓ Point d'arrivée sélectionné :%s %s[%s]%s%s %s\n\n",
+		ui.Green+ui.Bold, ui.Reset, ui.Cyan+ui.Bold, arrivalCommit.Sha, ui.Reset, arrivalTagBadge, arrivalCommit.Message)
+
+	// 4. Génération des Release Notes par le LLM
+	fromRef := startCommit.Sha
+	toRef := arrivalCommit.Sha
+
+	spinner := ui.NewSpinner(fmt.Sprintf("Extraction des commits (%s ➔ %s) et rédaction par le LLM...", fromRef, toRef))
 	spinner.Start()
-	notes, err := client.GetReleaseNotes(fromTag, toTag)
+	notes, err := client.GetReleaseNotes(fromRef, toRef)
 	spinner.Stop("")
 
 	isError := (err != nil) || (notes != nil && (!notes.Success || notes.Markdown == ""))
@@ -52,7 +96,7 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 
 		ui.PrintErrorCard("Erreur de Génération des Release Notes", errMsg,
 			"Vérifiez que le serveur Ollama est démarré et accessible (menu [3] Configuration)",
-			fmt.Sprintf("Vérifiez que les révisions '%s' et '%s' existent dans l'historique Git", fromTag, toTag),
+			fmt.Sprintf("Vérifiez la validité de l'intervalle '%s ➔ %s'", fromRef, toRef),
 			"Vous pouvez retourner au menu principal avec [R]",
 		)
 
@@ -60,8 +104,8 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 			notes = &models.ReleaseNotesResponse{
 				Success: false,
 				Error:   errMsg,
-				FromTag: fromTag,
-				ToTag:   toTag,
+				FromTag: fromRef,
+				ToTag:   toRef,
 			}
 		}
 
@@ -73,11 +117,11 @@ func ShowReleaseNotesFlow(reader *bufio.Reader, client bridge.BackendClient, sta
 		for _, l := range strings.Split(notes.Markdown, "\n") {
 			lines = append(lines, l)
 		}
-		ui.PrintCard(fmt.Sprintf("Release Notes (%s ➔ %s)", fromTag, toTag), lines, width, ui.Magenta)
+		ui.PrintCard(fmt.Sprintf("Release Notes (%s ➔ %s)", fromRef, toRef), lines, width, ui.Magenta)
 		fmt.Println()
 	}
 
-	// Choix utilisateur
+	// 5. Options utilisateur (Sauvegarde / Retour)
 	for {
 		fmt.Println(ui.Bold + "  Options :" + ui.Reset)
 		if !isError {

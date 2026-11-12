@@ -234,7 +234,7 @@ C'est le cœur de l'outil :
    * `[D]` en rouge pour supprimé.
    * Badge spécial `🔒 [Secret Masqué]` si Dorian a détecté une clé API ou un token dans le patch.
    * Badge `[Binaire]` pour les images ou exécutables exclus.
-4. **Appel IA** : Le spinner tourne pendant que le modèle `gemma4:12b` réfléchit.
+4. **Appel IA** : Le spinner tourne pendant que le modèle `gemma4:26b` réfléchit.
 5. **Carte Conventional Commits** : Affichage encadré du résultat structuré :
    * `Type` (`feat`, `fix`, `docs`, etc.)
    * `Scope` (`auth`, `cli`, etc.)
@@ -262,7 +262,7 @@ C'est le cœur de l'outil :
 Cet écran répond directement aux **consignes impératives de contrôle de l'IUT** :
 * Affiche les variables lues par Python et Go :
   * `OLLAMA_BASE_URL` (par défaut `http://10.22.28.190:11434`)
-  * `OLLAMA_MODEL` (par défaut `gemma4:12b`)
+  * `OLLAMA_MODEL` (par défaut `gemma4:26b`)
   * `OLLAMA_TIMEOUT_S` (300s)
   * `MOCK_INTERFACE` et `MOCK_AI` (visibles et modifiables uniquement si le mode `--dev` est actif)
 * **Action `[T]` (Test Ping)** : Go demande à Python d'effectuer une requête rapide vers le serveur Ollama. S'il répond, l'écran affiche en vert la latence en millisecondes et la liste réelle des modèles installés sur le serveur !

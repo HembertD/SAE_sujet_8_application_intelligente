@@ -72,6 +72,7 @@ nav:
       - Tests:
           - Présentation: doc_test_files/README.md
           - Core (point d'entrée): doc_test_files/test_core.md
+          - Configuration: doc_test_files/test_config.md
           - Git wrapper: doc_test_files/test_git_wrapper.md
           - Intégration Git wrapper (slow): doc_test_files/test_integration_git_wrapper_slow.md
           - Ollama LLM: doc_test_files/test_ollama_llm.md

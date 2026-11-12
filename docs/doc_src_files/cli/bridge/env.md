@@ -45,7 +45,7 @@ Précisions issues des commentaires retirés de `env.go` :
 - `ReadMockAISettingFromEnv()` : Lit l'activation de la simulation IA depuis l'environnement.
 - `LoadConfigFromEnv()` : Charge la configuration complète depuis le .env applicatif.
 - `ReadPythonBinFromEnv()` : Lit l'interpréteur Python explicitement configuré, sinon chaîne vide.
-- `WriteEnvFile()` : Écrit la configuration dans le fichier .env applicatif (USE_DOCKER_LLM désactivé par défaut).
+- `WriteEnvFile()` : Écrit la configuration dans le fichier .env applicatif en **conservant** la valeur existante de `USE_DOCKER_LLM` (le mode Docker ou le serveur IUT n'est donc pas changé par une simple sauvegarde de configuration).
 - `WriteEnvFileWithDockerLLM()` : Écrit la configuration avec la valeur explicite de USE_DOCKER_LLM.
 - `ReadDockerLLMSettingFromEnv()` : Lit l'activation du serveur Ollama via Docker depuis l'environnement.
 - `ReadEnableNotificationsFromEnv()` : Lit l'activation des notifications de bureau depuis l'environnement.

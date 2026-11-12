@@ -9,8 +9,9 @@ Ce module contient les paramètres globaux utilisés par le client Ollama et le 
 ## Variables principales
 
 - `OLLAMA_BASE_URL` : URL du serveur Ollama (ex: `http://10.22.28.190:11434` ou local).
-- `OLLAMA_MODEL` : modèle utilisé pour la génération des messages de commit (ex: `gemma4:12b`, `mistral:latest`).
+- `OLLAMA_MODEL` : modèle utilisé pour la génération des messages de commit (référence IUT : `gemma4:26b` ; `gemma4:12b` possible en Docker local).
 - `OLLAMA_TIMEOUT_S` : délai de requête avant timeout en secondes.
+- `USE_DOCKER_LLM` : si `true`, le backend Python force `OLLAMA_BASE_URL` sur `http://localhost:11434` (serveur Docker local), même lorsqu'il est lancé indépendamment du CLI Go. Si `false`, l'URL du serveur IUT du `.env` est conservée.
 - `MOCK_INTERFACE` : activation du mode simulation complète de l'interface en Go (`true` ou `false`).
 - `MOCK_AI` : activation de la simulation des réponses de l'IA Ollama hors-ligne (`true` ou `false`).
 

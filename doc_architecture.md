@@ -50,6 +50,7 @@ Exemples :
 │  └─ prepare-commit-msg
 ├─ Dockerfile
 ├─ docker-compose.yml
+├─ docker-compose.gpu.yml
 ├─ entrypoint.sh
 ├─ scripts/
 │  ├─ generate_documentation_pdf.py
@@ -193,7 +194,7 @@ Exemples :
 Le code applicatif du projet (Python pour le backend IA et git wrapper, Go pour l'interface TUI/CLI).
 
 ### Racine du projet (Docker)
-Les fichiers `Dockerfile`, `docker-compose.yml` et `entrypoint.sh` à la racine orchestrent le serveur Ollama local utilisé quand `USE_DOCKER_LLM=true`. Leur documentation est placée à la racine de `docs/doc_src_files/` (`Dockerfile.md`, `docker-compose.md`, `entrypoint.md`) et référencée dans la section « Docker » de `mkdocs.yml`.
+Les fichiers `Dockerfile`, `docker-compose.yml`, `docker-compose.gpu.yml` et `entrypoint.sh` à la racine orchestrent le serveur Ollama local utilisé quand `USE_DOCKER_LLM=true`. `docker-compose.gpu.yml` est un override optionnel pour les hôtes équipés d'un GPU NVIDIA. Leur documentation est placée à la racine de `docs/doc_src_files/` (`Dockerfile.md`, `docker-compose.md`, `entrypoint.md`) et référencée dans la section « Docker » de `mkdocs.yml`.
 
 ### docs/doc_src_files/
 La documentation technique détaillant les fichiers de src, avec le même arbre que le code et des fichiers .md.

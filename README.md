@@ -10,7 +10,7 @@ Les développeurs négligent souvent la qualité des messages de commit, ce qui 
 ## Fonctionnalités principales :
 ```
 Analyse de code : exécution et parsing de la commande git diff pour extraire les modifications locales avant le commit.
-Génération structurée : utilisation de gemma4:12b avec un prompt strict pour générer un message respectant la norme Conventional Commits (ex. feat: ajout du bouton de connexion).
+Génération structurée : utilisation de gemma4:26b avec un prompt strict pour générer un message respectant la norme Conventional Commits (ex. feat: ajout du bouton de connexion).
 Synthèse de version : extraction de l'historique entre deux tags Git et génération d'un changelog organisé par catégories (Corrections, Nouveautés, Régressions) au format Markdown.
 Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibles (clés d'API) avant l'envoi au modèle.
 ```
@@ -96,12 +96,17 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
 6. **Serveur Ollama local via Docker (optionnel) :**
    Pour utiliser un serveur Ollama local déployé avec Docker Compose plutôt que le serveur distant de l'IUT :
    ```bash
-   # Construire et lancer le conteneur Ollama (modèle défini par OLLAMA_MODEL, gemma4:12b par défaut)
-   docker compose up -d
+   # Construire et lancer le conteneur Ollama (modèle défini par OLLAMA_MODEL, gemma4:26b par défaut)
+   docker compose up -d --build
    ```
    Puis, dans le TUI de l'application, allez dans **Configuration > Modifier** et activez `LLM via Docker (true/false) : true`. Le conteneur Ollama sera démarré automatiquement avec une barre de progression, et le backend Python communiquera avec `http://localhost:11434`.
 
-   Le modèle téléchargé est celui de `OLLAMA_MODEL` dans le `.env` (par défaut `gemma4:12b`, environ 8 Go). Le premier lancement peut être long ; suivez la progression avec `docker compose logs -f ollama`. Adaptez `OLLAMA_MODEL` si votre machine dispose de moins de ressources.
+   Le modèle téléchargé est celui de `OLLAMA_MODEL` dans le `.env` (par défaut `gemma4:26b`, le modèle de référence du serveur IUT). Pour un mode Docker local sur une machine limitée en RAM, utiliser par exemple `gemma4:12b` (~8 Go) dans le `.env`. Le premier lancement peut être long ; suivez la progression avec `docker compose logs -f ollama`.
+
+   Pour activer le GPU NVIDIA (si `nvidia-container-toolkit` est installé) :
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+   ```
 
    Pour revenir au serveur distant de l'IUT, désactivez l'option et arrêtez le conteneur :
    ```bash

@@ -9,7 +9,7 @@ Ce fichier définit l'image Docker du serveur Ollama utilisé par Gitelligence q
 ## Contenu
 
 - **Image de base** : `ollama/ollama:latest` (serveur Ollama officiel)
-- **Modèle par défaut** : `gemma4:12b` via `ENV OLLAMA_MODEL`, qui peut être remplacé par la valeur du `.env` applicatif (docker compose)
+- **Modèle par défaut** : `gemma4:26b` (modèle de référence IUT) via `ENV OLLAMA_MODEL`, qui peut être remplacé par la valeur du `.env` applicatif (docker compose). Pour un mode Docker local plus léger, utiliser par exemple `gemma4:12b` dans le `.env`.
 - **Port exposé** : `11434` (API Ollama standard)
 - **Volume de persistance** : `/root/.ollama` (les modèles survivent aux redémarrages du conteneur)
 
@@ -30,7 +30,7 @@ L'image exécute `/entrypoint.sh` au lancement :
 docker build -t gitelligence-ollama .
 
 # Lancer via docker compose (recommandé)
-docker compose up -d
+docker compose up -d --build
 ```
 
 ## Sécurité

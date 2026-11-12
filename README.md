@@ -94,12 +94,18 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
      ```
 
 6. **Serveur Ollama local via Docker (optionnel) :**
-   Pour utiliser un serveur Ollama local déployé avec Docker Compose plutôt que le serveur distant de l'IUT :
+   Pour utiliser un serveur Ollama local déployé avec Docker Compose plutôt que le serveur distant de l'IUT, tout peut se faire depuis le TUI :
+   1. lancez l'application ;
+   2. ouvrez **Configuration** : l'écran affiche deux informations distinctes :
+      - `LLM via Docker` : le mode utilisé par l'application (`USE_DOCKER_LLM`) ;
+      - `Conteneur Docker` : l'état réel du conteneur Ollama (`En cours`, `Arrêté` ou `Indisponible`) ;
+   3. appuyez sur **`[D]`** : le mode Docker est activé et le conteneur est construit/démarré automatiquement (`docker compose up -d --build`). Un second appui sur `[D]` désactive le mode et arrête le conteneur.
+
+   Le backend Python communique alors avec `http://localhost:11434`. L'option `[M]` reste disponible pour modifier les autres paramètres. Le démarrage manuel reste possible :
    ```bash
    # Construire et lancer le conteneur Ollama (modèle défini par OLLAMA_MODEL, gemma4:26b par défaut)
    docker compose up -d --build
    ```
-   Puis, dans le TUI de l'application, allez dans **Configuration > Modifier** et activez `LLM via Docker (true/false) : true`. Le conteneur Ollama sera démarré automatiquement avec une barre de progression, et le backend Python communiquera avec `http://localhost:11434`.
 
    Le modèle téléchargé est celui de `OLLAMA_MODEL` dans le `.env` (par défaut `gemma4:26b`, le modèle de référence du serveur IUT). Pour un mode Docker local sur une machine limitée en RAM, utiliser par exemple `gemma4:12b` (~8 Go) dans le `.env`. Le premier lancement peut être long ; suivez la progression avec `docker compose logs -f ollama`.
 
@@ -108,7 +114,7 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
    docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
    ```
 
-   Pour revenir au serveur distant de l'IUT, désactivez l'option et arrêtez le conteneur :
+   Pour revenir au serveur distant de l'IUT, appuyez sur `[D]` dans l'écran Configuration ou exécutez manuellement :
    ```bash
    docker compose down
    ```

@@ -10,7 +10,7 @@ Ce fichier définit l'interface maîtresse `BackendClient` et le coordinateur ad
 
 - Définir le contrat d'interface haut niveau `BackendClient` regroupant les actions du domaine Git, Ollama et configuration.
 - Instancier le coordinateur via `NewBackendClientWithAppRoot(repoRoot, appRoot, forceMockInterface, forceMockIA, forceDockerLLM...)`.
-- Gérer le cycle de vie du conteneur Ollama Docker (`StartDockerOllama`, `StopDockerOllama`), en **déléguant au client actif** : le mode mock n'exécute jamais de commande Docker réelle.
+- Gérer le cycle de vie du conteneur Ollama Docker (`DockerOllamaStatus`, `StartDockerOllama`, `StopDockerOllama`), en **déléguant au client actif** : le mode mock n'exécute jamais de commande Docker réelle.
 - **Adresse effective du LLM** : `EffectiveOllamaBaseURL(cfg)` renvoie `http://localhost:11434` (`DockerOllamaBaseURL`) lorsque `USE_DOCKER_LLM` est actif, sinon l'URL distante du `.env` ; cette dernière reste conservée pour revenir au serveur de l'IUT après désactivation.
 - Maintenir la référence vers le dépôt cible (`repoRoot`) et la racine de l'application (`appRoot`).
 - Assurer le routage dynamique vers le délégué actif en fonction du drapeau `--mockInterface` ou du paramètre `MOCK_INTERFACE` du `.env`.
@@ -30,7 +30,7 @@ Précisions issues des commentaires retirés de `client.go` :
 - `GetConfig` lit la configuration depuis le `.env` de l'application et force `MockAI` à `true` si `forceMockIA` est actif ; expose également l'état de `DockerLLM`.
 - `SaveConfig` persiste la nouvelle configuration dans le `.env` applicatif puis actualise l'état du client : mise à jour dynamique de `isMock` sauf si forcé par `--mockInterface`, et notification du backend Python via `save-config` uniquement en mode réel.
 - `SaveConfigWithDockerLLM` persiste la configuration avec la valeur explicite de `USE_DOCKER_LLM`.
-- `StartDockerOllama` et `StopDockerOllama` délèguent à `activeDelegate()` : `PythonClient` exécute réellement `docker compose up -d --build` / `down`, tandis que `MockClient` renvoie une réponse simulée sans toucher au système.
+- `DockerOllamaStatus`, `StartDockerOllama` et `StopDockerOllama` délèguent à `activeDelegate()` : `PythonClient` interroge réellement `docker compose ps -q ollama` et exécute `docker compose up -d --build` / `down`, tandis que `MockClient` renvoie un état et des réponses simulés sans toucher au système.
 - `EffectiveOllamaBaseURL` centralise le choix de l'URL Ollama (localhost en mode Docker, URL du `.env` sinon) pour le client Python et l'affichage de configuration.
 - `IsDockerLLM` indique si le mode LLM via Docker est activé.
 
@@ -53,5 +53,6 @@ Précisions issues des commentaires retirés de `client.go` :
 - `BridgeClient.SaveConfig()` : Persiste la configuration (USE_DOCKER_LLM conservé) et notifie le backend réel si nécessaire.
 - `BridgeClient.SaveConfigWithDockerLLM()` : Persiste la configuration avec USE_DOCKER_LLM explicite.
 - `BridgeClient.IsDockerLLM()` : Indique si le mode LLM via Docker est actif.
+- `BridgeClient.DockerOllamaStatus()` : Interroge l'état du conteneur Ollama via le client actif (réel ou simulé).
 - `BridgeClient.StartDockerOllama()` : Lance le conteneur Ollama Docker via `docker compose up -d --build`.
 - `BridgeClient.StopDockerOllama()` : Arrête le conteneur Ollama Docker via `docker compose down`.

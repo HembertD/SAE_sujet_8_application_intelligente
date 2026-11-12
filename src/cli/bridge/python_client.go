@@ -401,8 +401,10 @@ func (p *PythonClient) runDockerCompose(args ...string) (*models.ActionResult, e
 }
 
 // StartDockerOllama lance le conteneur Ollama via docker compose.
+// --build garantit que les modifications du Dockerfile ou de entrypoint.sh
+// sont prises en compte, tout en réutilisant le cache Docker.
 func (p *PythonClient) StartDockerOllama() (*models.ActionResult, error) {
-	return p.runDockerCompose("up", "-d")
+	return p.runDockerCompose("up", "-d", "--build")
 }
 
 // StopDockerOllama arrête le conteneur Ollama via docker compose.

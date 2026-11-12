@@ -31,7 +31,11 @@ TARGET_MODEL="${OLLAMA_MODEL:-gemma4:26b}"
 # Télécharge le modèle configuré s'il n'est pas déjà présent
 if ! ollama list | awk 'NR > 1 {print $1}' | grep -qx "$TARGET_MODEL"; then
     echo "Pulling model $TARGET_MODEL (this may take a while)..."
-    ollama pull "$TARGET_MODEL"
+    if ! ollama pull "$TARGET_MODEL"; then
+        echo "ERREUR : impossible de télécharger le modèle '$TARGET_MODEL'." >&2
+        echo "Vérifiez OLLAMA_MODEL dans le .env (ex: gemma4:12b ou gemma4:26b)." >&2
+        exit 1
+    fi
 else
     echo "Model $TARGET_MODEL already present."
 fi

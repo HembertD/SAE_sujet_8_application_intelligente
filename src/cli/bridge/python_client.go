@@ -608,7 +608,7 @@ func (p *PythonClient) runDockerCompose(args ...string) (*models.ActionResult, e
 
 	return &models.ActionResult{
 		Success: true,
-		Message: "Conteneur Ollama démarré avec succès via docker compose.",
+		Message: "Commande de démarrage envoyée. Vérifiez la ligne « Conteneur Docker » et les logs en cas d'arrêt.",
 	}, nil
 }
 

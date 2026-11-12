@@ -60,6 +60,19 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 		}
 		lines = append(lines, fmt.Sprintf("  • %sConteneur Docker%s   : %s%s%s", ui.Bold, ui.Reset, dockerContainerColor, dockerContainerStatus, ui.Reset))
 
+		if dockerStatusErr == nil && dockerStatus != nil && dockerStatus.Success {
+			if cfg.DockerLLM && !dockerStatus.Running {
+				lines = append(lines, "")
+				lines = append(lines, fmt.Sprintf("%s  ⚠ LLM Docker activé mais conteneur arrêté.%s", ui.Red, ui.Reset))
+				lines = append(lines, fmt.Sprintf("%s    Modèle configuré : %s (modifiable avec [M])%s", ui.Dim, cfg.OllamaModel, ui.Reset))
+				lines = append(lines, fmt.Sprintf("%s    Logs : docker compose logs -f ollama%s", ui.Dim, ui.Reset))
+			} else if !cfg.DockerLLM && dockerStatus.Running {
+				lines = append(lines, "")
+				lines = append(lines, fmt.Sprintf("%s  ⚠ Conteneur Docker actif mais LLM Docker désactivé.%s", ui.Yellow, ui.Reset))
+				lines = append(lines, fmt.Sprintf("%s    Appuyez sur [D] pour utiliser ce conteneur.%s", ui.Dim, ui.Reset))
+			}
+		}
+
 		notifColor := ui.Green
 		notifStatus := "Désactivé"
 		if cfg.EnableNotifications {
@@ -412,6 +425,15 @@ func toggleDockerLLM(reader *bufio.Reader, client bridge.BackendClient, cfg *mod
 			spinner.Stop("")
 			if dockerErr != nil || res == nil || !res.Success {
 				ui.PrintErrorCard("Erreur Docker", fmt.Sprintf("Impossible de démarrer le conteneur Ollama : %s", dockerErrorDetail(res, dockerErr)))
+				return
+			}
+			if statusAfter, afterErr := client.DockerOllamaStatus(); afterErr == nil && statusAfter != nil && statusAfter.Success && !statusAfter.Running {
+				ui.PrintErrorCard("Conteneur Arrêté",
+					"Le conteneur s'est arrêté juste après son démarrage.",
+					fmt.Sprintf("Modèle configuré : %s", cfg.OllamaModel),
+					"Consultez les logs : docker compose logs -f ollama",
+					"Vérifiez que OLLAMA_MODEL correspond à un modèle existant, puis réessayez avec [D].",
+				)
 				return
 			}
 			ui.PrintSuccess(res.Message)

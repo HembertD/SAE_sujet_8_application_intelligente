@@ -588,6 +588,50 @@ func TestWriteEnvFilePreserveDockerLLM(t *testing.T) {
 		t.Errorf("attendu USE_DOCKER_LLM=false, contenu :\n%s", content)
 	}
 }
+
+func TestSaveConfigDockerLLMCanBeDisabledAtRuntime(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	if err := os.WriteFile(envPath, []byte("USE_DOCKER_LLM=true\nOLLAMA_MODEL=gemma4:26b\n"), 0644); err != nil {
+		t.Fatalf("écriture .env : %v", err)
+	}
+	t.Setenv("USE_DOCKER_LLM", "")
+
+	// Mock interface pour éviter de lancer le backend Python pendant le test.
+	client := bridge.NewBackendClientWithAppRoot(dir, dir, true, false)
+
+	if !client.IsDockerLLM() {
+		t.Fatalf("état initial attendu : USE_DOCKER_LLM=true")
+	}
+
+	res, err := client.SaveConfigWithDockerLLM("http://10.22.28.190:11434", "gemma4:26b", 300, true, false)
+	if err != nil {
+		t.Fatalf("SaveConfigWithDockerLLM(false) : %v", err)
+	}
+	if res == nil || !res.Success {
+		t.Fatalf("sauvegarde attendue réussie, obtenu : %+v", res)
+	}
+
+	// Le .env et l'état exposé par le client doivent immédiatement refléter false.
+	content, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("lecture .env : %v", err)
+	}
+	if !strings.Contains(string(content), "USE_DOCKER_LLM=false") {
+		t.Errorf("le .env doit contenir USE_DOCKER_LLM=false, contenu :\n%s", content)
+	}
+	if client.IsDockerLLM() {
+		t.Errorf("IsDockerLLM() doit passer à false après sauvegarde")
+	}
+	cfg, err := client.GetConfig()
+	if err != nil {
+		t.Fatalf("GetConfig : %v", err)
+	}
+	if cfg.DockerLLM {
+		t.Errorf("GetConfig().DockerLLM doit refléter false après sauvegarde")
+	}
+}
+
 func TestReadWritePythonBinSetting(t *testing.T) {
 	tempDir := t.TempDir()
 

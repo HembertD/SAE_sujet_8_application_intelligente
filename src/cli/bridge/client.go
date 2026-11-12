@@ -84,9 +84,12 @@ func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceMockInterface bo
 	if mockIAActive {
 		_ = os.Setenv("MOCK_AI", "true")
 	}
-	dockerLLMActive := false
-	if len(forceDockerLLM) > 0 && forceDockerLLM[0] {
-		dockerLLMActive = true
+	// Ne forcer le mode Docker que si le flag CLI --docker-llm est explicitement
+	// passé. Sinon, la valeur du .env n'est qu'un état initial : elle doit
+	// pouvoir être modifiée depuis l'interface [M] sans redémarrage.
+	dockerLLMForced := len(forceDockerLLM) > 0 && forceDockerLLM[0]
+	dockerLLMActive := dockerLLMForced
+	if dockerLLMForced {
 		_ = os.Setenv("USE_DOCKER_LLM", "true")
 	} else {
 		dockerLLMActive = ReadDockerLLMSettingFromEnv(appRoot)
@@ -97,7 +100,7 @@ func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceMockInterface bo
 		appRoot:            appRoot,
 		forceMockInterface: forceMockInterface,
 		forceMockIA:        mockIAActive,
-		forceDockerLLM:     dockerLLMActive,
+		forceDockerLLM:     dockerLLMForced,
 		isMock:             mockActive,
 		isDockerLLM:        dockerLLMActive,
 		realClient:         NewPythonClientWithAppRoot(repoRoot, appRoot),

@@ -109,6 +109,8 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
 
    Le modèle téléchargé est celui de `OLLAMA_MODEL` dans le `.env` (par défaut `gemma4:26b`, le modèle de référence du serveur IUT). Pour un mode Docker local sur une machine limitée en RAM, utiliser par exemple `gemma4:12b` (~8 Go) dans le `.env`. Le premier lancement peut être long ; suivez la progression avec `docker compose logs -f ollama`.
 
+   Si le conteneur s'arrête juste après le démarrage, l'écran Configuration affiche `LLM Docker activé mais conteneur arrêté` avec le modèle configuré et la commande de logs. Vérifiez que `OLLAMA_MODEL` correspond à un modèle existant : par exemple `smollm:135` n'existe pas (utiliser `smollm:135m`), tandis que `gemma4:12b` et `gemma4:26b` sont valides.
+
    Pour activer le GPU NVIDIA (si `nvidia-container-toolkit` est installé) :
    ```bash
    docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build

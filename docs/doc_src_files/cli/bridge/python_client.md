@@ -35,7 +35,7 @@ Précisions issues des commentaires retirés de `python_client.go` :
 - `IsDockerLLM` lit `USE_DOCKER_LLM` via `ReadDockerLLMSettingFromEnv(p.appRoot)` (variable d'environnement prioritaire, puis `.env`).
 - `dockerComposeOutput` factorise l'exécution d'une commande `docker compose` : vérification de la présence de `docker-compose.yml`, `cmd.Dir` fixé à `p.appRoot`, et retour de la sortie brute.
 - `DockerOllamaStatus` exécute `docker compose ps -q ollama` : un identifiant non vide indique que le conteneur tourne. Une indisponibilité de Docker n'est pas une erreur fatale ; elle est exposée dans `DockerStatusResponse.Error` pour l'affichage TUI.
-- `runDockerCompose` factorise `docker compose up -d --build` / `down` via `dockerComposeOutput`, avec repli sur `err.Error()` si `CombinedOutput` ne renvoie aucune sortie (ex: binaire `docker` introuvable).
+- `runDockerCompose` factorise `docker compose up -d --build` / `down` via `dockerComposeOutput`, avec repli sur `err.Error()` si `CombinedOutput` ne renvoie aucune sortie (ex: binaire `docker` introuvable). Le message de démarrage précise qu'il s'agit de l'exécution de la commande, pas d'une garantie que le conteneur restera actif : le téléchargement du modèle peut échouer ensuite et l'état réel doit être vérifié via `DockerOllamaStatus`.
 
 ## Commentaires de fonction (dupliqués du code source)
 

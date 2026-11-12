@@ -297,6 +297,36 @@ def call_chat_json(messages: list[dict], json_schema: dict) -> dict:
     try:
         with urllib.request.urlopen(request, timeout=OLLAMA_TIMEOUT_S) as response:
             payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        # HTTPError est une sous-classe d'OSError : ce handler doit passer avant.
+        raw_error = ""
+        try:
+            raw_error = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            raw_error = ""
+
+        error_detail = raw_error.strip()
+        try:
+            error_payload = json.loads(raw_error)
+            error_detail = str(
+                error_payload.get("error")
+                or error_payload.get("message")
+                or error_detail
+            ).strip()
+        except (json.JSONDecodeError, AttributeError, TypeError):
+            pass
+
+        if e.code == 404 and "model" in error_detail.lower():
+            raise OllamaCallError(
+                f"Le modèle '{OLLAMA_MODEL}' n'est pas installé sur le serveur Ollama "
+                f"({OLLAMA_BASE_URL}). Lancez `ollama pull {OLLAMA_MODEL}` "
+                "ou vérifiez la variable OLLAMA_MODEL."
+            ) from e
+
+        raise OllamaCallError(
+            f"Erreur HTTP {e.code} du serveur Ollama à {OLLAMA_BASE_URL} : "
+            f"{error_detail or e.reason}"
+        ) from e
     except OSError as e:
         # OSError (pas seulement urllib.error.URLError) : un timeout survenant
         # pendant la lecture de la reponse (apres connexion etablie) peut

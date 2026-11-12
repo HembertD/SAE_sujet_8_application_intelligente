@@ -4,6 +4,7 @@ Aucun appel réseau réel : `urllib.request.urlopen` est monkeypatché pour
 simuler la réponse d'Ollama, comme demandé par les conventions du projet.
 Les tests contre le vrai serveur sont marqués `@pytest.mark.slow` ailleurs.
 """
+import io
 import json
 import sys
 import urllib.error
@@ -99,6 +100,48 @@ def test_call_chat_json_wraps_bare_timeout_error(monkeypatch):
 
     with pytest.raises(OllamaCallError):
         llm.call_chat_json([{"role": "user", "content": "x"}], {"type": "object"})
+
+
+def test_call_chat_json_reports_missing_model(monkeypatch):
+    # Ollama répond 404 avec un corps JSON quand le modèle demandé n'est pas
+    # installé. Le message doit distinguer ce cas d'un serveur injoignable.
+    def _raise(*a, **k):
+        raise urllib.error.HTTPError(
+            "http://localhost:11434/api/chat",
+            404,
+            "Not Found",
+            None,
+            io.BytesIO(b'{"error":"model \'gemma4:12b\' not found"}'),
+        )
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", _raise)
+
+    with pytest.raises(OllamaCallError) as excinfo:
+        llm.call_chat_json([{"role": "user", "content": "x"}], {"type": "object"})
+
+    message = str(excinfo.value)
+    assert "n'est pas installé" in message
+    assert llm.OLLAMA_MODEL in message
+    assert "ollama pull" in message
+
+
+def test_call_chat_json_reports_generic_http_error(monkeypatch):
+    def _raise(*a, **k):
+        raise urllib.error.HTTPError(
+            "http://localhost:11434/api/chat",
+            500,
+            "Internal Server Error",
+            None,
+            io.BytesIO(b'{"error":"boom"}'),
+        )
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", _raise)
+
+    with pytest.raises(OllamaCallError) as excinfo:
+        llm.call_chat_json([{"role": "user", "content": "x"}], {"type": "object"})
+
+    assert "Erreur HTTP 500" in str(excinfo.value)
+    assert "boom" in str(excinfo.value)
 
 
 def test_generate_commit_message_retries_on_malformed_json_then_succeeds(monkeypatch):

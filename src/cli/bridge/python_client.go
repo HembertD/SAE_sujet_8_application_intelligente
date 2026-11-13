@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"sae-git-cli/models"
 )
@@ -541,17 +543,28 @@ func (p *PythonClient) IsDockerLLM() bool {
 	return ReadDockerLLMSettingFromEnv(p.appRoot)
 }
 
-// dockerComposeOutput exécute une commande docker compose depuis la racine de
-// l'application et renvoie sa sortie brute.
-func (p *PythonClient) dockerComposeOutput(args ...string) ([]byte, error) {
+// dockerComposeCommand prépare une commande docker compose depuis la racine de
+// l'application. Le contexte permet de borner les commandes de diagnostic qui
+// ne doivent jamais bloquer l'interface.
+func (p *PythonClient) dockerComposeCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	composeFile := filepath.Join(p.appRoot, "docker-compose.yml")
 	if _, err := os.Stat(composeFile); err != nil {
 		return nil, fmt.Errorf("fichier docker-compose.yml introuvable à la racine de l'application : %s", composeFile)
 	}
 
 	cmdArgs := append([]string{"compose", "-f", composeFile}, args...)
-	cmd := exec.Command("docker", cmdArgs...)
+	cmd := exec.CommandContext(ctx, "docker", cmdArgs...)
 	cmd.Dir = p.appRoot
+	return cmd, nil
+}
+
+// dockerComposeOutput exécute une commande docker compose et renvoie stdout et
+// stderr combinés. Utilisé pour les actions où les logs de build sont utiles.
+func (p *PythonClient) dockerComposeOutput(args ...string) ([]byte, error) {
+	cmd, err := p.dockerComposeCommand(context.Background(), args...)
+	if err != nil {
+		return nil, err
+	}
 	return cmd.CombinedOutput()
 }
 
@@ -559,9 +572,29 @@ func (p *PythonClient) dockerComposeOutput(args ...string) ([]byte, error) {
 // cours d'exécution. Une indisponibilité de Docker n'est pas une erreur fatale :
 // elle est exposée dans le champ Error pour que l'interface puisse l'afficher.
 func (p *PythonClient) DockerOllamaStatus() (*models.DockerStatusResponse, error) {
-	output, err := p.dockerComposeOutput("ps", "-q", "ollama")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cmd, err := p.dockerComposeCommand(ctx, "ps", "-q", "ollama")
 	if err != nil {
-		detail := strings.TrimSpace(string(output))
+		return &models.DockerStatusResponse{
+			Success: false,
+			Running: false,
+			Error:   fmt.Sprintf("impossible de vérifier le conteneur Ollama : %s", err),
+		}, nil
+	}
+
+	// Output ne renvoie que stdout en cas de succès : un warning Docker Compose
+	// sur stderr ne peut donc pas être confondu avec un identifiant de conteneur.
+	output, err := cmd.Output()
+	if err != nil {
+		detail := ""
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			detail = strings.TrimSpace(string(exitErr.Stderr))
+		}
+		if ctx.Err() == context.DeadlineExceeded {
+			detail = "délai d'attente dépassé (10s)"
+		}
 		if detail == "" {
 			detail = err.Error()
 		}
@@ -589,13 +622,13 @@ func (p *PythonClient) runDockerCompose(args ...string) (*models.ActionResult, e
 		if detail == "" {
 			detail = err.Error()
 		}
-		action := "lancement"
+		action := "du lancement"
 		if len(args) > 0 && args[0] == "down" {
-			action = "arrêt"
+			action = "de l'arrêt"
 		}
 		return &models.ActionResult{
 			Success: false,
-			Error:   fmt.Sprintf("échec du %s du conteneur Ollama : %s", action, detail),
+			Error:   fmt.Sprintf("échec %s du conteneur Ollama : %s", action, detail),
 		}, err
 	}
 

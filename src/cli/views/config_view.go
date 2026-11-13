@@ -326,8 +326,14 @@ func ShowConfigFlow(reader *bufio.Reader, client bridge.BackendClient, status *m
 			}
 			spinnerSave.Stop("")
 
-			if saveErr != nil {
-				ui.PrintErrorCard("Sauvegarde Impossible", fmt.Sprintf("Échec de la sauvegarde dans le fichier .env : %v", saveErr))
+			if saveErr != nil || res == nil || !res.Success {
+				detail := "réponse vide du backend"
+				if saveErr != nil {
+					detail = saveErr.Error()
+				} else if res != nil && res.Error != "" {
+					detail = res.Error
+				}
+				ui.PrintErrorCard("Sauvegarde Impossible", fmt.Sprintf("Échec de la sauvegarde dans le fichier .env : %s", detail))
 			} else {
 				ui.PrintSuccess(res.Message)
 
@@ -456,10 +462,12 @@ func toggleDockerLLM(reader *bufio.Reader, client bridge.BackendClient, cfg *mod
 	}
 
 	resSave, saveErr := client.SaveConfigWithDockerLLM(cfg.OllamaBaseURL, cfg.OllamaModel, cfg.TimeoutS, cfg.MockInterface, targetEnabled, cfg.MockAI)
-	if saveErr != nil || resSave == nil {
+	if saveErr != nil || resSave == nil || !resSave.Success {
 		detail := "réponse vide du backend"
 		if saveErr != nil {
 			detail = saveErr.Error()
+		} else if resSave != nil && resSave.Error != "" {
+			detail = resSave.Error
 		}
 		ui.PrintErrorCard("Sauvegarde Impossible", fmt.Sprintf("Le conteneur a été mis à jour mais la configuration n'a pas pu être sauvegardée : %s", detail))
 		return

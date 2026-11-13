@@ -28,10 +28,10 @@ func ShowMainMenu(reader *bufio.Reader, client bridge.BackendClient, status *mod
 	isMockAI := err == nil && cfg.MockAI
 
 	if isMockInterface {
-		menuLines = append(menuLines, ui.Dim+"  ℹ Mock Interface actif (MOCK_INTERFACE=true dans le .env)"+ui.Reset)
+		menuLines = append(menuLines, ui.Dim+"  ℹ Mock Interface actif (flag --mockInterface ou .env)"+ui.Reset)
 	}
 	if isMockAI {
-		menuLines = append(menuLines, ui.Dim+"  ℹ Mock IA actif (MOCK_AI=true dans le .env)"+ui.Reset)
+		menuLines = append(menuLines, ui.Dim+"  ℹ Mock IA actif (flag --mockIA ou .env)"+ui.Reset)
 	}
 
 	ui.PrintCard("Menu Principal", menuLines, width, ui.Cyan)

@@ -281,6 +281,27 @@ func TestBridgeClientSwitching(t *testing.T) {
 	}
 }
 
+func TestForcedMockInterfaceOverridesEnvFile(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	if err := os.WriteFile(envPath, []byte("MOCK_INTERFACE=false\n"), 0644); err != nil {
+		t.Fatalf("écriture .env : %v", err)
+	}
+	t.Setenv("MOCK_INTERFACE", "")
+
+	client := bridge.NewBackendClientWithAppRoot(dir, dir, true, false)
+	if !client.IsMock() {
+		t.Fatalf("le flag --mockInterface doit forcer IsMock() à true")
+	}
+	cfg, err := client.GetConfig()
+	if err != nil {
+		t.Fatalf("GetConfig : %v", err)
+	}
+	if !cfg.MockInterface {
+		t.Errorf("GetConfig().MockInterface doit rester true malgré MOCK_INTERFACE=false dans le .env")
+	}
+}
+
 func TestPythonClientRealIntegration(t *testing.T) {
 	repoRoot := bridge.FindAppRoot()
 
@@ -534,8 +555,13 @@ func TestPythonClientDockerOllamaStatus(t *testing.T) {
 
 	binDir := t.TempDir()
 	dockerScript := `#!/bin/sh
-if [ "$4" = "ps" ] && [ "$FAKE_DOCKER_RUNNING" = "1" ]; then
-  echo "abc123"
+if [ "$4" = "ps" ]; then
+  if [ "$FAKE_DOCKER_RUNNING" = "1" ]; then
+    echo "abc123"
+  fi
+  if [ "$FAKE_DOCKER_WARNING" = "1" ]; then
+    echo "warning: variable non definie" >&2
+  fi
 fi
 `
 	if err := os.WriteFile(filepath.Join(binDir, "docker"), []byte(dockerScript), 0755); err != nil {
@@ -561,6 +587,17 @@ fi
 	}
 	if status == nil || !status.Success || status.Running {
 		t.Errorf("attendu conteneur arrêté, obtenu : %+v", status)
+	}
+
+	// Un warning Docker Compose sur stderr ne doit pas être interprété comme un
+	// identifiant de conteneur : seul stdout détermine l'état réel.
+	t.Setenv("FAKE_DOCKER_WARNING", "1")
+	status, err = client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus (warning stderr) : %v", err)
+	}
+	if status == nil || !status.Success || status.Running || status.ContainerID != "" {
+		t.Errorf("un warning stderr ne doit pas simuler un conteneur actif, obtenu : %+v", status)
 	}
 }
 
@@ -661,7 +698,9 @@ func TestSaveConfigDockerLLMCanBeDisabledAtRuntime(t *testing.T) {
 	if err := os.WriteFile(envPath, []byte("USE_DOCKER_LLM=true\nOLLAMA_MODEL=gemma4:26b\n"), 0644); err != nil {
 		t.Fatalf("écriture .env : %v", err)
 	}
-	t.Setenv("USE_DOCKER_LLM", "")
+	// Simule une variable héritée du shell : la sauvegarde doit aussi
+	// resynchroniser l'environnement du processus, pas seulement le .env.
+	t.Setenv("USE_DOCKER_LLM", "true")
 
 	// Mock interface pour éviter de lancer le backend Python pendant le test.
 	client := bridge.NewBackendClientWithAppRoot(dir, dir, true, false)
@@ -688,6 +727,9 @@ func TestSaveConfigDockerLLMCanBeDisabledAtRuntime(t *testing.T) {
 	}
 	if client.IsDockerLLM() {
 		t.Errorf("IsDockerLLM() doit passer à false après sauvegarde")
+	}
+	if got := os.Getenv("USE_DOCKER_LLM"); got != "false" {
+		t.Errorf("USE_DOCKER_LLM du processus doit être resynchronisé à false, obtenu %q", got)
 	}
 	cfg, err := client.GetConfig()
 	if err != nil {

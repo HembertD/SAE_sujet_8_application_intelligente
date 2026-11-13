@@ -122,7 +122,7 @@ func (b *BridgeClient) IsMock() bool {
 	if b.forceMockInterface {
 		return true
 	}
-	return ReadMockSettingFromEnv(b.appRoot)
+	return b.isMock
 }
 
 // IsDockerLLM indique si l'usage du serveur Ollama via Docker est activé.
@@ -130,7 +130,7 @@ func (b *BridgeClient) IsDockerLLM() bool {
 	if b.forceDockerLLM {
 		return true
 	}
-	return ReadDockerLLMSettingFromEnv(b.appRoot)
+	return b.isDockerLLM
 }
 
 // GetRepoStatus délègue la récupération de l'état du dépôt au client actif
@@ -186,6 +186,9 @@ func (b *BridgeClient) SaveMarkdownFile(filename, content string) error {
 // GetConfig lit la configuration depuis le fichier .env de l'application
 func (b *BridgeClient) GetConfig() (*models.ConfigResponse, error) {
 	cfg := LoadConfigFromEnv(b.appRoot, b.IsMock())
+	if b.forceMockInterface {
+		cfg.MockInterface = true
+	}
 	if b.forceMockIA {
 		cfg.MockAI = true
 	}
@@ -210,6 +213,12 @@ func (b *BridgeClient) SaveConfigWithDockerLLM(baseURL, model string, timeout fl
 		b.isMock = mockInterface
 	}
 	b.isDockerLLM = dockerLLM
+	// Aligne aussi la variable d'environnement du processus : sans cela, une
+	// valeur USE_DOCKER_LLM héritée du shell pourrait continuer à être transmise
+	// au backend Python alors que l'utilisateur vient de désactiver le mode.
+	if !b.forceDockerLLM {
+		_ = os.Setenv("USE_DOCKER_LLM", fmt.Sprintf("%t", dockerLLM))
+	}
 
 	// Si en mode réel, tenter de notifier le backend Python
 	if !b.IsMock() {
@@ -223,7 +232,7 @@ func (b *BridgeClient) SaveConfigWithDockerLLM(baseURL, model string, timeout fl
 
 	return &models.ActionResult{
 		Success: true,
-		Message: fmt.Sprintf("Configuration sauvegardée dans %s (USE_DOCKER_LLM=%t).", filepath.Base(envPath), dockerLLM),
+		Message: fmt.Sprintf("Configuration sauvegardée dans %s (USE_DOCKER_LLM=%t).", filepath.Base(envPath), b.IsDockerLLM()),
 	}, nil
 }
 

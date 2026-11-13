@@ -15,14 +15,21 @@ trap 'kill -TERM "$OLLAMA_PID" 2>/dev/null || true; wait "$OLLAMA_PID" 2>/dev/nu
 # Attend que l'API Ollama soit joignable (timeout 30s). On utilise la CLI
 # `ollama` déjà présente dans l'image : `curl` n'est pas installé dans
 # ollama/ollama:latest.
+SERVER_READY=false
 for i in $(seq 1 30); do
     if ollama list > /dev/null 2>&1; then
+        SERVER_READY=true
         echo "Ollama server is ready."
         break
     fi
     echo "Waiting for Ollama server... ($i/30)"
     sleep 1
 done
+
+if [ "$SERVER_READY" != "true" ]; then
+    echo "ERREUR : le serveur Ollama n'a pas démarré dans les 30 secondes." >&2
+    exit 1
+fi
 
 # Modèle cible : celui du .env applicatif (propagé par docker compose),
 # sinon gemma4:26b (modèle de référence IUT) par défaut.

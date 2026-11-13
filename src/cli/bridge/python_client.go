@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"sae-git-cli/models"
@@ -57,16 +58,158 @@ func NewPythonClientWithAppRoot(repoRoot, appRoot string) *PythonClient {
 	}
 }
 
-// CheckPythonEnvironment vérifie qu'un interpréteur Python valide est résolu
-// pour appRoot, sans construire de client. Destiné à un contrôle explicite au
-// démarrage du CLI (main.go), pour un échec immédiat et clair plutôt qu'un
-// plantage différé (ModuleNotFoundError) lors de la première action réelle.
-func CheckPythonEnvironment(appRoot string) error {
-	_, err := resolvePythonBin(appRoot)
-	return err
+// PythonEnvReport détaille le diagnostic approfondi de l'environnement Python.
+type PythonEnvReport struct {
+	Executable   string   `json:"executable"`
+	Version      string   `json:"version"`
+	Mode         string   `json:"mode"`
+	MissingDeps  []string `json:"missing_deps"`
+	AppLoadError string   `json:"app_load_error"`
+	Success      bool     `json:"success"`
 }
 
-// resolvePythonBin détermine quel interpréteur Python utiliser, par ordre de priorité :
+// runPythonProbe exécute le script de sonde avec l'interpréteur ciblé et valide les dépendances requises.
+func runPythonProbe(pyBin, appRoot, mode string) (*PythonEnvReport, error) {
+	probeScript := `import sys, json
+required = ["git", "yaml"]
+missing = []
+for dep in required:
+    try:
+        __import__(dep)
+    except ImportError:
+        missing.append(dep)
+
+app_err = ""
+try:
+    import git_commit_release_notes_generator.service.core
+except Exception as e:
+    app_err = str(e)
+
+print(json.dumps({
+    "executable": sys.executable,
+    "version": sys.version.split()[0],
+    "missing_deps": missing,
+    "app_load_error": app_err,
+    "success": len(missing) == 0 and not app_err
+}))
+`
+
+	cmd := exec.Command(pyBin, "-c", probeScript)
+	cmd.Dir = appRoot
+
+	pathSep := string(os.PathListSeparator)
+	appSrc := filepath.Join(appRoot, "src")
+	env := os.Environ()
+	if stat, errStat := os.Stat(appSrc); errStat == nil && stat.IsDir() {
+		existing := os.Getenv("PYTHONPATH")
+		if existing != "" {
+			env = append(env, fmt.Sprintf("PYTHONPATH=%s%s%s", appSrc, pathSep, existing))
+		} else {
+			env = append(env, fmt.Sprintf("PYTHONPATH=%s", appSrc))
+		}
+	}
+	cmd.Env = env
+
+	out, errCmd := cmd.CombinedOutput()
+	if errCmd != nil {
+		return nil, fmt.Errorf("impossible d'exécuter l'interpréteur Python (%s) : %w (détail : %s)", pyBin, errCmd, strings.TrimSpace(string(out)))
+	}
+
+	var report PythonEnvReport
+	if errJson := json.Unmarshal(out, &report); errJson != nil {
+		return nil, fmt.Errorf("réponse inattendue de la vérification Python : %w (sortie : %s)", errJson, strings.TrimSpace(string(out)))
+	}
+
+	report.Mode = mode
+	if len(report.MissingDeps) > 0 || report.AppLoadError != "" {
+		report.Success = false
+	}
+
+	return &report, nil
+}
+
+// VerifyPythonEnvironment teste en profondeur l'environnement Python résolu pour appRoot :
+//  1. Localisation de l'exécutable Python via ResolvePythonBin
+//  2. Exécution d'un script de sonde vérifiant l'installation des dépendances requises (GitPython, PyYAML)
+//  3. Vérification de l'import et du chargement du module backend de l'application
+func VerifyPythonEnvironment(appRoot string) (*PythonEnvReport, error) {
+	if appRoot == "" {
+		appRoot = FindAppRoot()
+	}
+
+	pyBin, err := ResolvePythonBin(appRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	mode := "Automatique (.venv)"
+	if custom := ReadPythonBinFromEnv(appRoot); custom != "" {
+		mode = "Personnalisé (variable PYTHON_BIN)"
+	}
+
+	return runPythonProbe(pyBin, appRoot, mode)
+}
+
+// VerifyPythonCandidate teste un interpréteur candidat avant d'autoriser sa sauvegarde dans la configuration :
+// - Si isAuto est true : teste l'environnement virtuel local (<appRoot>/.venv).
+// - Sinon : teste le binaire personnalisé spécifié (avec tolérance 'activate' -> 'python').
+func VerifyPythonCandidate(appRoot string, candidatePyBin string, isAuto bool) (*PythonEnvReport, error) {
+	if appRoot == "" {
+		appRoot = FindAppRoot()
+	}
+
+	targetPy := candidatePyBin
+	mode := "Personnalisé (variable PYTHON_BIN)"
+
+	if isAuto {
+		venvPy := filepath.Join(appRoot, ".venv", "Scripts", "python.exe")
+		if runtime.GOOS != "windows" {
+			venvPy = filepath.Join(appRoot, ".venv", "bin", "python")
+		}
+		if fi, err := os.Stat(venvPy); err != nil || fi.IsDir() {
+			return nil, fmt.Errorf("aucun environnement virtuel .venv valide trouvé dans %s (exécutez scripts/setup_python_env.py)", appRoot)
+		}
+		targetPy = venvPy
+		mode = "Automatique (.venv)"
+	} else {
+		if filepath.Base(targetPy) == "activate" {
+			candidate := filepath.Join(filepath.Dir(targetPy), "python")
+			if runtime.GOOS == "windows" {
+				candidate = filepath.Join(filepath.Dir(targetPy), "python.exe")
+			}
+			if fi, errStat := os.Stat(candidate); errStat == nil && !fi.IsDir() {
+				targetPy = candidate
+			}
+		}
+		if fi, errStat := os.Stat(targetPy); errStat != nil || fi.IsDir() {
+			return nil, fmt.Errorf("l'exécutable Python spécifié est introuvable ou inaccessible : %s", targetPy)
+		}
+	}
+
+	return runPythonProbe(targetPy, appRoot, mode)
+}
+
+// CheckPythonEnvironment vérifie qu'un interpréteur Python valide est résolu
+// et que toutes les dépendances requises sont présentes et prêtes à l'emploi.
+func CheckPythonEnvironment(appRoot string) error {
+	report, err := VerifyPythonEnvironment(appRoot)
+	if err != nil {
+		return fmt.Errorf("environnement Python invalide : %w", err)
+	}
+	if !report.Success {
+		var details []string
+		if len(report.MissingDeps) > 0 {
+			details = append(details, fmt.Sprintf("dépendance(s) manquante(s) : %s", strings.Join(report.MissingDeps, ", ")))
+		} else if report.AppLoadError != "" {
+			details = append(details, fmt.Sprintf("erreur chargement backend : %s", report.AppLoadError))
+		}
+		details = append(details, "Pour installer les dépendances nécessaires, exécutez :\n    python scripts/setup_python_env.py")
+		return fmt.Errorf("environnement Python invalide : %s", strings.Join(details, "\n"))
+	}
+	return nil
+}
+
+// ResolvePythonBin détermine quel interpréteur Python utiliser, par ordre de priorité :
 //  1. PYTHON_BIN (variable d'environnement système, ou définie dans le .env applicatif) ;
 //  2. l'environnement virtuel autonome créé dans les fichiers de l'application
 //     (<appRoot>/.venv, via scripts/setup_python_env.py).
@@ -75,8 +218,21 @@ func CheckPythonEnvironment(appRoot string) error {
 // Unix, "python" sous Windows) ferait démarrer l'application même sans
 // dépendances installées, pour planter plus tard avec un ModuleNotFoundError
 // incompréhensible. On préfère échouer tout de suite, explicitement.
-func resolvePythonBin(appRoot string) (string, error) {
+func ResolvePythonBin(appRoot string) (string, error) {
+	if appRoot == "" {
+		appRoot = FindAppRoot()
+	}
 	if customPy := ReadPythonBinFromEnv(appRoot); customPy != "" {
+		// Tolérance utilisateur : si le script d'activation 'activate' a été renseigné à la place du binaire python
+		if filepath.Base(customPy) == "activate" {
+			candidate := filepath.Join(filepath.Dir(customPy), "python")
+			if runtime.GOOS == "windows" {
+				candidate = filepath.Join(filepath.Dir(customPy), "python.exe")
+			}
+			if fi, errStat := os.Stat(candidate); errStat == nil && !fi.IsDir() {
+				return candidate, nil
+			}
+		}
 		return customPy, nil
 	}
 
@@ -95,6 +251,10 @@ func resolvePythonBin(appRoot string) (string, error) {
 			"Pour utiliser un interpréteur existant, renseignez PYTHON_BIN dans votre .env :\n" +
 			"    PYTHON_BIN=/chemin/vers/votre/python",
 	)
+}
+
+func resolvePythonBin(appRoot string) (string, error) {
+	return ResolvePythonBin(appRoot)
 }
 
 // runPythonCommand exécute la commande Python et récupère stdout
@@ -298,6 +458,27 @@ func (p *PythonClient) GetReleaseNotes(fromTag, toTag string) (*models.ReleaseNo
 	var res models.ReleaseNotesResponse
 	if err := json.Unmarshal(out, &res); err != nil {
 		return nil, err
+	}
+	if !res.Success && res.Error != "" {
+		return &res, fmt.Errorf("%s", res.Error)
+	}
+	return &res, nil
+}
+
+// GetRecentCommits demande à Python de récupérer l'historique complet ou récent des commits
+func (p *PythonClient) GetRecentCommits(limit int) (*models.CommitsResponse, error) {
+	args := []string{"--action", "commits"}
+	if limit > 0 {
+		args = append(args, "--limit", strconv.Itoa(limit))
+	}
+	out, err := p.runPythonCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var res models.CommitsResponse
+	if err := json.Unmarshal(out, &res); err != nil {
+		return nil, fmt.Errorf("erreur de décodage des commits : %w", err)
 	}
 	if !res.Success && res.Error != "" {
 		return &res, fmt.Errorf("%s", res.Error)

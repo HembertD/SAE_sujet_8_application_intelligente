@@ -19,6 +19,16 @@ class CommitInfo:
     message: str
     author: str
     date: str
+    tag: str = ""
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "sha": self.sha,
+            "message": self.message,
+            "author": self.author,
+            "date": self.date,
+            "tag": self.tag,
+        }
 
 
 class GitWrapper:
@@ -215,10 +225,66 @@ class GitWrapper:
         """Retourne le payload directement exploitable par le modèle, sans bloc prompt interne."""
         return self.get_staged_diff_payload(max_chars=max_chars)
 
+    def get_recent_commits(self, limit: int = 0) -> list[CommitInfo]:
+        """Récupère l'historique complet ou récent des commits avec leurs tags associés."""
+        try:
+            if not self.repo.head.is_valid():
+                return []
+            tags_by_sha: dict[str, str] = {}
+            for tag in self.repo.tags:
+                try:
+                    target_sha = tag.commit.hexsha
+                    tags_by_sha[target_sha] = tag.name
+                except Exception:
+                    pass
+
+            kwargs: dict[str, object] = {}
+            if limit > 0:
+                kwargs["max_count"] = limit
+
+            commits = list(self.repo.iter_commits("HEAD", **kwargs))
+            return [
+                CommitInfo(
+                    sha=c.hexsha[:7],
+                    message=c.message.splitlines()[0].strip() if c.message else "",
+                    author=c.author.name,
+                    date=c.committed_datetime.strftime("%Y-%m-%d"),
+                    tag=tags_by_sha.get(c.hexsha, ""),
+                )
+                for c in commits
+            ]
+        except Exception as exc:
+            raise GitWrapperError(f"Erreur lors de la récupération des commits : {exc}") from exc
+
     def get_commits_between_tags(self, tag_a: str, tag_b: str) -> list[CommitInfo]:
         """Récupère l'historique des commits structurés entre deux tags ou révisions."""
         try:
-            rev_range = f"{tag_a}..{tag_b}"
+            rev_a = tag_a
+            rev_b = tag_b
+
+            # Détection et inversion si l'utilisateur a inversé l'ordre chronologique
+            try:
+                commit_a = self.repo.commit(tag_a)
+                commit_b = self.repo.commit(tag_b)
+                if self.repo.is_ancestor(commit_b, commit_a):
+                    rev_a, rev_b = tag_b, tag_a
+            except Exception:
+                pass
+
+            # Si rev_a est un hash de commit (et pas un tag Git explicite), on cherche à inclure le commit de départ
+            is_tag = any(t.name == rev_a for t in self.repo.tags)
+            if not is_tag:
+                try:
+                    c_start = self.repo.commit(rev_a)
+                    if c_start.parents:
+                        rev_range = f"{c_start.hexsha}^..{rev_b}"
+                    else:
+                        rev_range = rev_b
+                except Exception:
+                    rev_range = f"{rev_a}..{rev_b}"
+            else:
+                rev_range = f"{rev_a}..{rev_b}"
+
             commits = list(self.repo.iter_commits(rev_range))
             return [
                 CommitInfo(

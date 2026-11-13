@@ -19,6 +19,12 @@ Ce fichier contient la suite de tests automatisés validant le pont Go ↔ Pytho
 9. **`TestSaveConfigBothMocks`** : valide l'enregistrement conjoint et la relecture distincte des réglages `MOCK_INTERFACE` et `MOCK_AI` dans le fichier `.env`.
 10. **`TestResolveForcedType`** : valide la résolution des 9 types Conventional Commits par index numérique (1 à 9), par nom exact insensible à la casse et le rejet des saisies invalides.
 11. **`TestBuildForcedTypeFeedback`** : valide la construction formatée du feedback (`type: <type>` ou `type: <type>. <consigne>`) conforme à l'extraction d'intention du backend.
+12. **`TestReadWritePythonBinSetting`** : valide l'écriture de `PYTHON_BIN`, sa relecture dans `ConfigResponse`, et sa réinitialisation vers la détection automatique.
+13. **`TestResolvePythonBinPriority`** : valide l'ordre de priorité strict de résolution (`PYTHON_BIN` surcharge `.venv`, et échec explicite sans repli silencieux si aucun environnement n'est configuré).
+14. **`TestVerifyPythonEnvironmentReal`** : valide l'exécution de la sonde complète sur l'environnement applicatif réel (présence des dépendances, absence d'erreur d'import et succès global).
+15. **`TestVerifyPythonEnvironmentInvalid`** : vérifie la détection d'erreur lorsqu'aucun environnement n'est configuré ou lorsqu'un binaire Python plante.
+16. **`TestVerifyPythonEnvironmentMissingDep`** : vérifie la détection explicite d'une dépendance manquante (`missing_deps`) et le blocage immédiat par `CheckPythonEnvironment`.
+17. **`TestVerifyPythonCandidate`** : vérifie la validation stricte d'un candidat avant modification de la configuration (rejet des binaires introuvables, des dépendances manquantes et validation des environnements intègres).
 
 ## Exécution des tests
 

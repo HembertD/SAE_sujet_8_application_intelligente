@@ -10,7 +10,7 @@ Ce fichier constitue le point d'entrée exécutable de l'interface en ligne de c
 
 - analyser les arguments et flags de la ligne de commande (`--dev`, `--mockInterface`, `--mockIA`, `--repo`, `--app-dir`) ;
 - localiser la racine applicative via `FindAppRoot` pour pointer sur le `.env` de l'application indépendamment du dépôt cible analysé ;
-- vérifier qu'un environnement Python valide est configuré (`bridge.CheckPythonEnvironment`) avant toute initialisation du backend, sauf en mode mock-interface ; arrêt immédiat (`os.Exit(1)`) avec une carte d'erreur guidée si ce n'est pas le cas ;
+- tester et vérifier automatiquement l'environnement Python et ses dépendances (`bridge.VerifyPythonEnvironment`) avant toute initialisation du backend, sauf en mode mock-interface ; affichage du statut et arrêt immédiat (`os.Exit(1)`) avec carte d'erreur explicite si une dépendance est manquante ou si l'environnement est défaillant ;
 - intercepter les signaux d'interruption système (`SIGINT` / `SIGTERM` / `Ctrl+C`) pour restaurer l'état du terminal (réaffichage du curseur et réinitialisation des couleurs) ;
 - initialiser le `BackendClient` relié au répertoire du dépôt Git et à la racine de l'application (en respectant la priorité du fichier `.env`) ;
 - interroger l'état du dépôt auprès du backend Python à chaque itération ;
@@ -22,6 +22,7 @@ Ce fichier constitue le point d'entrée exécutable de l'interface en ligne de c
 - `--dev` : active le mode développeur, autorisant l'utilisation des drapeaux de simulation en CLI et la modification des réglages de mock dans l'écran de configuration.
 - `--mockInterface` : activation forcée du mock de l'interface (`MockClient`) sans exécuter le backend Python (requiert obligatoirement `--dev`).
 - `--mockIA` : activation forcée du mock de l'IA sans serveur Ollama (requiert obligatoirement `--dev`).
+- `--python-bin <chemin>` : chemin explicite vers l'interpréteur Python à utiliser (surcharge prioritaire du `.env` et du `.venv`).
 - `--app-dir <chemin>` : chemin explicite vers la racine de l'application Gitelligence (où se trouvent le code et le `.env` applicatif). Permet d'isoler à 100% la configuration applicative lorsque le binaire est exécuté sur un dépôt tiers.
 
 ## Points clés
@@ -40,7 +41,7 @@ Précisions issues des commentaires retirés de `main.go` et non redondantes ave
 
 - En cas d'erreur de `GetRepoStatus`, le statut est dégradé à `nil` (`status = nil`) et le menu principal est quand même affiché via `views.ShowMainMenu`.
 - Toute option non reconnue dans le `switch` (`default`) provoque un retour direct au menu, sans message d'erreur ni sortie.
-- Le contrôle de l'environnement Python (`CheckPythonEnvironment`) suit exactement le même schéma que le garde `--dev` qui le précède : `ui.PrintErrorCard` suivi de `os.Exit(1)`. Il est volontairement sauté si le mode mock-interface est actif (flag `--mockInterface` ou `.env`), puisqu'aucun sous-processus Python n'est alors jamais lancé.
+- Le contrôle de l'environnement Python (`VerifyPythonEnvironment` / `CheckPythonEnvironment`) vérifie à la fois la résolution de l'interpréteur, la présence de toutes les dépendances indispensables (`GitPython`, `PyYAML`) et le chargement du backend applicatif. Il arrête immédiatement l'application avec `ui.PrintErrorCard` et des conseils de remédiation clairs en cas de manquement. Il est volontairement sauté si le mode mock-interface est actif (flag `--mockInterface` ou `.env`), puisqu'aucun sous-processus Python n'est alors jamais lancé.
 
 ## Commentaires de fonction (dupliqués du code source)
 

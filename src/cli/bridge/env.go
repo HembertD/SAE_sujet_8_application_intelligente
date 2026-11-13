@@ -310,6 +310,50 @@ func WriteNotificationsSetting(appRoot string, enabled bool) error {
 	return os.WriteFile(cleanPath, []byte(content), 0644)
 }
 
+// WritePythonBinSetting met à jour la variable PYTHON_BIN dans le fichier .env applicatif.
+// Si pythonBin est vide, réinitialise la ligne (PYTHON_BIN=) pour rétablir la détection automatique (.venv).
+func WritePythonBinSetting(appRoot string, pythonBin string) error {
+	cleanPath := FindAppEnvPath(appRoot)
+	dir := filepath.Dir(cleanPath)
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	found := false
+	var newLines []string
+	if existing, errRead := os.ReadFile(cleanPath); errRead == nil {
+		scanner := bufio.NewScanner(bytes.NewReader(existing))
+		for scanner.Scan() {
+			line := scanner.Text()
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "PYTHON_BIN=") {
+				newLines = append(newLines, fmt.Sprintf("PYTHON_BIN=%s", pythonBin))
+				found = true
+			} else {
+				newLines = append(newLines, line)
+			}
+		}
+	}
+
+	if !found {
+		newLines = append(newLines, fmt.Sprintf("\n# Interpréteur Python personnalisé (vide = détection automatique .venv)\nPYTHON_BIN=%s", pythonBin))
+	}
+
+	content := strings.Join(newLines, "\n")
+	if !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+
+	if pythonBin != "" {
+		_ = os.Setenv("PYTHON_BIN", pythonBin)
+	} else {
+		_ = os.Unsetenv("PYTHON_BIN")
+	}
+
+	return os.WriteFile(cleanPath, []byte(content), 0644)
+}
+
 // LoadConfigFromEnv lit la configuration depuis le fichier .env applicatif et renvoie une structure ConfigResponse.
 func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse {
 	cfg := &models.ConfigResponse{
@@ -320,6 +364,10 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 		MockInterface:       isMockActive,
 		MockAI:              ReadMockAISettingFromEnv(appRoot),
 		EnableNotifications: ReadEnableNotificationsFromEnv(appRoot),
+		PythonBin:           ReadPythonBinFromEnv(appRoot),
+	}
+	if resolved, err := ResolvePythonBin(appRoot); err == nil {
+		cfg.ResolvedPythonBin = resolved
 	}
 
 	envPath := FindAppEnvPath(appRoot)
@@ -364,6 +412,10 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 				case "ENABLE_NOTIFICATIONS":
 					if os.Getenv("ENABLE_NOTIFICATIONS") == "" {
 						cfg.EnableNotifications = ParseBoolFromString(v)
+					}
+				case "PYTHON_BIN":
+					if os.Getenv("PYTHON_BIN") == "" {
+						cfg.PythonBin = v
 					}
 				}
 			}

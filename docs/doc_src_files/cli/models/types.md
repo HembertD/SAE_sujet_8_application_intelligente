@@ -32,9 +32,10 @@ Proposition de commit générée par le modèle LLM au format Conventional Commi
 - `Body` (`string`, optionnel) : explications détaillées de la modification ;
 - `RawFormatted` (`string`) : message assemblé prêt pour `git commit`.
 
-### ConfigResponse & PingResponse
-- `ConfigResponse` : paramètres de configuration lus dans le `.env` applicatif (`OllamaBaseURL`, `OllamaModel`, `TimeoutS`, `EnableNotifications`, `MockInterface`, `MockAI`, `PythonBin`, `ResolvedPythonBin`).
+### ConfigResponse, PingResponse & DockerStatusResponse
+- `ConfigResponse` : paramètres de configuration lus dans le `.env` applicatif (`OllamaBaseURL`, `OllamaModel`, `TimeoutS`, `EnableNotifications`, `MockInterface`, `MockAI`, `DockerLLM`, `PythonBin`, `ResolvedPythonBin`).
 - `PingResponse` : diagnostic réseau vers le serveur Ollama de l'IUT (latence en millisecondes et liste des modèles disponibles).
+- `DockerStatusResponse` : état du conteneur Ollama piloté par Docker Compose (`Success`, `Running`, `ContainerID`, `Error`), utilisé par l'écran Configuration pour afficher `En cours`, `Arrêté` ou `Indisponible`.
 
 ## Rôle dans l’architecture
 
@@ -46,6 +47,7 @@ Précisions issues des commentaires retirés de `types.go` et non redondantes av
 
 - `DiffResponse` contient la liste des fichiers en attente (`Files`) et les métadonnées associées (`Success`, `Error`, `StagedCount`).
 - `ActionResult` représente le retour d'une action exécutée par Python (`commit`, `stage`, `push`, `save`), avec `Message`, `Sha` et `Error` optionnels.
+- `DockerStatusResponse` distingue l'échec d'interrogation (`Success=false` + `Error`) de l'absence de conteneur actif (`Success=true`, `Running=false`), afin que l'interface puisse afficher `Indisponible` sans confondre cet état avec un conteneur simplement arrêté.
 - `ReleaseNotesResponse` contient le texte Markdown synthétisé par le LLM (`Markdown`), encadré par `FromTag` / `ToTag` et `CommitCount`.
 - Le champ `Status` de `DiffFile` reprend les codes Git usuels (`M`, `A`, `D`, `R`, etc.).
 - `RepoStatus` représente l'état brut du dépôt fourni par le backend Python ; `CommitProposal` représente la suggestion au format Conventional Commits ; `ConfigResponse` contient les paramètres lus ou écrits dans le `.env` par Python ; `PingResponse` contient le diagnostic de joignabilité du serveur Ollama de l'IUT.

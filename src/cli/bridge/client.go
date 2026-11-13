@@ -8,6 +8,24 @@ import (
 	"sae-git-cli/models"
 )
 
+// DockerOllamaBaseURL est l'adresse locale exposée par le conteneur Ollama
+// lancé via docker compose. Elle est utilisée à la place de l'URL distante du
+// .env lorsque USE_DOCKER_LLM est actif.
+const DockerOllamaBaseURL = "http://localhost:11434"
+
+// EffectiveOllamaBaseURL renvoie l'URL réellement utilisée pour joindre Ollama.
+// En mode Docker, le conteneur local expose le service sur localhost ; sinon,
+// l'URL configurée dans le .env (serveur de l'IUT) est conservée.
+func EffectiveOllamaBaseURL(cfg *models.ConfigResponse) string {
+	if cfg == nil {
+		return ""
+	}
+	if cfg.DockerLLM {
+		return DockerOllamaBaseURL
+	}
+	return cfg.OllamaBaseURL
+}
+
 // BackendClient définit l'interface publique d'accès aux services du back-end.
 // Les vues front-end dépendent exclusivement de cette interface.
 type BackendClient interface {
@@ -21,9 +39,14 @@ type BackendClient interface {
 	GetRecentCommits(limit int) (*models.CommitsResponse, error)
 	GetConfig() (*models.ConfigResponse, error)
 	SaveConfig(baseURL, model string, timeout float64, mockInterface bool, mockAI ...bool) (*models.ActionResult, error)
+	SaveConfigWithDockerLLM(baseURL, model string, timeout float64, mockInterface bool, dockerLLM bool, mockAI ...bool) (*models.ActionResult, error)
 	PingOllama() (*models.PingResponse, error)
 	SaveMarkdownFile(filename, content string) error
 	IsMock() bool
+	IsDockerLLM() bool
+	DockerOllamaStatus() (*models.DockerStatusResponse, error)
+	StartDockerOllama() (*models.ActionResult, error)
+	StopDockerOllama() (*models.ActionResult, error)
 }
 
 // BridgeClient coordonne l'accès au backend en déléguant à PythonClient ou MockClient.
@@ -32,22 +55,24 @@ type BridgeClient struct {
 	appRoot            string
 	forceMockInterface bool
 	forceMockIA        bool
+	forceDockerLLM     bool
 	isMock             bool
+	isDockerLLM        bool
 	realClient         *PythonClient
 	mockClient         *MockClient
 }
 
 // NewBackendClient instancie le client de pontage vers le backend.
-func NewBackendClient(repoRoot string, forceMockInterface bool, forceMockIA ...bool) BackendClient {
+func NewBackendClient(repoRoot string, forceMockInterface bool, forceMockIA bool) BackendClient {
 	appRoot := FindAppRoot(repoRoot)
 	if isTestDir(repoRoot) {
 		appRoot = repoRoot
 	}
-	return NewBackendClientWithAppRoot(repoRoot, appRoot, forceMockInterface, forceMockIA...)
+	return NewBackendClientWithAppRoot(repoRoot, appRoot, forceMockInterface, forceMockIA)
 }
 
 // NewBackendClientWithAppRoot instancie le client en séparant le dépôt cible et la racine de l'application.
-func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceMockInterface bool, forceMockIA ...bool) BackendClient {
+func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceMockInterface bool, forceMockIA bool, forceDockerLLM ...bool) BackendClient {
 	if appRoot == "" {
 		if isTestDir(repoRoot) {
 			appRoot = repoRoot
@@ -56,10 +81,19 @@ func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceMockInterface bo
 		}
 	}
 	mockActive := forceMockInterface || ReadMockSettingFromEnv(appRoot)
-	mockIAActive := false
-	if len(forceMockIA) > 0 && forceMockIA[0] {
-		mockIAActive = true
+	mockIAActive := forceMockIA
+	if mockIAActive {
 		_ = os.Setenv("MOCK_AI", "true")
+	}
+	// Ne forcer le mode Docker que si le flag CLI --docker-llm est explicitement
+	// passé. Sinon, la valeur du .env n'est qu'un état initial : elle doit
+	// pouvoir être modifiée depuis l'interface [M] sans redémarrage.
+	dockerLLMForced := len(forceDockerLLM) > 0 && forceDockerLLM[0]
+	dockerLLMActive := dockerLLMForced
+	if dockerLLMForced {
+		_ = os.Setenv("USE_DOCKER_LLM", "true")
+	} else {
+		dockerLLMActive = ReadDockerLLMSettingFromEnv(appRoot)
 	}
 
 	return &BridgeClient{
@@ -67,7 +101,9 @@ func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceMockInterface bo
 		appRoot:            appRoot,
 		forceMockInterface: forceMockInterface,
 		forceMockIA:        mockIAActive,
+		forceDockerLLM:     dockerLLMForced,
 		isMock:             mockActive,
+		isDockerLLM:        dockerLLMActive,
 		realClient:         NewPythonClientWithAppRoot(repoRoot, appRoot),
 		mockClient:         NewMockClientWithAppRoot(repoRoot, appRoot),
 	}
@@ -86,7 +122,15 @@ func (b *BridgeClient) IsMock() bool {
 	if b.forceMockInterface {
 		return true
 	}
-	return ReadMockSettingFromEnv(b.appRoot)
+	return b.isMock
+}
+
+// IsDockerLLM indique si l'usage du serveur Ollama via Docker est activé.
+func (b *BridgeClient) IsDockerLLM() bool {
+	if b.forceDockerLLM {
+		return true
+	}
+	return b.isDockerLLM
 }
 
 // GetRepoStatus délègue la récupération de l'état du dépôt au client actif
@@ -142,22 +186,38 @@ func (b *BridgeClient) SaveMarkdownFile(filename, content string) error {
 // GetConfig lit la configuration depuis le fichier .env de l'application
 func (b *BridgeClient) GetConfig() (*models.ConfigResponse, error) {
 	cfg := LoadConfigFromEnv(b.appRoot, b.IsMock())
+	if b.forceMockInterface {
+		cfg.MockInterface = true
+	}
 	if b.forceMockIA {
 		cfg.MockAI = true
 	}
+	cfg.DockerLLM = b.IsDockerLLM()
 	return cfg, nil
 }
 
 // SaveConfig persiste la nouvelle configuration dans le .env applicatif et actualise l'état du client.
 func (b *BridgeClient) SaveConfig(baseURL, model string, timeout float64, mockInterface bool, mockAI ...bool) (*models.ActionResult, error) {
+	return b.SaveConfigWithDockerLLM(baseURL, model, timeout, mockInterface, b.IsDockerLLM(), mockAI...)
+}
+
+// SaveConfigWithDockerLLM persiste la configuration avec l'option USE_DOCKER_LLM explicite.
+func (b *BridgeClient) SaveConfigWithDockerLLM(baseURL, model string, timeout float64, mockInterface bool, dockerLLM bool, mockAI ...bool) (*models.ActionResult, error) {
 	envPath := FindAppEnvPath(b.appRoot)
-	if err := WriteEnvFile(envPath, baseURL, model, timeout, mockInterface, mockAI...); err != nil {
+	if err := WriteEnvFileWithDockerLLM(envPath, baseURL, model, timeout, mockInterface, dockerLLM, mockAI...); err != nil {
 		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
 	}
 
 	// Met à jour dynamiquement le mode si pas forcé par le flag --mockInterface
 	if !b.forceMockInterface {
 		b.isMock = mockInterface
+	}
+	b.isDockerLLM = dockerLLM
+	// Aligne aussi la variable d'environnement du processus : sans cela, une
+	// valeur USE_DOCKER_LLM héritée du shell pourrait continuer à être transmise
+	// au backend Python alors que l'utilisateur vient de désactiver le mode.
+	if !b.forceDockerLLM {
+		_ = os.Setenv("USE_DOCKER_LLM", fmt.Sprintf("%t", dockerLLM))
 	}
 
 	// Si en mode réel, tenter de notifier le backend Python
@@ -172,6 +232,24 @@ func (b *BridgeClient) SaveConfig(baseURL, model string, timeout float64, mockIn
 
 	return &models.ActionResult{
 		Success: true,
-		Message: fmt.Sprintf("Configuration sauvegardée dans %s.", filepath.Base(envPath)),
+		Message: fmt.Sprintf("Configuration sauvegardée dans %s (USE_DOCKER_LLM=%t).", filepath.Base(envPath), b.IsDockerLLM()),
 	}, nil
+}
+
+// DockerOllamaStatus interroge l'état du conteneur Ollama via le client actif.
+// En mode mock, l'état est simulé et aucune commande Docker n'est exécutée.
+func (b *BridgeClient) DockerOllamaStatus() (*models.DockerStatusResponse, error) {
+	return b.activeDelegate().DockerOllamaStatus()
+}
+
+// StartDockerOllama lance le conteneur Ollama via docker compose en déléguant
+// au client actif : le mode mock reste ainsi totalement isolé du système hôte.
+func (b *BridgeClient) StartDockerOllama() (*models.ActionResult, error) {
+	return b.activeDelegate().StartDockerOllama()
+}
+
+// StopDockerOllama arrête le conteneur Ollama via docker compose en déléguant
+// au client actif (no-op en mode mock).
+func (b *BridgeClient) StopDockerOllama() (*models.ActionResult, error) {
+	return b.activeDelegate().StopDockerOllama()
 }

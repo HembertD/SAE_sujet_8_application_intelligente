@@ -12,6 +12,7 @@ Ce module implémente l'interface `BackendClient` en fournissant des réponses s
 - Générer des messages de commit simulés respectant la convention Conventional Commits.
 - Produire des Release Notes formatées en Markdown sans appel réseau.
 - Simuler la connectivité et la latence avec un serveur Ollama.
+- Simuler l'état du conteneur Ollama (`DockerOllamaStatus`) et son cycle de vie (démarrage/arrêt) sans exécuter de commande Docker réelle.
 - Permettre la surcharge (`CustomError`, `CustomDiff`, `SimulateDelay = false`) pour les tests unitaires Go.
 
 ## Points clés
@@ -27,6 +28,7 @@ Précisions issues des commentaires retirés de `mock_client.go` :
 - `IsMock` retourne toujours `true` ; `SimulateDelay` (via `sleep`) simule les latences réseau.
 - Données types : branche `interface-cli` avec 3 fichiers indexés et 1 non indexé ; `src/auth/token_vault.py` avec données sensibles masquées (`HasSecretsMasked`) ; `assets/banner.png` comme fichier binaire exclu.
 - `GenerateCommit` renvoie une proposition Conventional Commits adaptée au `feedback` éventuel ; `ApplyCommit` applique le commit sur la branche courante ; `Push` envoie vers la branche distante ; `GetReleaseNotes` synthétise le Markdown entre deux tags ; `PingOllama` vérifie la joignabilité d'Ollama ; `SaveMarkdownFile` enregistre localement le Markdown exporté ; `GetConfig` / `SaveConfig` lisent et mettent à jour le `.env` applicatif.
+- `dockerRunning` conserve l'état simulé du conteneur : `DockerOllamaStatus` le renvoie, `StartDockerOllama` le passe à `true` et `StopDockerOllama` à `false`, sans aucun appel système.
 
 ## Commentaires de fonction (dupliqués du code source)
 
@@ -44,6 +46,9 @@ Précisions issues des commentaires retirés de `mock_client.go` :
 - `MockClient.GetConfig()` : Charge la configuration simulée depuis l'environnement.
 - `MockClient.SaveConfig()` : Persiste la configuration simulée dans le .env applicatif.
 - `MockClient.PingOllama()` : Retourne un diagnostic Ollama simulé.
+- `MockClient.DockerOllamaStatus()` : Retourne l'état simulé du conteneur Ollama.
+- `MockClient.StartDockerOllama()` : Passe l'état simulé du conteneur à « en cours ».
+- `MockClient.StopDockerOllama()` : Passe l'état simulé du conteneur à « arrêté ».
 - `MockClient.SaveMarkdownFile()` : Sauvegarde le contenu Markdown dans le dépôt simulé.
 - `extractForcedType()` : Détecte un type forcé dans la consigne de feedback via regex d'intention explicite (aligné sur `_extract_forced_type` de `llm.py`).
 

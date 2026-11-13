@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"sae-git-cli/models"
 )
@@ -322,11 +324,16 @@ func (p *PythonClient) runPythonCommand(args ...string) ([]byte, error) {
 	if cfg.MockAI {
 		mockAIStr = "true"
 	}
+
+	// En mode Docker, le serveur Ollama est exposé localement par le conteneur.
+	// L'URL distante reste stockée dans le .env pour pouvoir y revenir lorsque
+	// l'option est désactivée.
 	env = append(env,
-		fmt.Sprintf("OLLAMA_BASE_URL=%s", cfg.OllamaBaseURL),
+		fmt.Sprintf("OLLAMA_BASE_URL=%s", EffectiveOllamaBaseURL(cfg)),
 		fmt.Sprintf("OLLAMA_MODEL=%s", cfg.OllamaModel),
 		fmt.Sprintf("OLLAMA_TIMEOUT_S=%.0f", cfg.TimeoutS),
 		fmt.Sprintf("MOCK_AI=%s", mockAIStr),
+		fmt.Sprintf("USE_DOCKER_LLM=%t", cfg.DockerLLM),
 		fmt.Sprintf("GITELLIGENCE_APP_ROOT=%s", p.appRoot),
 		fmt.Sprintf("SMART_COMMIT_APP_ROOT=%s", p.appRoot),
 	)
@@ -529,4 +536,143 @@ func (p *PythonClient) PingOllama() (*models.PingResponse, error) {
 func (p *PythonClient) SaveMarkdownFile(filename, content string) error {
 	path := filepath.Join(p.repoRoot, filename)
 	return os.WriteFile(path, []byte(content), 0644)
+}
+
+// IsDockerLLM indique si le mode Docker LLM est activé.
+func (p *PythonClient) IsDockerLLM() bool {
+	return ReadDockerLLMSettingFromEnv(p.appRoot)
+}
+
+// dockerComposeCommand prépare une commande docker compose depuis la racine de
+// l'application. Le contexte permet de borner les commandes de diagnostic qui
+// ne doivent jamais bloquer l'interface.
+func (p *PythonClient) dockerComposeCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
+	composeFile := filepath.Join(p.appRoot, "docker-compose.yml")
+	if _, err := os.Stat(composeFile); err != nil {
+		return nil, fmt.Errorf("fichier docker-compose.yml introuvable à la racine de l'application : %s", composeFile)
+	}
+
+	cmdArgs := append([]string{"compose", "-f", composeFile}, args...)
+	cmd := exec.CommandContext(ctx, "docker", cmdArgs...)
+	cmd.Dir = p.appRoot
+	return cmd, nil
+}
+
+// dockerComposeOutput exécute une commande docker compose et renvoie stdout et
+// stderr combinés. Utilisé pour les actions où les logs de build sont utiles.
+func (p *PythonClient) dockerComposeOutput(args ...string) ([]byte, error) {
+	cmd, err := p.dockerComposeCommand(context.Background(), args...)
+	if err != nil {
+		return nil, err
+	}
+	return cmd.CombinedOutput()
+}
+
+// DockerOllamaStatus vérifie si le conteneur Ollama du projet Compose est en
+// cours d'exécution. Une indisponibilité de Docker n'est pas une erreur fatale :
+// elle est exposée dans le champ Error pour que l'interface puisse l'afficher.
+func (p *PythonClient) DockerOllamaStatus() (*models.DockerStatusResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cmd, err := p.dockerComposeCommand(ctx, "ps", "-q", "ollama")
+	if err != nil {
+		return &models.DockerStatusResponse{
+			Success: false,
+			Running: false,
+			Error:   fmt.Sprintf("impossible de vérifier le conteneur Ollama : %s", err),
+		}, nil
+	}
+
+	// Output ne renvoie que stdout en cas de succès : un warning Docker Compose
+	// sur stderr ne peut donc pas être confondu avec un identifiant de conteneur.
+	output, err := cmd.Output()
+	if err != nil {
+		detail := ""
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			detail = strings.TrimSpace(string(exitErr.Stderr))
+		}
+		if ctx.Err() == context.DeadlineExceeded {
+			detail = "délai d'attente dépassé (10s)"
+		}
+		if detail == "" {
+			detail = err.Error()
+		}
+		return &models.DockerStatusResponse{
+			Success: false,
+			Running: false,
+			Error:   fmt.Sprintf("impossible de vérifier le conteneur Ollama : %s", detail),
+		}, nil
+	}
+
+	containerID := strings.TrimSpace(string(output))
+	return &models.DockerStatusResponse{
+		Success:     true,
+		Running:     containerID != "",
+		ContainerID: containerID,
+	}, nil
+}
+
+// runDockerCompose exécute une commande docker compose depuis la racine de
+// l'application et normalise les erreurs (binaire absent, sortie vide, etc.).
+func (p *PythonClient) runDockerCompose(args ...string) (*models.ActionResult, error) {
+	output, err := p.dockerComposeOutput(args...)
+	if err != nil {
+		detail := strings.TrimSpace(string(output))
+		if detail == "" {
+			detail = err.Error()
+		}
+		action := "du lancement"
+		if len(args) > 0 && args[0] == "down" {
+			action = "de l'arrêt"
+		}
+		return &models.ActionResult{
+			Success: false,
+			Error:   fmt.Sprintf("échec %s du conteneur Ollama : %s", action, detail),
+		}, err
+	}
+
+	if len(args) > 0 && args[0] == "down" {
+		return &models.ActionResult{
+			Success: true,
+			Message: "Conteneur Ollama arrêté.",
+		}, nil
+	}
+
+	return &models.ActionResult{
+		Success: true,
+		Message: "Commande de démarrage envoyée. Vérifiez la ligne « Conteneur Docker » et les logs en cas d'arrêt.",
+	}, nil
+}
+
+// StartDockerOllama lance le conteneur Ollama via docker compose.
+// --build garantit que les modifications du Dockerfile ou de entrypoint.sh
+// sont prises en compte, tout en réutilisant le cache Docker.
+func (p *PythonClient) StartDockerOllama() (*models.ActionResult, error) {
+	return p.runDockerCompose("up", "-d", "--build")
+}
+
+// StopDockerOllama arrête le conteneur Ollama via docker compose.
+func (p *PythonClient) StopDockerOllama() (*models.ActionResult, error) {
+	return p.runDockerCompose("down")
+}
+
+// SaveConfigWithDockerLLM persiste la configuration avec l'option USE_DOCKER_LLM explicite.
+func (p *PythonClient) SaveConfigWithDockerLLM(baseURL, model string, timeout float64, mockInterface bool, dockerLLM bool, mockAI ...bool) (*models.ActionResult, error) {
+	envPath := FindAppEnvPath(p.appRoot)
+	if err := WriteEnvFileWithDockerLLM(envPath, baseURL, model, timeout, mockInterface, dockerLLM, mockAI...); err != nil {
+		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
+	}
+
+	_, _ = p.runPythonCommand(
+		"--action", "save-config",
+		"--base-url", baseURL,
+		"--model", model,
+		"--timeout", fmt.Sprintf("%f", timeout),
+	)
+
+	return &models.ActionResult{
+		Success: true,
+		Message: fmt.Sprintf("Configuration sauvegardée dans %s (USE_DOCKER_LLM=%t).", filepath.Base(envPath), dockerLLM),
+	}, nil
 }

@@ -20,7 +20,7 @@ Ce fichier contient la suite de tests automatisés validant le pont Go ↔ Pytho
 10. **`TestResolveForcedType`** : valide la résolution des 9 types Conventional Commits par index numérique (1 à 9), par nom exact insensible à la casse et le rejet des saisies invalides.
 11. **`TestBuildForcedTypeFeedback`** : valide la construction formatée du feedback (`type: <type>` ou `type: <type>. <consigne>`) conforme à l'extraction d'intention du backend.
 12. **`TestBridgeClientMockNeExecutePasDocker`** : garantit qu'en mode mock, `DockerOllamaStatus`, `StartDockerOllama` et `StopDockerOllama` renvoient un état/réponse simulé sans exécuter de commande Docker réelle, et que l'état simulé passe bien de arrêté à en cours puis à arrêté.
-13. **`TestPythonClientDockerOllamaStatus`** : vérifie que `PythonClient.DockerOllamaStatus` exécute `docker compose ps -q ollama` et interprète correctement la sortie (identifiant présent = conteneur en cours, sortie vide = arrêté).
+13. **`TestPythonClientDockerOllamaStatus`** : vérifie que `PythonClient.DockerOllamaStatus` exécute `docker compose ps -q ollama` et interprète correctement la sortie (identifiant présent = conteneur en cours, sortie vide = arrêté). Vérifie aussi qu'un warning Docker Compose émis sur `stderr` n'est pas confondu avec un identifiant de conteneur.
 14. **`TestEffectiveOllamaBaseURL`** : vérifie le choix de l'URL Ollama (`localhost:11434` en mode Docker, URL du `.env` sinon, chaîne vide pour une config nulle).
 15. **`TestReadDockerLLMSettingFromEnvPriorite`** : valide la priorité variable d'environnement > `.env` pour `USE_DOCKER_LLM`, ainsi que la lecture par `PythonClient.IsDockerLLM`.
 16. **`TestWriteEnvFilePreserveDockerLLM`** : vérifie l'écriture explicite de `USE_DOCKER_LLM` (true/false) et sa préservation par l'ancienne signature `WriteEnvFile`.
@@ -31,6 +31,7 @@ Ce fichier contient la suite de tests automatisés validant le pont Go ↔ Pytho
 21. **`TestVerifyPythonEnvironmentInvalid`** : vérifie la détection d'erreur lorsqu'aucun environnement n'est configuré ou lorsqu'un binaire Python plante.
 22. **`TestVerifyPythonEnvironmentMissingDep`** : vérifie la détection explicite d'une dépendance manquante (`missing_deps`) et le blocage immédiat par `CheckPythonEnvironment`.
 23. **`TestVerifyPythonCandidate`** : vérifie la validation stricte d'un candidat avant modification de la configuration (rejet des binaires introuvables, des dépendances manquantes et validation des environnements intègres).
+24. **`TestForcedMockInterfaceOverridesEnvFile`** : garantit que le flag `--mockInterface` reste prioritaire sur un `MOCK_INTERFACE=false` présent dans le `.env`, y compris dans `GetConfig()`.
 
 ## Exécution des tests
 

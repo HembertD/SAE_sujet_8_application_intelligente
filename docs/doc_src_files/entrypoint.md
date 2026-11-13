@@ -11,10 +11,11 @@ Ce script shell est le point d'entrée (`ENTRYPOINT`) du conteneur Docker Ollama
 1. Lance `ollama serve` en arrière-plan et mémorise son PID
 2. Installe un `trap` `SIGTERM`/`SIGINT` qui transmet proprement l'arrêt au serveur Ollama (évite le `SIGKILL` de Docker après timeout et protège le stockage des modèles)
 3. Attend que l'API Ollama soit joignable pendant 30 secondes maximum (1 tentative par seconde) via `ollama list` — `curl` n'est pas présent dans l'image `ollama/ollama:latest`
-4. Lit le modèle cible dans `OLLAMA_MODEL` (valeur du `.env` propagée par `docker compose`), avec `gemma4:26b` par défaut (modèle de référence IUT ; `gemma4:12b` possible en local)
-5. Si le modèle n'est pas déjà installé, exécute `ollama pull "$OLLAMA_MODEL"`
-6. En cas d'échec du téléchargement (nom de modèle inexistant, registre inaccessible), affiche une erreur explicite rappelant de vérifier `OLLAMA_MODEL` dans le `.env`, puis quitte avec le code 1
-7. Appelle `wait` sur le PID d'Ollama pour maintenir le conteneur en vie
+4. Si le serveur n'est toujours pas joignable au bout des 30 secondes, affiche une erreur explicite et quitte avec le code 1 au lieu de tenter un `pull` sur un serveur mort
+5. Lit le modèle cible dans `OLLAMA_MODEL` (valeur du `.env` propagée par `docker compose`), avec `gemma4:26b` par défaut (modèle de référence IUT ; `gemma4:12b` possible en local)
+6. Si le modèle n'est pas déjà installé, exécute `ollama pull "$OLLAMA_MODEL"`
+7. En cas d'échec du téléchargement (nom de modèle inexistant, registre inaccessible), affiche une erreur explicite rappelant de vérifier `OLLAMA_MODEL` dans le `.env`, puis quitte avec le code 1
+8. Appelle `wait` sur le PID d'Ollama pour maintenir le conteneur en vie
 
 ## Sortie console exemple
 
@@ -22,6 +23,13 @@ Ce script shell est le point d'entrée (`ENTRYPOINT`) du conteneur Docker Ollama
 Ollama server is ready.
 Pulling model gemma4:26b (this may take a while)...
 ...
+```
+
+En cas de serveur Ollama non démarré :
+
+```
+Waiting for Ollama server... (30/30)
+ERREUR : le serveur Ollama n'a pas démarré dans les 30 secondes.
 ```
 
 En cas de modèle invalide :

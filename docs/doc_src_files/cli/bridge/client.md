@@ -26,8 +26,9 @@ Ce fichier définit l'interface maîtresse `BackendClient` et le coordinateur ad
 Précisions issues des commentaires retirés de `client.go` :
 
 - `BridgeClient` coordonne l'accès au backend en déléguant à `PythonClient` ou `MockClient` ; `activeDelegate` renvoie l'implémentation active selon `IsMock`.
-- `IsMock` indique si le mode simulation est actif : le drapeau forcé `forceMockInterface` est prioritaire, sinon lecture via `ReadMockSettingFromEnv`.
-- `GetConfig` lit la configuration depuis le `.env` de l'application et force `MockAI` à `true` si `forceMockIA` est actif ; expose également l'état de `DockerLLM`.
+- `IsMock` indique si le mode simulation est actif : le drapeau forcé `forceMockInterface` est prioritaire, sinon l'état en mémoire `isMock` initialisé depuis `ReadMockSettingFromEnv` et mis à jour par `SaveConfig`.
+- `IsDockerLLM` suit la même logique : `forceDockerLLM` (flag `--docker-llm`) est prioritaire, sinon l'état en mémoire `isDockerLLM` initialisé depuis le `.env`/l'environnement et mis à jour par `SaveConfigWithDockerLLM`. Cela évite qu'une variable d'environnement globale écrase une modification faite dans l'interface. La sauvegarde resynchronise également `USE_DOCKER_LLM` dans l'environnement du processus (sauf mode forcé) pour que le sous-processus Python utilise immédiatement la même valeur.
+- `GetConfig` lit la configuration depuis le `.env` de l'application et force `MockInterface` à `true` si `forceMockInterface` est actif, ainsi que `MockAI` à `true` si `forceMockIA` est actif ; expose également l'état de `DockerLLM`.
 - `SaveConfig` persiste la nouvelle configuration dans le `.env` applicatif puis actualise l'état du client : mise à jour dynamique de `isMock` sauf si forcé par `--mockInterface`, et notification du backend Python via `save-config` uniquement en mode réel.
 - `SaveConfigWithDockerLLM` persiste la configuration avec la valeur explicite de `USE_DOCKER_LLM`.
 - `DockerOllamaStatus`, `StartDockerOllama` et `StopDockerOllama` délèguent à `activeDelegate()` : `PythonClient` interroge réellement `docker compose ps -q ollama` et exécute `docker compose up -d --build` / `down`, tandis que `MockClient` renvoie un état et des réponses simulés sans toucher au système.

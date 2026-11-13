@@ -14,7 +14,7 @@ Ce module implémente le pont de communication entre l'interface TUI Go et le ba
 ## Architecture & Responsabilités
 
 1. **`BackendClient` (Interface)** :
-   - Définit le contrat haut niveau et fortement typé (`GetRepoStatus`, `GetDiff`, `StageAll`, `GenerateCommit`, `ApplyCommit`, `Push`, `GetReleaseNotes`, `GetConfig`, `SaveConfig`, `PingOllama`, `DockerOllamaStatus`, `StartDockerOllama`, `StopDockerOllama`, `SaveMarkdownFile`, `IsMock`).
+   - Définit le contrat haut niveau et fortement typé (`GetRepoStatus`, `GetDiff`, `StageAll`, `GenerateCommit`, `ApplyCommit`, `Push`, `GetReleaseNotes`, `GetConfig`, `SaveConfig`, `SaveConfigWithDockerLLM`, `PingOllama`, `DockerOllamaStatus`, `StartDockerOllama`, `StopDockerOllama`, `SaveMarkdownFile`, `IsMock`, `IsDockerLLM`).
 
 2. **`PythonClient` (Mode Standard)** :
    - Exécute les commandes en sous-processus via `exec.Command` (`python3 -m git_commit_release_notes_generator.service.core`) ;

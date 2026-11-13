@@ -1,0 +1,33 @@
+# Sprint N°9 : Aide universelle CLI (--help / --version), audit d'environnement Python, fiabilisation Ollama et durcissement Docker
+
+User Stories :
+
+- US 9.1 : En tant que développeur, j'implémente un système complet d'aide universelle et de versionnage en ligne de commande (`src/cli/ui/help.go`, `src/cli/version/version.go`, `src/cli/main.go`), interceptant immédiatement et de façon prioritaire les drapeaux d'aide (`--help`, `-h`, sous-commande `help`) et de version (`--version`, `-v`) avec un code de sortie `0` sans charger la TUI, sans solliciter Git ni initialiser Python, affichant une documentation générale structurée avec encadrés ANSI, les descriptions ciblées par sous-commande (`commit`, `release-notes`, `config`) avec exemples concrets, ainsi que les métadonnées officielles du binaire (`1.0.0`, `Gitelligence`, `git-generator`).
+
+- US 9.2 : En tant que développeur, je clarifie et applique rigoureusement la politique d'accès aux drapeaux de la ligne de commande (Carte Trello #95, `src/cli/main.go`), en imposant obligatoirement le drapeau `--dev` pour l'activation des modes de simulation (`--mockInterface` et `--mockIA`) sous peine d'interruption immédiate avec message guidé, tout en garantissant que les drapeaux opérationnels (`--repo`, `--app-dir`, `--python-bin`, `--help`, `--version`) restent librement utilisables en production sans contrainte.
+
+- US 9.3 : En tant que développeur, j'automatise l'audit d'intégrité de l'environnement Python dès le démarrage de l'application (`VerifyPythonEnvironment`, `runPythonProbe` dans `src/cli/bridge/python_client.go`) et j'expose l'action `check-env` dans le service backend (`src/git_commit_release_notes_generator/service/core.py`), vérifiant la présence et la conformité des dépendances requises (`git`, `yaml`, `urllib3`) avec arrêt immédiat et message explicite si l'interpréteur est invalide ou corrompu.
+
+- US 9.4 : En tant que développeur, je sécurise la sélection et la modification de l'interpréteur Python dans l'écran de configuration du CLI Go (`src/cli/views/config_view.go`, `src/cli/bridge/env.go`, `src/cli/models/types.go`), en validant préalablement tout chemin candidat via `VerifyPythonCandidate` avant réécriture de `PYTHON_BIN` dans le `.env`, en fournissant l'action interactive `[P]` pour lancer un diagnostic en temps réel, et en intégrant le mot-clé `auto` pour réinitialiser la détection automatique du dossier `.venv/`.
+
+- US 9.5 : En tant que développeur, j'améliore la résilience du client LLM Ollama face aux erreurs réseau (`src/git_commit_release_notes_generator/ollama_client/llm.py`), en interceptant spécifiquement les exceptions `urllib.error.HTTPError` pour distinguer un modèle introuvable ou non téléchargé (code HTTP 404) d'une erreur serveur générique (code HTTP 500), et en retournant un message explicite orientant l'utilisateur vers la commande `ollama pull` ou la vérification de `OLLAMA_MODEL`.
+
+- US 9.6 : En tant que développeur, je renforce le cycle de vie du conteneur Docker local en appliquant systématiquement la reconstruction d'image (`docker compose up -d --build`) dans le client Go (`src/cli/bridge/python_client.go`) afin d'éviter la réutilisation d'images périmées, et j'ajoute le fichier de composition dédié `docker-compose.gpu.yml` pour activer la réservation matérielle NVIDIA GPU en option sans impacter les environnements CPU standard.
+
+- US 9.7 : En tant que développeur, j'harmonise la configuration applicative (`.env.exemple`, `config.py`, `Dockerfile`, `docker-compose.yml`, `entrypoint.sh`, `mock_client.go`, `mock_llm.py`) en restaurant le modèle de référence `gemma4:26b` pour le serveur distant IUT tout en documentant le modèle local allégé `gemma4:12b`, et en forçant l'URL `localhost` côté Python uniquement lorsque `USE_DOCKER_LLM=true`.
+
+- US 9.8 : En tant que développeur, j'aligne la documentation technique (`README.md`, `doc_architecture.md`, `docs/doc_src_files/docker-compose.md`, `docs/doc_test_files/test_config.md`, `mkdocs.yml`) sur les deux modes d'inférence (serveur distant IUT vs conteneur Docker local), je documente l'override GPU et la résolution des erreurs HTTP 404, et je compile la version à jour du livrable `documentation.pdf`.
+
+- US 9.9 : En tant que développeur, je consolide la suite de tests automatisés en intégrant les tests unitaires du système d'aide (`test/cli/help_test.go`), 269 assertions dans `test/cli/bridge_test.go` validant l'audit d'environnement Python et le diagnostic des dépendances, la suite `test/test_config.py` verrouillant la configuration IUT/Docker, les tests de discrimination HTTP 404/500 dans `test/test_ollama_llm.py` et la validation backend de `check-env` dans `test/test_core.py`.
+
+
+Livrables / DoR & DoD :
+
+- Système complet d'aide universelle CLI (`--help`, `-h`, `help`), documentation contextuelle par sous-commande (`commit`, `release-notes`, `config`), et module de versionnage centralisé (`src/cli/version/version.go`, drapeaux `--version`, `-v`) pleinement opérationnels dans le CLI Go, avec code de sortie `0` sans chargement de TUI ni de Git.
+- Politique d'accès aux drapeaux CLI formalisée : drapeau `--dev` strictement obligatoire pour activer les modes de simulation (`--mockInterface`, `--mockIA`), avec arrêt explicite en cas de non-respect, tout en laissant les drapeaux opérationnels (`--repo`, `--app-dir`, `--python-bin`, etc.) librement accessibles en production.
+- Audit automatique de l'environnement Python déployé : sonde au démarrage (`VerifyPythonEnvironment`), endpoint backend `check-env` dans `core.py`, vérification préventive des modifications (`VerifyPythonCandidate`) et diagnostic interactif `[P]` dans l'écran de configuration.
+- Gestion granulaire des erreurs HTTP LLM (`ollama_client/llm.py`) : interception de `HTTPError`, distinction claire du code 404 avec invitation explicite à exécuter `ollama pull`.
+- Conteneurisation Docker locale renforcée : reconstruction automatique de l'image au lancement (`--build`), fichier de configuration GPU optionnel `docker-compose.gpu.yml`.
+- Dualité d'environnements d'inférence clarifiée et verrouillée : configuration par défaut sur le serveur distant IUT (`gemma4:26b`), bascule transparente sur `localhost` et modèle local `gemma4:12b` sous `USE_DOCKER_LLM=true`, validée par la suite `test_config.py`.
+- Documentation technique MkDocs (`mkdocs.yml`, fiches miroirs `help.md`, `version.md`, `help_test.md`, `test_config.md`, `docker-compose.md`, `doc_architecture.md`, `README.md`) synchronisée et livrable `documentation.pdf` actualisé.
+- Suite de tests automatisés validée à 100% : 74 tests unitaires Python (hors slow) passés avec succès et tests Go au vert.

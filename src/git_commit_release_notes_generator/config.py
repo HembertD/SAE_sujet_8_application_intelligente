@@ -58,6 +58,7 @@ def load_env() -> dict[str, str]:
         "OLLAMA_MODEL",
         "OLLAMA_TIMEOUT_S",
         "OLLAMA_NUM_CTX",
+        "USE_DOCKER_LLM",
         "APP_LANGUAGE",
         "MOCK_INTERFACE",
         "MOCK_AI",
@@ -74,6 +75,14 @@ if "OLLAMA_BASE_URL" not in ENV:
     ENV["OLLAMA_BASE_URL"] = "http://10.22.28.190:11434"
 if "OLLAMA_MODEL" not in ENV:
     ENV["OLLAMA_MODEL"] = "gemma4:26b"
+if "USE_DOCKER_LLM" not in ENV:
+    ENV["USE_DOCKER_LLM"] = "false"
+# En mode Docker, le serveur Ollama est exposé localement par le conteneur.
+# Cette bascule est aussi appliquée ici pour que le backend Python fonctionne
+# correctement lorsqu'il est lancé seul (tests, scripts, exécution directe).
+USE_DOCKER_LLM = parse_bool(ENV["USE_DOCKER_LLM"])
+if USE_DOCKER_LLM:
+    ENV["OLLAMA_BASE_URL"] = "http://localhost:11434"
 if "OLLAMA_TIMEOUT_S" not in ENV:
     ENV["OLLAMA_TIMEOUT_S"] = "300"
 if "OLLAMA_NUM_CTX" not in ENV:

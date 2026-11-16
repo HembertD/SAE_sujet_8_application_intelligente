@@ -37,6 +37,7 @@ type MockClient struct {
 	repoRoot      string
 	appRoot       string
 	SimulateDelay bool
+	dockerRunning bool
 
 	// Champs de surcharge pour les tests unitaires
 	CustomRepoStatus     *models.RepoStatus
@@ -176,11 +177,11 @@ func (m *MockClient) GenerateCommit(feedback string) (*models.CommitProposal, er
 	}
 
 	return &models.CommitProposal{
-		Success: true,
-		Type:    "feat",
-		Scope:   "auth",
-		Subject: "ajout de l'authentification OAuth2 sécurisée",
-		Body:    "Intègre la gestion des jetons d'accès et filtre automatiquement les variables d'environnement sensibles.",
+		Success:      true,
+		Type:         "feat",
+		Scope:        "auth",
+		Subject:      "ajout de l'authentification OAuth2 sécurisée",
+		Body:         "Intègre la gestion des jetons d'accès et filtre automatiquement les variables d'environnement sensibles.",
 		RawFormatted: "feat(auth): ajout de l'authentification OAuth2 sécurisée\n\nIntègre la gestion des jetons d'accès et filtre automatiquement les variables d'environnement sensibles.",
 	}, nil
 }
@@ -311,8 +312,8 @@ func (m *MockClient) PingOllama() (*models.PingResponse, error) {
 		Reachable: true,
 		LatencyMs: 42,
 		InstalledModels: []string{
-			"gemma4:12b",
 			"gemma4:26b",
+			"gemma4:12b",
 			"mistral:latest",
 			"codellama:7b",
 		},
@@ -323,4 +324,47 @@ func (m *MockClient) PingOllama() (*models.PingResponse, error) {
 func (m *MockClient) SaveMarkdownFile(filename, content string) error {
 	path := filepath.Join(m.repoRoot, filename)
 	return os.WriteFile(path, []byte(content), 0644)
+}
+
+// IsDockerLLM indique si le mode Docker LLM est actif (toujours false en mock).
+func (m *MockClient) IsDockerLLM() bool {
+	return false
+}
+
+// DockerOllamaStatus renvoie l'état simulé du conteneur Ollama.
+func (m *MockClient) DockerOllamaStatus() (*models.DockerStatusResponse, error) {
+	return &models.DockerStatusResponse{
+		Success: true,
+		Running: m.dockerRunning,
+	}, nil
+}
+
+// StartDockerOllama lance le conteneur Ollama (opération no-op en mock).
+func (m *MockClient) StartDockerOllama() (*models.ActionResult, error) {
+	m.dockerRunning = true
+	return &models.ActionResult{
+		Success: true,
+		Message: "Mode mock : démarrage du conteneur Ollama simulé.",
+	}, nil
+}
+
+// StopDockerOllama arrête le conteneur Ollama (opération no-op en mock).
+func (m *MockClient) StopDockerOllama() (*models.ActionResult, error) {
+	m.dockerRunning = false
+	return &models.ActionResult{
+		Success: true,
+		Message: "Mode mock : arrêt du conteneur Ollama simulé.",
+	}, nil
+}
+
+// SaveConfigWithDockerLLM persiste la configuration avec l'option USE_DOCKER_LLM (mock).
+func (m *MockClient) SaveConfigWithDockerLLM(baseURL, model string, timeout float64, mockInterface bool, dockerLLM bool, mockAI ...bool) (*models.ActionResult, error) {
+	envPath := FindAppEnvPath(m.appRoot)
+	if err := WriteEnvFileWithDockerLLM(envPath, baseURL, model, timeout, mockInterface, dockerLLM, mockAI...); err != nil {
+		return nil, fmt.Errorf("impossible d'écrire dans le fichier .env applicatif : %w", err)
+	}
+	return &models.ActionResult{
+		Success: true,
+		Message: fmt.Sprintf("Configuration sauvegardée dans %s (USE_DOCKER_LLM=%t).", filepath.Base(envPath), dockerLLM),
+	}, nil
 }

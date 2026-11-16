@@ -63,11 +63,16 @@ nav:
               - Métriques: doc_scripts_files/run_metrics.md
               - Environnement Python: doc_scripts_files/setup_python_env.md
               - PDF: doc_scripts_files/generate_documentation_pdf.md
+      - Docker:
+          - Dockerfile: doc_src_files/Dockerfile.md
+          - Docker Compose: doc_src_files/docker-compose.md
+          - Entrypoint: doc_src_files/entrypoint.md
       - CLI Go (guide): explication_go_cli.md
 
       - Tests:
           - Présentation: doc_test_files/README.md
           - Core (point d'entrée): doc_test_files/test_core.md
+          - Configuration: doc_test_files/test_config.md
           - Git wrapper: doc_test_files/test_git_wrapper.md
           - Intégration Git wrapper (slow): doc_test_files/test_integration_git_wrapper_slow.md
           - Ollama LLM: doc_test_files/test_ollama_llm.md

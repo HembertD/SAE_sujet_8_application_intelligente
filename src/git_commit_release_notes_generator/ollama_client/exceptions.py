@@ -30,3 +30,8 @@ class ConflictResolutionError(RuntimeError):
 class ReleaseNotesError(RuntimeError):
     """Les release notes générées par le modèle sont invalides, même après retry
     (contenu vide ou réponse non exploitable)."""
+
+
+class ImageDescriptionError(RuntimeError):
+    """La description d'image générée par le modèle de vision est invalide, même
+    après retry (contenu vide ou réponse non exploitable)."""

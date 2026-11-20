@@ -242,5 +242,81 @@ def test_get_staged_diff_still_excludes_unsupported_binary_files(tmp_path):
     assert all(f.path != "logo.png" for f in files)
 
 
+_PNG_BYTES_V1 = b"\x89PNG\r\n\x1a\n" + bytes(range(50))
+_PNG_BYTES_V2 = b"\x89PNG\r\n\x1a\n" + bytes(range(50, 100))
+
+
+def test_get_staged_image_changes_detects_addition(tmp_path):
+    repo_dir = tmp_path / "repo"
+    _init_repo_with_base_commit(repo_dir)
+
+    (repo_dir / "photo.png").write_bytes(_PNG_BYTES_V1)
+    _run_git(["add", "-A"], repo_dir)
+
+    wrapper = GitWrapper(repo_dir)
+    changes = wrapper.get_staged_image_changes()
+
+    assert len(changes) == 1
+    assert changes[0].path == "photo.png"
+    assert changes[0].status == "A"
+    assert changes[0].new_bytes == _PNG_BYTES_V1
+    assert changes[0].old_bytes is None
+
+
+def test_get_staged_image_changes_detects_modification(tmp_path):
+    repo_dir = tmp_path / "repo"
+    _init_repo_with_base_commit(repo_dir)
+
+    photo = repo_dir / "photo.png"
+    photo.write_bytes(_PNG_BYTES_V1)
+    _run_git(["add", "-A"], repo_dir)
+    _run_git(["commit", "-m", "ajout photo"], repo_dir)
+
+    photo.write_bytes(_PNG_BYTES_V2)
+    _run_git(["add", "-A"], repo_dir)
+
+    wrapper = GitWrapper(repo_dir)
+    changes = wrapper.get_staged_image_changes()
+
+    assert len(changes) == 1
+    assert changes[0].status == "M"
+    assert changes[0].old_bytes == _PNG_BYTES_V1
+    assert changes[0].new_bytes == _PNG_BYTES_V2
+
+
+def test_get_staged_image_changes_detects_deletion(tmp_path):
+    repo_dir = tmp_path / "repo"
+    _init_repo_with_base_commit(repo_dir)
+
+    photo = repo_dir / "photo.png"
+    photo.write_bytes(_PNG_BYTES_V1)
+    _run_git(["add", "-A"], repo_dir)
+    _run_git(["commit", "-m", "ajout photo"], repo_dir)
+
+    _run_git(["rm", "photo.png"], repo_dir)
+
+    wrapper = GitWrapper(repo_dir)
+    changes = wrapper.get_staged_image_changes()
+
+    assert len(changes) == 1
+    assert changes[0].status == "D"
+    assert changes[0].old_bytes == _PNG_BYTES_V1
+    assert changes[0].new_bytes is None
+
+
+def test_get_staged_image_changes_ignores_text_and_document_files(tmp_path):
+    repo_dir = tmp_path / "repo"
+    _init_repo_with_base_commit(repo_dir)
+
+    (repo_dir / "notes.txt").write_text("hello\n")
+    (repo_dir / "rapport.docx").write_bytes(_make_docx_bytes("contenu"))
+    _run_git(["add", "-A"], repo_dir)
+
+    wrapper = GitWrapper(repo_dir)
+    changes = wrapper.get_staged_image_changes()
+
+    assert changes == []
+
+
 if __name__ == "__main__":
     unittest.main()

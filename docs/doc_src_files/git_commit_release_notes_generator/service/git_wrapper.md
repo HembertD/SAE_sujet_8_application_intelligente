@@ -11,8 +11,9 @@ Ce module encapsule les interactions avec GitPython pour récupérer les diffs, 
 - ouvrir un dépôt Git à partir d'un chemin local ;
 - récupérer le diff indexé (`git diff --cached`) ;
 - normaliser les sections de diff en objets `DiffFile` ;
-- détecter les fichiers binaires "opaques" (images, archives, ...) et les exclure des payloads LLM ;
+- détecter les fichiers binaires "opaques" (archives, ...) et les exclure des payloads LLM ;
 - convertir les formats de document "riches" supportés (`.docx`, `.pdf`) en diff textuel exploitable, par extraction de contenu plutôt que de les traiter comme des binaires ignorés ;
+- exposer les octets bruts des images modifiées (`get_staged_image_changes()`), sans appel réseau, pour une description optionnelle par un modèle de vision (module C, `ollama_client.vision`) ;
 - masquer les secrets dans le texte avant transmission à l'IA ;
 - exposer des payloads structurés pour le reste de l'application.
 
@@ -49,6 +50,10 @@ Pour que l'IA puisse "lire" les changements dans des formats que Git traite nati
 - `_read_staged_blob_bytes(file_path)` : lit le contenu indexé (staged) directement depuis l'object database Git (`repo.odb`), sans dépendre du fichier sur disque qui a pu diverger depuis le `git add`.
 - `_read_head_blob_bytes(file_path)` : lit la version `HEAD` du fichier, ou `None` s'il est nouveau (pas encore commité).
 - `_try_build_document_diff(diff_file)` : orchestre l'extraction des deux côtés (ancien/nouveau, `None` si ajout ou suppression), calcule un diff ligne à ligne (`difflib.unified_diff`) et renvoie un `DiffFile` texte (`is_binary=False`) prêt à suivre le chemin standard (sanitisation, troncature). Renvoie `None` en cas d'extension non supportée ou d'échec d'extraction (document corrompu, dépendance manquante) : l'appelant conserve alors le comportement binaire existant plutôt que de planter.
+
+### Images modifiées (`get_staged_image_changes`)
+
+Contrairement aux documents riches ci-dessus, aucune extraction de contenu n'est tentée ici : `get_staged_image_changes()` liste simplement les fichiers image (`.png`, `.jpg`, `.jpeg`, `.gif`, `.bmp`, `.webp`) ajoutés/modifiés/supprimés, avec leurs octets avant/après (réutilise `_read_staged_blob_bytes`/`_read_head_blob_bytes`), sous forme d'`ImageChange(path, status, old_bytes, new_bytes)`. N'effectue aucun appel réseau : c'est à l'appelant (`action_generate_commit`, et uniquement au moment de générer un message de commit) de décider s'il invoque un modèle de vision sur ces octets — `get_staged_diff()` reste donc rapide et sans réseau, inchangé pour les images.
 
 ## Rôle dans le flux
 

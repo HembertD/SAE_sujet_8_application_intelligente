@@ -27,3 +27,6 @@ Ce fichier de test valide le comportement du module `git_commit_release_notes_ge
 17. **`test_action_ping_ollama_reachable`** : simule une réponse positive d'Ollama avec latence et modèles installés.
 18. **`test_action_ping_ollama_unreachable`** : vérifie le retour propre en cas de défaillance réseau (`reachable = False`).
 19. **`test_action_check_env`** : vérifie la conformité de l'action de diagnostic d'intégrité de l'environnement (`version`, `executable`, statut `"ready"`).
+20. **`test_action_generate_commit_includes_image_description`** : vérifie qu'une image modifiée (`GitWrapper.get_staged_image_changes` patché) est décrite via `describe_image_change` et transmise à `generate_commit_message()` comme un `DiffFile` texte supplémentaire (`is_binary=False`, patch préfixé `[Analyse visuelle]`).
+21. **`test_action_generate_commit_skips_image_on_description_failure`** : vérifie qu'une image dont la description échoue est simplement ignorée (le diff textuel restant est toujours transmis), sans faire échouer toute la génération du commit.
+22. **`test_action_generate_commit_fails_when_only_image_and_description_fails`** : vérifie l'échec explicite quand il n'y a ni diff textuel ni image décrite avec succès.

@@ -12,7 +12,8 @@ Ce module valide le comportement du wrapper Git utilisé pour analyser les diffs
 - la détection des modifications par fichier ;
 - la suppression des données sensibles dans les patches ;
 - la création d’un payload JSON exploitable par le modèle ou par l’orchestrateur applicatif ;
-- l'extraction de texte depuis des documents `.docx`/`.pdf` et leur conversion en diff textuel exploitable.
+- l'extraction de texte depuis des documents `.docx`/`.pdf` et leur conversion en diff textuel exploitable ;
+- la détection des images modifiées (ajout/modification/suppression) avec leurs octets avant/après, sans appel réseau.
 
 ## Cas de test principaux
 
@@ -39,6 +40,15 @@ Le test s’assure que les objets renvoyés par le wrapper sont convertibles en 
 - `test_get_staged_diff_converts_modified_docx_to_text_diff` : sur un vrai dépôt Git temporaire, modifie un `.docx` entre deux commits/staging et vérifie que `get_staged_diff()` renvoie un `DiffFile` texte (`is_binary=False`) dont le patch contient l'ancien et le nouveau contenu, avec des compteurs `added`/`removed` cohérents.
 - `test_get_staged_diff_converts_newly_added_pdf_to_text_diff` : même principe pour un `.pdf` nouvellement ajouté (`status="A"`, pas de contenu "ancien").
 - `test_get_staged_diff_still_excludes_unsupported_binary_files` : vérifie la non-régression du comportement existant — un binaire sans extracteur dédié (ex: `.png`) reste exclu du diff exploitable par le LLM.
+
+### 5. Détection des images modifiées (`get_staged_image_changes`)
+
+Sur de vrais dépôts Git temporaires (PNG minimaux mais valides, octets distincts entre versions) :
+
+- `test_get_staged_image_changes_detects_addition` : `status="A"`, `new_bytes` renseigné, `old_bytes=None`.
+- `test_get_staged_image_changes_detects_modification` : `status="M"`, `old_bytes`/`new_bytes` correspondent bien aux deux versions committées/stagées.
+- `test_get_staged_image_changes_detects_deletion` : `status="D"`, `old_bytes` renseigné (contenu de la version supprimée), `new_bytes=None`.
+- `test_get_staged_image_changes_ignores_text_and_document_files` : un `.txt` et un `.docx` stagés ne produisent aucune `ImageChange` (périmètre strictement limité aux extensions image).
 
 ## Points de vigilance
 

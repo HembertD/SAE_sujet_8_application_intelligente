@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 from git import Repo
 from git_commit_release_notes_generator.models import CommitMessage, DiffFile
-from git_commit_release_notes_generator.service.git_wrapper import CommitInfo
+from git_commit_release_notes_generator.service.git_wrapper import CommitInfo, ImageChange
 import git_commit_release_notes_generator.service.core as core
 from git_commit_release_notes_generator.service.core import (
     action_apply_commit,
@@ -109,6 +109,68 @@ def test_action_generate_commit_success():
                 assert result["subject"] == "ajout de la fonction addition"
                 assert "raw_formatted" in result
                 assert "feat(calc): ajout de la fonction addition" in result["raw_formatted"]
+
+
+def test_action_generate_commit_includes_image_description():
+    fake_image = ImageChange(path="photo.png", status="A", old_bytes=None, new_bytes=b"\x89PNG...")
+    fake_commit = CommitMessage(type="feat", scope="assets", subject="ajout d'une photo", body=None)
+
+    captured_diff_files = {}
+
+    def _fake_generate(diff_files, feedback=""):
+        captured_diff_files["value"] = diff_files
+        return fake_commit
+
+    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_diff", return_value=[]):
+        with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_image_changes", return_value=[fake_image]):
+            with patch("git_commit_release_notes_generator.service.core.check_ollama_reachable", return_value=(True, None)):
+                with patch("git_commit_release_notes_generator.service.core.describe_image_change", return_value="Un éléphant dans la savane.") as mock_describe:
+                    with patch("git_commit_release_notes_generator.service.core.generate_commit_message", side_effect=_fake_generate):
+                        result = core.action_generate_commit(str(ROOT))
+
+    assert result["success"] is True
+    mock_describe.assert_called_once_with("photo.png", "A", b"\x89PNG...", old_image=None)
+    diff_files = captured_diff_files["value"]
+    assert len(diff_files) == 1
+    assert diff_files[0].is_binary is False
+    assert "Un éléphant dans la savane." in diff_files[0].patch
+
+
+def test_action_generate_commit_skips_image_on_description_failure():
+    fake_text_diff = [DiffFile(path="calc.py", status="M", added=1, removed=0, is_binary=False, patch="+x=1")]
+    fake_image = ImageChange(path="broken.png", status="A", old_bytes=None, new_bytes=b"\x89PNG...")
+    fake_commit = CommitMessage(type="feat", scope=None, subject="ajout", body=None)
+
+    captured_diff_files = {}
+
+    def _fake_generate(diff_files, feedback=""):
+        captured_diff_files["value"] = diff_files
+        return fake_commit
+
+    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_diff", return_value=fake_text_diff):
+        with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_image_changes", return_value=[fake_image]):
+            with patch("git_commit_release_notes_generator.service.core.check_ollama_reachable", return_value=(True, None)):
+                with patch("git_commit_release_notes_generator.service.core.describe_image_change", side_effect=Exception("vision indisponible")):
+                    with patch("git_commit_release_notes_generator.service.core.generate_commit_message", side_effect=_fake_generate):
+                        result = core.action_generate_commit(str(ROOT))
+
+    assert result["success"] is True
+    diff_files = captured_diff_files["value"]
+    assert len(diff_files) == 1
+    assert diff_files[0].path == "calc.py"
+
+
+def test_action_generate_commit_fails_when_only_image_and_description_fails():
+    fake_image = ImageChange(path="broken.png", status="A", old_bytes=None, new_bytes=b"\x89PNG...")
+
+    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_diff", return_value=[]):
+        with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_image_changes", return_value=[fake_image]):
+            with patch("git_commit_release_notes_generator.service.core.check_ollama_reachable", return_value=(True, None)):
+                with patch("git_commit_release_notes_generator.service.core.describe_image_change", side_effect=Exception("vision indisponible")):
+                    result = core.action_generate_commit(str(ROOT))
+
+    assert result["success"] is False
+    assert "error" in result
 
 
 def test_action_generate_commit_ollama_unreachable():

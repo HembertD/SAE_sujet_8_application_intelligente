@@ -66,6 +66,13 @@ def mock_conflict_resolution(conflict: ConflictSection) -> ConflictResolution:
     )
 
 
+def mock_describe_image(file_path: str, has_old: bool) -> str:
+    """Simule une description d'image par un modèle de vision, sans appel réseau."""
+    if has_old:
+        return f"[mock] Changement visuel détecté dans {file_path} (comparaison avant/après simulée)."
+    return f"[mock] Nouvelle image {file_path} : contenu simulé pour test hors ligne."
+
+
 def mock_ping() -> dict:
     """Simule un test de connectivité réussi avec le serveur Ollama."""
     return {

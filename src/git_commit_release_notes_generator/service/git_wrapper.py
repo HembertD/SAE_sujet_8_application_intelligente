@@ -39,6 +39,22 @@ _DOCUMENT_TEXT_EXTRACTORS = {
     ".pdf": _extract_pdf_text,
 }
 
+# Formats image pour lesquels get_staged_image_changes() expose les octets
+# bruts, à destination d'une description par un modèle de vision (cf.
+# ollama_client.vision). Contrairement aux documents riches ci-dessus, on ne
+# tente aucune extraction de texte ici : seul l'appelant décide d'invoquer
+# le modèle de vision, et seulement quand il en a réellement besoin.
+_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
+
+
+@dataclass(frozen=True)
+class ImageChange:
+    """Un fichier image ajouté, modifié ou supprimé, avec son contenu avant/après."""
+    path: str
+    status: str
+    old_bytes: bytes | None
+    new_bytes: bytes | None
+
 
 @dataclass(frozen=True)
 class CommitInfo:
@@ -308,6 +324,39 @@ class GitWrapper:
             return sanitized_files
         except Exception as exc:
             raise GitWrapperError(f"Erreur lors de la récupération du diff indexé : {exc}") from exc
+
+    def get_staged_image_changes(self) -> list[ImageChange]:
+        """Liste les fichiers image indexés (ajoutés/modifiés/supprimés), avec
+        leurs octets avant/après.
+
+        N'effectue aucun appel réseau : c'est à l'appelant (service/core.py,
+        uniquement au moment de générer un message de commit) de décider s'il
+        invoque un modèle de vision sur ces octets. Reste donc indépendant de
+        get_staged_diff(), qui doit rester rapide et sans réseau.
+        """
+        try:
+            diff_text = self.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTUXBD")
+            if not diff_text.strip():
+                return []
+
+            changes: list[ImageChange] = []
+            for diff_file in self._parse_diff(diff_text):
+                if not diff_file.is_binary:
+                    continue
+                if Path(diff_file.path).suffix.lower() not in _IMAGE_EXTENSIONS:
+                    continue
+
+                new_bytes = None if diff_file.status == "D" else self._read_staged_blob_bytes(diff_file.path)
+                old_bytes = None if diff_file.status == "A" else self._read_head_blob_bytes(diff_file.path)
+                if not new_bytes and not old_bytes:
+                    continue
+
+                changes.append(
+                    ImageChange(path=diff_file.path, status=diff_file.status, old_bytes=old_bytes, new_bytes=new_bytes)
+                )
+            return changes
+        except Exception as exc:
+            raise GitWrapperError(f"Erreur lors de la détection des images modifiées : {exc}") from exc
 
     def get_staged_diff_as_json(self, max_chars: int = 8000) -> list[dict[str, str | int | bool]]:
         """Retourne le diff indexé sous forme de liste JSON-ready, par fichier modifié."""

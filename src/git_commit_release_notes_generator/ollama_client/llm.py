@@ -135,14 +135,25 @@ class PingResult:
         return data
 
 
-def check_ollama_reachable(timeout: float = _PING_TIMEOUT_S, fetch_models: bool = False) -> PingResult:
+def check_ollama_reachable(
+    timeout: float = _PING_TIMEOUT_S, fetch_models: bool = False, validate_model: bool = False
+) -> PingResult:
     """Vérifie la joignabilité du serveur Ollama et optionnellement les modèles installés.
 
     Mesure la latence en millisecondes et retourne un PingResult.
     Peut être déballé comme un tuple `reachable, error = check_ollama_reachable()`
     ou manipulé avec ses attributs (`res.reachable`, `res.latency_ms`, `res.error`, `res.installed_models`).
     Ne lève jamais d'exception.
+
+    `validate_model=True` (implique `fetch_models=True`) vérifie en plus que
+    `OLLAMA_MODEL` (configuré via `.env`) figure bien dans la liste des modèles
+    installés sur le serveur, et échoue explicitement si ce n'est pas le cas,
+    *avant* de tenter une génération (plutôt que de découvrir l'absence du
+    modèle après coup, via une erreur HTTP 404 réactive lors de l'appel réel).
     """
+    if validate_model:
+        fetch_models = True
+
     if config.MOCK_AI:
         mock_data = mock_ping()
         models = mock_data.get("installed_models", []) if fetch_models else []
@@ -171,6 +182,18 @@ def check_ollama_reachable(timeout: float = _PING_TIMEOUT_S, fetch_models: bool 
                             installed_models.append(str(m["name"]))
             except Exception as e:
                 logger.debug(f"Impossible de récupérer les modèles Ollama : {e}")
+
+        if validate_model and installed_models and OLLAMA_MODEL not in installed_models:
+            return PingResult(
+                reachable=False,
+                error=(
+                    f"Le modèle '{OLLAMA_MODEL}' n'est pas installé sur le serveur Ollama "
+                    f"({OLLAMA_BASE_URL}). Modèles disponibles : {', '.join(installed_models) or 'aucun'}. "
+                    f"Lancez `ollama pull {OLLAMA_MODEL}` ou vérifiez la variable OLLAMA_MODEL."
+                ),
+                latency_ms=latency_ms,
+                installed_models=installed_models,
+            )
 
         return PingResult(reachable=True, latency_ms=latency_ms, installed_models=installed_models)
     except urllib.error.URLError as e:

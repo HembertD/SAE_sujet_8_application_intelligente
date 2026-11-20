@@ -12,6 +12,7 @@ Ce module fournit une implémentation simulée (Mock) des fonctionnalités d'int
 - Supporter la prise en compte de consignes utilisateur (`feedback`) injectées dans le corps du message pour les tests de révision interactive ;
 - Simuler la charge utile JSON d'un appel à l'API de chat Ollama (`mock_call_chat`) ;
 - Générer une réponse fixe et prévisible pour les Release Notes (`mock_release_notes`) ;
+- Simuler la description d'une image ou d'un changement d'image par un modèle de vision (`mock_describe_image`) ;
 - Simuler le ping de connectivité et la liste des modèles installés (`mock_ping`) avec une latence factice de 10 ms.
 
 ## Fonctions exposées
@@ -21,6 +22,7 @@ Ce module fournit une implémentation simulée (Mock) des fonctionnalités d'int
 | `mock_generate_commit_message` | `diff_files`, `feedback=""` | `CommitMessage` | Renvoie le commit statique mocké. Lève `ValueError` si la liste de diff est vide. |
 | `mock_call_chat` | `messages` | `dict` | Simule la réponse brute de `/api/chat`. |
 | `mock_release_notes` | `commits`, `from_tag`, `to_tag` | `str` | Renvoie une note de version Markdown statique déterministe. |
+| `mock_describe_image` | `file_path`, `has_old` | `str` | Renvoie une description d'image statique, différenciant ajout/suppression (`has_old=False`) de modification (`has_old=True`). |
 | `mock_ping` | — | `dict` | Renvoie un diagnostic de connectivité simulé réussi avec latence de 10 ms. |
 
 ## Points clés
@@ -33,4 +35,5 @@ Ce module fournit une implémentation simulée (Mock) des fonctionnalités d'int
 - `mock_generate_commit_message()` : Génère un message de commit simulé pour le mode hors-ligne.
 - `mock_call_chat()` : Simule une réponse brute de l'API de chat.
 - `mock_release_notes()` : Génère des release notes simulées entre deux révisions.
+- `mock_describe_image()` : Simule une description d'image par un modèle de vision.
 - `mock_ping()` : Simule un diagnostic de connectivité Ollama réussi.

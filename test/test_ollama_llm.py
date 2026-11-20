@@ -236,6 +236,52 @@ def test_check_ollama_reachable_with_models(monkeypatch):
     assert d["installed_models"] == ["llama3:latest", "mistral:7b"]
 
 
+def test_check_ollama_reachable_validate_model_fails_when_model_missing(monkeypatch):
+    responses = [
+        _FakeResponse({"version": "0.1.30"}),
+        _FakeResponse({"models": [{"name": "llama3:latest"}, {"name": "mistral:7b"}]}),
+    ]
+    monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: responses.pop(0))
+
+    res = llm.check_ollama_reachable(validate_model=True)
+
+    assert res.reachable is False
+    assert llm.OLLAMA_MODEL in res.error
+    assert "llama3:latest" in res.error
+    assert res.installed_models == ["llama3:latest", "mistral:7b"]
+
+
+def test_check_ollama_reachable_validate_model_succeeds_when_model_present(monkeypatch):
+    responses = [
+        _FakeResponse({"version": "0.1.30"}),
+        _FakeResponse({"models": [{"name": llm.OLLAMA_MODEL}, {"name": "mistral:7b"}]}),
+    ]
+    monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: responses.pop(0))
+
+    res = llm.check_ollama_reachable(validate_model=True)
+
+    assert res.reachable is True
+    assert res.error is None
+
+
+def test_check_ollama_reachable_validate_model_does_not_false_positive_on_empty_tags_fetch(monkeypatch):
+    """Si /api/tags echoue (liste vide), on ne doit pas conclure a tort que le
+    modele configure est absent : on ne peut pas affirmer ce qu'on n'a pas pu lire."""
+    responses = [_FakeResponse({"version": "0.1.30"})]
+
+    def _urlopen(request, timeout=None):
+        if not responses:
+            raise urllib.error.URLError("tags endpoint unreachable")
+        return responses.pop(0)
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", _urlopen)
+
+    res = llm.check_ollama_reachable(validate_model=True)
+
+    assert res.reachable is True
+    assert res.installed_models == []
+
+
 def test_ping_ollama_alias():
     assert llm.ping_ollama is llm.check_ollama_reachable
 

@@ -10,6 +10,11 @@ Ce module propose une résolution pour une section de conflit de merge Git, via 
 
 Ce module ne lit ni n'écrit aucun fichier, et ne détecte pas les conflits sur le disque (rôle du `GitWrapper`, module B). Il prend en entrée le texte déjà extrait des deux côtés du conflit (`ConflictSection`), et sa sortie (`ConflictResolution`) n'est **jamais appliquée automatiquement** : c'est toujours à l'utilisateur de valider avant toute écriture sur disque, comme pour le reste de l'application.
 
+Le résolveur continue d'utiliser les champs historiques `file_path`, `base`,
+`ours` et `theirs`. Les champs de contexte ajoutés à `ConflictSection`
+(`start_line`, `context_before`, etc.) sont destinés au payload LLM et peuvent
+être ignorés par ce module sans casser son contrat.
+
 ## Flux de travail
 
 1. Rejeter immédiatement un conflit dont les deux côtés sont vides (`ValueError`), sans appel réseau.

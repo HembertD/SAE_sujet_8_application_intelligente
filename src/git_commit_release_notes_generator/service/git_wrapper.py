@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import difflib
+import io
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +13,31 @@ from git_commit_release_notes_generator.models import DiffFile
 
 class GitWrapperError(Exception):
     """Exception métier levée lors d'un échec de commande Git."""
+
+
+def _extract_docx_text(data: bytes) -> str:
+    """Extrait le texte brut d'un document Word (.docx), paragraphe par paragraphe."""
+    from docx import Document  # import différé : dépendance optionnelle, coûteuse à charger
+
+    document = Document(io.BytesIO(data))
+    return "\n".join(p.text for p in document.paragraphs)
+
+
+def _extract_pdf_text(data: bytes) -> str:
+    """Extrait le texte brut d'un PDF, page par page."""
+    from pypdf import PdfReader  # import différé : dépendance optionnelle, coûteuse à charger
+
+    reader = PdfReader(io.BytesIO(data))
+    return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+
+# Formats de document "riches" pour lesquels on tente une extraction de texte
+# et un diff ligne à ligne, plutôt que de les traiter comme des binaires opaques
+# (images, archives, ...) qui restent exclus du payload LLM.
+_DOCUMENT_TEXT_EXTRACTORS = {
+    ".docx": _extract_docx_text,
+    ".pdf": _extract_pdf_text,
+}
 
 
 @dataclass(frozen=True)
@@ -162,8 +189,81 @@ class GitWrapper:
         except Exception as exc:
             raise GitWrapperError(f"Erreur lors de la récupération des fichiers indexés : {exc}") from exc
 
+    def _read_staged_blob_bytes(self, file_path: str) -> bytes | None:
+        """Lit le contenu brut (octets) tel qu'indexé (staged), sans dépendre du
+        contenu actuel sur disque (qui peut avoir divergé depuis le `git add`)."""
+        entry = self.repo.index.entries.get((file_path, 0))
+        if entry is None:
+            return None
+        return self.repo.odb.stream(entry.binsha).read()
+
+    def _read_head_blob_bytes(self, file_path: str) -> bytes | None:
+        """Lit le contenu brut (octets) de la version HEAD d'un fichier, ou None s'il est nouveau."""
+        try:
+            if not self.repo.head.is_valid():
+                return None
+            blob = self.repo.head.commit.tree / file_path
+            return blob.data_stream.read()
+        except Exception:
+            return None
+
+    def _try_build_document_diff(self, diff_file: DiffFile) -> DiffFile | None:
+        """Tente de transformer un DiffFile binaire en diff textuel exploitable
+        par le LLM, pour les formats de document "riches" supportés (.docx, .pdf).
+
+        Renvoie None si l'extension n'est pas supportée ou si l'extraction
+        échoue (document corrompu, format inattendu, dépendance manquante) :
+        l'appelant doit alors conserver le comportement binaire existant
+        (fichier exclu du payload LLM) plutôt que de faire planter le diff.
+        """
+        extractor = _DOCUMENT_TEXT_EXTRACTORS.get(Path(diff_file.path).suffix.lower())
+        if extractor is None:
+            return None
+
+        try:
+            new_bytes = None if diff_file.status == "D" else self._read_staged_blob_bytes(diff_file.path)
+            old_bytes = None if diff_file.status == "A" else self._read_head_blob_bytes(diff_file.path)
+
+            new_text = extractor(new_bytes) if new_bytes else ""
+            old_text = extractor(old_bytes) if old_bytes else ""
+        except Exception:
+            return None
+
+        if not new_text and not old_text:
+            return None
+
+        diff_lines = list(
+            difflib.unified_diff(
+                old_text.splitlines(),
+                new_text.splitlines(),
+                fromfile=f"a/{diff_file.path}",
+                tofile=f"b/{diff_file.path}",
+                lineterm="",
+            )
+        )
+        added = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
+        removed = sum(1 for line in diff_lines if line.startswith("-") and not line.startswith("---"))
+
+        header = f"diff --git a/{diff_file.path} b/{diff_file.path}"
+        patch = header + "\n" + "\n".join(diff_lines) if diff_lines else header + "\n(contenu textuel identique)"
+
+        return DiffFile(
+            path=diff_file.path,
+            status=diff_file.status,
+            added=added,
+            removed=removed,
+            is_binary=False,
+            patch=self._sanitize_diff_text(patch),
+        )
+
     def get_staged_diff(self, max_chars: int = 8000) -> list[DiffFile]:
-        """Extrait le diff indexé en objets DiffFile structurés, sans fichiers binaires."""
+        """Extrait le diff indexé en objets DiffFile structurés.
+
+        Les fichiers binaires "opaques" (images, archives, ...) restent exclus.
+        Les formats de document "riches" supportés (.docx, .pdf) sont convertis
+        en diff textuel par extraction de contenu (cf. `_try_build_document_diff`)
+        plutôt que d'être traités comme des binaires silencieusement ignorés.
+        """
         try:
             diff_text = self.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTUXBD")
             if not diff_text.strip():
@@ -187,7 +287,11 @@ class GitWrapper:
             sanitized_files: list[DiffFile] = []
             for diff_file in parsed:
                 if diff_file.is_binary:
-                    continue
+                    document_diff = self._try_build_document_diff(diff_file)
+                    if document_diff is None:
+                        continue
+                    diff_file = document_diff
+
                 patch = diff_file.patch
                 if len(patch) > max_chars:
                     patch = patch[:max_chars] + "\n\n... [DIFF TRUNCATED: TROP VOLUMINEUX] ..."

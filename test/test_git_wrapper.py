@@ -1,10 +1,16 @@
+import io
+import subprocess
 import sys
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from git_commit_release_notes_generator.service.git_wrapper import GitWrapper
+from git_commit_release_notes_generator.service.git_wrapper import (
+    GitWrapper,
+    _extract_docx_text,
+    _extract_pdf_text,
+)
 
 
 class GitWrapperParsingTests(unittest.TestCase):
@@ -101,6 +107,139 @@ index 3333333..4444444 100644
         self.assertEqual(payload["summary"]["file_count"], 2)
         self.assertIn("files", payload)
         self.assertEqual(payload["files"][0]["path"], "app.py")
+
+
+def _make_docx_bytes(text: str) -> bytes:
+    from docx import Document
+
+    document = Document()
+    for line in text.splitlines():
+        document.add_paragraph(line)
+    buf = io.BytesIO()
+    document.save(buf)
+    return buf.getvalue()
+
+
+def _make_pdf_bytes(text: str) -> bytes:
+    """Construit un PDF minimal mais valide avec un unique flux de texte,
+    exploitable par `pypdf.PdfReader.extract_text()` (pas de dépendance à
+    reportlab : seul pypdf, déjà requis par le module, est utilisé)."""
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=300, height=300)
+
+    content = f"BT /F1 14 Tf 10 250 Td ({text}) Tj ET".encode("latin-1")
+    stream = DecodedStreamObject()
+    stream.set_data(content)
+    stream_ref = writer._add_object(stream)
+    page[NameObject("/Contents")] = stream_ref
+
+    font = DictionaryObject()
+    font[NameObject("/Type")] = NameObject("/Font")
+    font[NameObject("/Subtype")] = NameObject("/Type1")
+    font[NameObject("/BaseFont")] = NameObject("/Helvetica")
+    font_ref = writer._add_object(font)
+
+    fonts_dict = DictionaryObject()
+    fonts_dict[NameObject("/F1")] = font_ref
+    resources = DictionaryObject()
+    resources[NameObject("/Font")] = fonts_dict
+    page[NameObject("/Resources")] = resources
+
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def test_extract_docx_text_reads_paragraphs():
+    data = _make_docx_bytes("première ligne\nseconde ligne")
+    text = _extract_docx_text(data)
+    assert "première ligne" in text
+    assert "seconde ligne" in text
+
+
+def test_extract_pdf_text_reads_content():
+    data = _make_pdf_bytes("Hello PDF")
+    text = _extract_pdf_text(data)
+    assert "Hello PDF" in text
+
+
+def _run_git(args: list[str], cwd: Path) -> None:
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+
+
+def _init_repo_with_base_commit(repo_dir: Path) -> None:
+    repo_dir.mkdir()
+    _run_git(["init"], repo_dir)
+    _run_git(["config", "user.email", "test@example.com"], repo_dir)
+    _run_git(["config", "user.name", "Test"], repo_dir)
+    (repo_dir / "README.md").write_text("base\n")
+    _run_git(["add", "-A"], repo_dir)
+    _run_git(["commit", "-m", "base"], repo_dir)
+
+
+def test_get_staged_diff_converts_modified_docx_to_text_diff(tmp_path):
+    repo_dir = tmp_path / "repo"
+    _init_repo_with_base_commit(repo_dir)
+
+    docx_path = repo_dir / "rapport.docx"
+    docx_path.write_bytes(_make_docx_bytes("version initiale"))
+    _run_git(["add", "-A"], repo_dir)
+    _run_git(["commit", "-m", "ajout du rapport"], repo_dir)
+
+    docx_path.write_bytes(_make_docx_bytes("version modifiee"))
+    _run_git(["add", "-A"], repo_dir)
+
+    wrapper = GitWrapper(repo_dir)
+    files = wrapper.get_staged_diff()
+
+    docx_entries = [f for f in files if f.path == "rapport.docx"]
+    assert len(docx_entries) == 1
+    entry = docx_entries[0]
+    assert entry.is_binary is False
+    assert entry.status == "M"
+    assert "version initiale" in entry.patch
+    assert "version modifiee" in entry.patch
+    assert entry.added > 0
+    assert entry.removed > 0
+
+
+def test_get_staged_diff_converts_newly_added_pdf_to_text_diff(tmp_path):
+    repo_dir = tmp_path / "repo"
+    _init_repo_with_base_commit(repo_dir)
+
+    pdf_path = repo_dir / "notice.pdf"
+    pdf_path.write_bytes(_make_pdf_bytes("Contenu du PDF"))
+    _run_git(["add", "-A"], repo_dir)
+
+    wrapper = GitWrapper(repo_dir)
+    files = wrapper.get_staged_diff()
+
+    pdf_entries = [f for f in files if f.path == "notice.pdf"]
+    assert len(pdf_entries) == 1
+    entry = pdf_entries[0]
+    assert entry.is_binary is False
+    assert entry.status == "A"
+    assert "Contenu du PDF" in entry.patch
+    assert entry.added > 0
+    assert entry.removed == 0
+
+
+def test_get_staged_diff_still_excludes_unsupported_binary_files(tmp_path):
+    """Les binaires sans extracteur dédié (images, archives, ...) restent
+    exclus du diff exploitable par le LLM, comportement inchangé."""
+    repo_dir = tmp_path / "repo"
+    _init_repo_with_base_commit(repo_dir)
+
+    (repo_dir / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50)
+    _run_git(["add", "-A"], repo_dir)
+
+    wrapper = GitWrapper(repo_dir)
+    files = wrapper.get_staged_diff()
+
+    assert all(f.path != "logo.png" for f in files)
 
 
 if __name__ == "__main__":

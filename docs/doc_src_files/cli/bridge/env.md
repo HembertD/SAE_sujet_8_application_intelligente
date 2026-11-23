@@ -10,9 +10,9 @@ Ce module isole l'ensemble de la logique de localisation, de lecture et d'écrit
 
 - **Localisation stricte de la racine applicative (`FindAppRoot`)** : exploration hiérarchique ascendante combinant `runtime.Caller`, `os.Executable` et `os.Getwd` pour déterminer l'emplacement physique du dépôt applicatif, indépendamment du dépôt Git cible analysé (`--repo`).
 - **Garantie d'emplacement (`FindAppEnvPath`)** : renvoie l'emplacement unique `<racine_projet>/.env`. Élimine tout sous-chemin `src/` ou `cli/` pour empêcher la création ou lecture d'un `.env` dans les sous-dossiers.
-- **Lecture typée (`LoadConfigFromEnv`)** : parse les variables `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT_S`, `MOCK_INTERFACE`, `MOCK_AI`, `ENABLE_NOTIFICATIONS`, ainsi que `PYTHON_BIN` et résout l'interpréteur actif (`ResolvedPythonBin`).
+- **Lecture typée (`LoadConfigFromEnv`)** : parse les variables `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT_S`, `MOCK_INTERFACE`, `MOCK_AI`, `USE_DOCKER_LLM` et `ENABLE_NOTIFICATIONS`, ainsi que `PYTHON_BIN`, et résout l'interpréteur actif (`ResolvedPythonBin`).
 - **Résolution et mise à jour de l'interpréteur Python (`ReadPythonBinFromEnv`, `WritePythonBinSetting`)** : lit et écrit `PYTHON_BIN` dans le fichier `.env` applicatif et synchronise la variable d'environnement du processus (`os.Setenv`/`os.Unsetenv`). Permet de basculer à chaud entre un interpréteur dédié et la détection automatique du `.venv`.
-- **Persistance atomique (`WriteEnvFile`)** : sauvegarde à chaud les réglages dans le `.env` à la racine de l'application (y compris `MOCK_INTERFACE` et `MOCK_AI`), purge préventivement tout fichier `.env` ou `.env.exemple` résiduel dans `src/`, et **préserve** les paramètres non gérés par cet écran (ex: `OLLAMA_NUM_CTX`, `PYTHON_BIN`) au lieu de les écraser silencieusement.
+- **Persistance atomique (`WriteEnvFile` / `WriteEnvFileWithDockerLLM` / `WriteNotificationsSetting`)** : sauvegarde à chaud les réglages dans le `.env` à la racine de l'application (y compris `MOCK_INTERFACE`, `MOCK_AI`, `USE_DOCKER_LLM` et `ENABLE_NOTIFICATIONS`), purge préventivement tout fichier `.env` ou `.env.exemple` résiduel dans `src/`, et **préserve** les paramètres non gérés par cet écran (ex: `OLLAMA_NUM_CTX`, `PYTHON_BIN`) au lieu de les écraser silencieusement. `WriteEnvFile` (ancienne signature sans paramètre Docker) relit la valeur existante de `USE_DOCKER_LLM` et la conserve au lieu de la forcer à `false`.
 - **Parsing booléen robuste (`ParseBoolFromString`)** : interprète les représentations usuelles (`true`, `1`, `yes`, `oui`, `false`, `0`, etc.).
 
 ## Points clés
@@ -28,8 +28,10 @@ Précisions issues des commentaires retirés de `env.go` :
 - `FindAppRoot` suit un ordre de recherche : hints valides d'abord, puis variable `SMART_COMMIT_APP_ROOT`, puis remontée depuis le code source Go (`runtime.Caller`), depuis l'exécutable Go, depuis le répertoire de travail, avec repli sur le premier hint non vide ou `"."` .
 - `FindAppEnvPath` renvoie l'emplacement STRICTEMENT à la racine et ne cherche JAMAIS dans `src/` ni dans le dépôt cible ; `FindEnvPath` est un alias conservé pour compatibilité avec le code existant et les tests.
 - `ParseBoolFromString` convertit `"true"`, `"1"`, `"yes"`, `"oui"` en booléen ; `ReadMockSettingFromEnv` / `ReadMockAISettingFromEnv` lisent respectivement `MOCK_INTERFACE` (avec variante historique `MOCKAGE_INTERFACE`) et `MOCK_AI`, avec priorité aux variables d'environnement système directes puis lecture du `.env` applicatif.
-- `LoadConfigFromEnv` purge par sécurité tout `.env` résiduel dans `src/` ; `WriteEnvFile` réécrit le `.env` STRICTEMENT à la racine, supprime préventivement tout ancien `src/.env`, et recopie telles quelles les lignes `clé=valeur` non gérées par cet écran (lues dans le `.env` existant avant réécriture) pour ne jamais les perdre.
+- `LoadConfigFromEnv` purge par sécurité tout `.env` résiduel dans `src/` ; `WriteEnvFile` (et sa variante `WriteEnvFileWithDockerLLM`) réécrit le `.env` STRICTEMENT à la racine, supprime préventivement tout ancien `src/.env`, et recopie telles quelles les lignes `clé=valeur` non gérées par cet écran (lues dans le `.env` existant avant réécriture) pour ne jamais les perdre.
 - `ReadPythonBinFromEnv` suit le même ordre de priorité que les autres lecteurs `.env` du module : variable d'environnement système directe, puis ligne `PYTHON_BIN=` du `.env` applicatif ; renvoie une chaîne vide si rien n'est configuré explicitement (détection automatique à faire par l'appelant).
+- `ReadDockerLLMSettingFromEnv` lit la variable `USE_DOCKER_LLM` avec priorité aux variables d'environnement système directes puis lecture du `.env` applicatif ; détermine si l'application doit s'appuyer sur un serveur Ollama local lancé via Docker.
+- `ReadEnableNotificationsFromEnv` lit la variable `ENABLE_NOTIFICATIONS` avec priorité aux variables d'environnement système directes puis lecture du `.env` applicatif ; `WriteNotificationsSetting` persiste ce réglage sans écraser les autres variables du fichier.
 
 ## Commentaires de fonction (dupliqués du code source)
 
@@ -44,4 +46,8 @@ Précisions issues des commentaires retirés de `env.go` :
 - `LoadConfigFromEnv()` : Charge la configuration complète depuis le .env applicatif.
 - `ReadPythonBinFromEnv()` : Lit l'interpréteur Python explicitement configuré, sinon chaîne vide.
 - `WritePythonBinSetting()` : Enregistre ou réinitialise la variable PYTHON_BIN dans le .env applicatif.
-- `WriteEnvFile()` : Écrit la configuration dans le fichier .env applicatif.
+- `WriteEnvFile()` : Écrit la configuration dans le fichier .env applicatif en **conservant** la valeur existante de `USE_DOCKER_LLM` (le mode Docker ou le serveur IUT n'est donc pas changé par une simple sauvegarde de configuration).
+- `WriteEnvFileWithDockerLLM()` : Écrit la configuration avec la valeur explicite de USE_DOCKER_LLM.
+- `ReadDockerLLMSettingFromEnv()` : Lit l'activation du serveur Ollama via Docker depuis l'environnement.
+- `ReadEnableNotificationsFromEnv()` : Lit l'activation des notifications de bureau depuis l'environnement.
+- `WriteNotificationsSetting()` : Persiste l'activation des notifications dans le fichier .env applicatif.

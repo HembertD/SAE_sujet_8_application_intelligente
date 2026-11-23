@@ -32,6 +32,12 @@ Le test simule un contenu contenant une clé ou une valeur sensible et vérifie 
 
 Le test s’assure que les objets renvoyés par le wrapper sont convertibles en payloads normalisés, sans informations parasites ou inutiles. Il vérifie notamment la présence des champs attendus comme `path`, `status`, `patch` et `is_binary`.
 
+## Voir aussi
+
+Les scénarios de merge, de conflits et de payload LLM sont couverts par
+`test/test_git_wrapper_merge.py` et documentés dans
+`doc_test_files/test_git_wrapper_merge.md`.
+
 ## Points de vigilance
 
 - La logique de parsing doit rester tolérante aux variations de format de diff Git.

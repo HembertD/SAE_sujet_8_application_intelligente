@@ -10,7 +10,7 @@ Les développeurs négligent souvent la qualité des messages de commit, ce qui 
 ## Fonctionnalités principales :
 ```
 Analyse de code : exécution et parsing de la commande git diff pour extraire les modifications locales avant le commit.
-Génération structurée : utilisation de gemma4:12b avec un prompt strict pour générer un message respectant la norme Conventional Commits (ex. feat: ajout du bouton de connexion).
+Génération structurée : utilisation de gemma4:26b avec un prompt strict pour générer un message respectant la norme Conventional Commits (ex. feat: ajout du bouton de connexion).
 Synthèse de version : extraction de l'historique entre deux tags Git et génération d'un changelog organisé par catégories (Corrections, Nouveautés, Régressions) au format Markdown.
 Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibles (clés d'API) avant l'envoi au modèle.
 ```
@@ -93,6 +93,39 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
      cd test/cli && go test -v ./...
      ```
 
+6. **Serveur Ollama local via Docker (optionnel) :**
+   Pour utiliser un serveur Ollama local déployé avec Docker Compose plutôt que le serveur distant de l'IUT, tout peut se faire depuis le TUI :
+   1. lancez l'application ;
+   2. ouvrez **Configuration** : l'écran affiche deux informations distinctes :
+      - `LLM via Docker` : le mode utilisé par l'application (`USE_DOCKER_LLM`) ;
+      - `Conteneur Docker` : l'état réel du conteneur Ollama (`En cours`, `Arrêté` ou `Indisponible`) ;
+   3. appuyez sur **`[D]`** : le mode Docker est activé et le conteneur est construit/démarré automatiquement (`docker compose up -d --build`). Un second appui sur `[D]` désactive le mode et arrête le conteneur.
+
+   Le backend Python communique alors avec `http://localhost:11434`. L'option `[M]` reste disponible pour modifier les autres paramètres. Le démarrage manuel reste possible :
+   ```bash
+   # Construire et lancer le conteneur Ollama (modèle défini par OLLAMA_MODEL, gemma4:26b par défaut)
+   docker compose up -d --build
+   ```
+
+   Le modèle téléchargé est celui de `OLLAMA_MODEL` dans le `.env` (par défaut `gemma4:26b`, le modèle de référence du serveur IUT). Pour un mode Docker local sur une machine limitée en RAM, utiliser par exemple `gemma4:12b` (~8 Go) dans le `.env`. Le premier lancement peut être long ; suivez la progression avec `docker compose logs -f ollama`.
+
+   Si le conteneur s'arrête juste après le démarrage, l'écran Configuration affiche `LLM Docker activé mais conteneur arrêté` avec le modèle configuré et la commande de logs. Vérifiez que `OLLAMA_MODEL` correspond à un modèle existant : par exemple `smollm:135` n'existe pas (utiliser `smollm:135m`), tandis que `gemma4:12b` et `gemma4:26b` sont valides.
+
+   Pour activer le GPU NVIDIA (si `nvidia-container-toolkit` est installé) :
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+   ```
+
+   Pour revenir au serveur distant de l'IUT, appuyez sur `[D]` dans l'écran Configuration ou exécutez manuellement :
+   ```bash
+   docker compose down
+   ```
+   
+   Documentation détaillée :
+   - [docs/doc_src_files/docker-compose.md](docs/doc_src_files/docker-compose.md) : orchestration du serveur Ollama
+   - [docs/doc_src_files/Dockerfile.md](docs/doc_src_files/Dockerfile.md) : image Docker du serveur Ollama
+   - [docs/doc_src_files/entrypoint.md](docs/doc_src_files/entrypoint.md) : script d'initialisation du conteneur
+
 
 ## Technologies
 
@@ -169,6 +202,8 @@ Elle contient les comptes-rendus de sprint et le suivi d’avancement du projet.
 - [docs/deploiement_documentation.md](docs/deploiement_documentation.md) : documentation du déploiement de la doc
 - [docs/deploiement_tests_workflows.md](docs/deploiement_tests_workflows.md) : documentation de la CI / tests GitHub Actions
 - [docs/explication_go_cli.md](docs/explication_go_cli.md) : explication du CLI Go
+- [docs/doc_src_files/docker-compose.md](docs/doc_src_files/docker-compose.md) : serveur Ollama local via Docker
+- [docs/doc_src_files/Dockerfile.md](docs/doc_src_files/Dockerfile.md) : image Docker du serveur Ollama
 
 ### 6. Documentation générée en PDF
 
@@ -225,6 +260,7 @@ La documentation suit cette convention :
 - [Architecture de documentation](doc_architecture.md)
 - [Déploiement de la documentation](docs/deploiement_documentation.md)
 - [Tests automatisés](docs/deploiement_tests_workflows.md)
+- [Serveur Ollama local via Docker](docs/doc_src_files/docker-compose.md)
 - [Projet GitHub](https://github.com/hembertd/SAE_sujet_8_application_intelligente)
 
 ## Trello

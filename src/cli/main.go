@@ -10,17 +10,33 @@ import (
 	"syscall"
 
 	"sae-git-cli/bridge"
+	"sae-git-cli/flags"
 	"sae-git-cli/ui"
 	"sae-git-cli/views"
 )
 
 func main() {
-	// Options de la ligne de commande
-	devFlag := flag.Bool("dev", false, "Active le mode développement (débloque les options de mock et leur modification)")
-	mockInterfaceFlag := flag.Bool("mockInterface", false, "Force la simulation complète de l'interface (mode démo sans Git ni Python, requiert --dev)")
-	mockIAFlag := flag.Bool("mockIA", false, "Force la simulation de l'IA hors-ligne sans serveur Ollama (requiert --dev)")
-	repoFlag := flag.String("repo", ".", "Chemin du dépôt Git à analyser")
-	appFlag := flag.String("app-dir", "", "Chemin vers l'application Gitelligence (dossier contenant le .env applicatif)")
+	// 1. Interception prioritaire et immédiate de l'aide et de la version.
+	// Cela garantit un code de retour 0 sans charger Python, ni TUI, ni Git.
+	if ui.IsVersionRequested(os.Args[1:]) {
+		ui.PrintVersion(os.Stdout)
+		os.Exit(0)
+	}
+	if ui.IsHelpRequested(os.Args[1:]) {
+		ui.PrintHelp(os.Stdout)
+		os.Exit(0)
+	}
+
+	// 2. Options de la ligne de commande standard
+	flag.Usage = func() {
+		ui.PrintHelp(os.Stdout)
+	}
+
+	devFlag := flags.Dev
+	mockInterfaceFlag := flags.MockInterface
+	mockIAFlag := flags.MockIA
+	repoFlag := flags.Repo
+	appFlag := flags.AppDir
 	flag.Parse()
 
 	// Gestion rigoureuse des signaux OS pour restaurer le terminal (Ctrl+C)
@@ -63,8 +79,7 @@ func main() {
 	// Initialisation des notifications de bureau selon la configuration .env
 	ui.SetNotificationsEnabled(bridge.ReadEnableNotificationsFromEnv(appRoot))
 
-	// Échec immédiat et explicite si aucun environnement Python valide n'est
-	// configuré (ni PYTHON_BIN, ni .venv/ créé par scripts/setup_python_env.py).
+	// Échec immédiat et explicite si aucun environnement Python valide n'est configuré
 	// Inutile en mode mock-interface : Python n'y est jamais appelé.
 	mockInterfaceActive := forceMockInterface || bridge.ReadMockSettingFromEnv(appRoot)
 	if !mockInterfaceActive {
@@ -83,7 +98,6 @@ func main() {
 		// Récupération de l'état du dépôt auprès du backend Python
 		status, errStatus := client.GetRepoStatus()
 		if errStatus != nil {
-			// En cas d'erreur inattendue, on crée un statut dégradé
 			status = nil
 		}
 

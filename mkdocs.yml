@@ -20,6 +20,8 @@ nav:
           - Présentation: doc_src_files/README.md
           - CLI Go:
               - Point d'entrée: doc_src_files/cli/main.md
+              - Version: doc_src_files/cli/version/version.md
+              - Drapeaux CLI: doc_src_files/cli/flags/flags.md
               - Module Go: doc_src_files/cli/go_mod.md
               - Bridge:
                   - Client: doc_src_files/cli/bridge/client.md
@@ -33,6 +35,8 @@ nav:
                   - Notifications: doc_src_files/cli/ui/notification.md
                   - Spinner: doc_src_files/cli/ui/spinner.md
                   - Styles: doc_src_files/cli/ui/styles.md
+                  - Sélecteur: doc_src_files/cli/ui/selector.md
+                  - Aide: doc_src_files/cli/ui/help.md
               - Vues:
                   - Menu: doc_src_files/cli/views/menu_view.md
                   - Commit: doc_src_files/cli/views/commit_view.md
@@ -80,6 +84,7 @@ nav:
           - CLI Go:
               - Bridge: doc_test_files/cli/bridge_test.md
               - Notifications: doc_test_files/cli/notification_test.md
+              - Aide CLI: doc_test_files/cli/help_test.md
               - Module Go: doc_test_files/cli/go_mod.md
           - Tests de situation:
               - Initialisation: doc_test_files/situation_test/init_test.md

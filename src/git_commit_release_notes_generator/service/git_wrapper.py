@@ -234,9 +234,36 @@ class GitWrapper:
         except Exception:
             return None
 
-    def _try_build_document_diff(self, diff_file: DiffFile) -> DiffFile | None:
+    def _get_staged_rename_sources(self) -> dict[str, str]:
+        """Associe, pour les fichiers renommés (status "R") indexés, le nouveau
+        chemin à son chemin d'origine dans HEAD.
+
+        Nécessite une détection explicite des renommages (`-M`), car
+        `get_staged_diff()` ne l'active pas par défaut (coût de calcul inutile
+        pour l'essentiel des diffs). Best-effort : renvoie un dict vide en cas
+        d'échec plutôt que de faire planter l'appelant, cette information ne
+        servant qu'à affiner un diff déjà fonctionnel sans elle (cf.
+        `_try_build_document_diff`).
+        """
+        try:
+            output = self.repo.git.diff("--cached", "--no-color", "-M", "--diff-filter=R", "--name-status")
+        except Exception:
+            return {}
+
+        sources: dict[str, str] = {}
+        for line in output.splitlines():
+            parts = line.split("\t")
+            if len(parts) == 3 and parts[0].startswith("R"):
+                sources[parts[2]] = parts[1]
+        return sources
+
+    def _try_build_document_diff(self, diff_file: DiffFile, old_path: str | None = None) -> DiffFile | None:
         """Tente de transformer un DiffFile binaire en diff textuel exploitable
         par le LLM, pour les formats de document "riches" supportés (.docx, .pdf).
+
+        `old_path` permet de lire la version HEAD depuis le chemin d'origine
+        d'un fichier renommé (`diff_file.path` porte alors déjà le nouveau nom,
+        introuvable dans HEAD) ; par défaut, identique à `diff_file.path`.
 
         Renvoie None si l'extension n'est pas supportée ou si l'extraction
         échoue (document corrompu, format inattendu, dépendance manquante) :
@@ -249,7 +276,7 @@ class GitWrapper:
 
         try:
             new_bytes = None if diff_file.status == "D" else self._read_staged_blob_bytes(diff_file.path)
-            old_bytes = None if diff_file.status == "A" else self._read_head_blob_bytes(diff_file.path)
+            old_bytes = None if diff_file.status == "A" else self._read_head_blob_bytes(old_path or diff_file.path)
 
             new_text = extractor(new_bytes) if new_bytes else ""
             old_text = extractor(old_bytes) if old_bytes else ""
@@ -311,6 +338,7 @@ class GitWrapper:
                 return []
 
             parsed = self._parse_diff(diff_text)
+            rename_sources: dict[str, str] | None = None
             sanitized_files: list[DiffFile] = []
             for diff_file in parsed:
                 # Un PDF n'a pas forcément d'octet nul dans ses premiers kilo-octets :
@@ -321,7 +349,15 @@ class GitWrapper:
                 # fait planter la sérialisation JSON en aval (surrogates invalides).
                 is_supported_doc = Path(diff_file.path).suffix.lower() in _DOCUMENT_TEXT_EXTRACTORS
                 if diff_file.is_binary or is_supported_doc:
-                    document_diff = self._try_build_document_diff(diff_file)
+                    old_path = None
+                    if is_supported_doc and diff_file.status == "R":
+                        # Calculé une seule fois, à la demande : un document
+                        # renommé (diff_file.path = le nouveau nom) a sa version
+                        # HEAD sous l'ancien nom, pas sous le nouveau.
+                        if rename_sources is None:
+                            rename_sources = self._get_staged_rename_sources()
+                        old_path = rename_sources.get(diff_file.path)
+                    document_diff = self._try_build_document_diff(diff_file, old_path=old_path)
                     if document_diff is None:
                         continue
                     diff_file = document_diff

@@ -224,6 +224,36 @@ def test_get_staged_diff_converts_modified_docx_to_text_diff(tmp_path):
     assert entry.removed > 0
 
 
+def test_get_staged_diff_converts_renamed_docx_to_incremental_diff(tmp_path):
+    """Un document renomme (git mv) doit etre diffe contre son contenu HEAD sous
+    l'ANCIEN chemin, pas traite comme un ajout complet sous le nouveau chemin."""
+    repo_dir = tmp_path / "repo"
+    _init_repo_with_base_commit(repo_dir)
+
+    docx_path = repo_dir / "rapport.docx"
+    docx_path.write_bytes(_make_docx_bytes("version initiale"))
+    _run_git(["add", "-A"], repo_dir)
+    _run_git(["commit", "-m", "ajout du rapport"], repo_dir)
+
+    _run_git(["mv", "rapport.docx", "rapport_final.docx"], repo_dir)
+    (repo_dir / "rapport_final.docx").write_bytes(_make_docx_bytes("version initiale\nligne ajoutee"))
+    _run_git(["add", "-A"], repo_dir)
+
+    wrapper = GitWrapper(repo_dir)
+    files = wrapper.get_staged_diff()
+
+    entries = [f for f in files if f.path == "rapport_final.docx"]
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.status == "R"
+    assert entry.added == 1
+    assert entry.removed == 0
+    # "version initiale" doit rester une ligne de contexte inchangee (pas "+version initiale") :
+    # sinon c'est que l'ancien contenu n'a pas ete retrouve et que tout est traite comme un ajout.
+    assert "+version initiale" not in entry.patch
+    assert "+ligne ajoutee" in entry.patch
+
+
 def test_get_staged_diff_converts_newly_added_pdf_to_text_diff(tmp_path):
     repo_dir = tmp_path / "repo"
     _init_repo_with_base_commit(repo_dir)

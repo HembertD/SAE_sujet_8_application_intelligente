@@ -76,6 +76,7 @@ nav:
           - Core (point d'entrée): doc_test_files/test_core.md
           - Configuration: doc_test_files/test_config.md
           - Git wrapper: doc_test_files/test_git_wrapper.md
+          - Contexte de merge: doc_test_files/test_git_wrapper_merge.md
           - Intégration Git wrapper (slow): doc_test_files/test_integration_git_wrapper_slow.md
           - Ollama LLM: doc_test_files/test_ollama_llm.md
           - Ollama LLM (slow, réseau réel): doc_test_files/test_ollama_llm_slow.md
@@ -107,3 +108,4 @@ nav:
       - Sprint 06: monitoring/sprint-06.md
       - Sprint 07: monitoring/sprint-07.md
       - Sprint 08: monitoring/sprint-08.md
+      - Sprint 09: monitoring/sprint-09.md

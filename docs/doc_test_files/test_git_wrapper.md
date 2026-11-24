@@ -53,6 +53,12 @@ Sur de vrais dépôts Git temporaires (PNG minimaux mais valides, octets distinc
 - `test_get_staged_image_changes_detects_deletion` : `status="D"`, `old_bytes` renseigné (contenu de la version supprimée), `new_bytes=None`.
 - `test_get_staged_image_changes_ignores_text_and_document_files` : un `.txt` et un `.docx` stagés ne produisent aucune `ImageChange` (périmètre strictement limité aux extensions image).
 
+## Voir aussi
+
+Les scénarios de merge, de conflits et de payload LLM sont couverts par
+`test/test_git_wrapper_merge.py` et documentés dans
+`doc_test_files/test_git_wrapper_merge.md`.
+
 ## Points de vigilance
 
 - La logique de parsing doit rester tolérante aux variations de format de diff Git.

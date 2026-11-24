@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import difflib
 import io
+import json
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from git import InvalidGitRepositoryError, Repo
 
-from git_commit_release_notes_generator.models import DiffFile
+from git_commit_release_notes_generator.models import (
+    ConflictFile,
+    ConflictSection,
+    DiffFile,
+    GitState,
+)
 
 
 class GitWrapperError(Exception):
@@ -211,7 +218,9 @@ class GitWrapper:
         sans diff exploitable" (fichier vide, par exemple).
         """
         try:
-            names = self.repo.git.diff("--cached", "--name-only", "--diff-filter=ACMRTUXBD")
+            # U (unmerged) est volontairement exclu : les conflits sont exposés
+            # séparément par get_conflict_files()/get_merge_payload().
+            names = self.repo.git.diff("--cached", "--name-only", "--diff-filter=ACMRTBD")
             return [n for n in names.splitlines() if n.strip()]
         except Exception as exc:
             raise GitWrapperError(f"Erreur lors de la récupération des fichiers indexés : {exc}") from exc
@@ -319,7 +328,7 @@ class GitWrapper:
         plutôt que d'être traités comme des binaires silencieusement ignorés.
         """
         try:
-            diff_text = self.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTUXBD")
+            diff_text = self.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTBD")
             if not diff_text.strip():
                 staged_files = self.get_staged_file_names()
                 if staged_files:
@@ -412,6 +421,450 @@ class GitWrapper:
         except Exception as exc:
             raise GitWrapperError(f"Erreur lors de la détection des images modifiées : {exc}") from exc
 
+    @staticmethod
+    def _short_sha(sha: str) -> str:
+        """Tronque un SHA Git à 7 caractères, comme les commits exposés au LLM."""
+        value = sha.strip().splitlines()[0] if sha.strip() else ""
+        return value[:7]
+
+    def _read_git_file(self, name: str) -> str:
+        """Lit un fichier interne du répertoire .git sans lever si absent."""
+        try:
+            return (Path(self.repo.git_dir) / name).read_text(encoding="utf-8", errors="replace").strip()
+        except OSError:
+            return ""
+
+    def _get_unmerged_stages(self) -> dict[str, dict[int, str]]:
+        """Retourne les stages Git (1=base, 2=ours, 3=theirs) des fichiers en conflit."""
+        try:
+            raw = self.repo.git.ls_files("-u", "-z")
+        except Exception as exc:
+            raise GitWrapperError(f"Erreur lors de la récupération des conflits Git : {exc}") from exc
+
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8", errors="replace")
+
+        result: dict[str, dict[int, str]] = {}
+        for entry in raw.split("\0"):
+            if not entry or "\t" not in entry:
+                continue
+            meta, path = entry.split("\t", 1)
+            parts = meta.split()
+            if len(parts) < 3:
+                continue
+            try:
+                stage = int(parts[2])
+            except ValueError:
+                continue
+            result.setdefault(path, {})[stage] = parts[1]
+        return result
+
+    def get_unmerged_paths(self) -> list[str]:
+        """Retourne les chemins actuellement en conflit (index non fusionné)."""
+        return sorted(self._get_unmerged_stages())
+
+    @staticmethod
+    def _conflict_type_from_stages(stages: set[int]) -> str:
+        """Déduit le type de conflit Git à partir des stages présents dans l'index."""
+        if stages == {1, 2, 3}:
+            return "both_modified"
+        if stages == {2, 3}:
+            return "both_added"
+        if stages == {1, 2}:
+            return "deleted_by_them"
+        if stages == {1, 3}:
+            return "deleted_by_us"
+        if stages == {1}:
+            return "both_deleted"
+        if stages == {2}:
+            return "added_by_us"
+        if stages == {3}:
+            return "added_by_them"
+        return "unknown"
+
+    def get_git_state(self) -> GitState:
+        """Expose l'état Git utile au LLM : branche, opération et parents de merge."""
+        try:
+            branch = ""
+            try:
+                branch = self.repo.active_branch.name
+            except (TypeError, ValueError):
+                branch = "HEAD" if self.repo.head.is_valid() else ""
+
+            head = self._short_sha(self.repo.head.commit.hexsha) if self.repo.head.is_valid() else ""
+            head_parents = (
+                [self._short_sha(parent.hexsha) for parent in self.repo.head.commit.parents]
+                if self.repo.head.is_valid()
+                else []
+            )
+
+            git_dir = Path(self.repo.git_dir)
+            operation = "none"
+            if (git_dir / "MERGE_HEAD").exists():
+                operation = "merge"
+            elif (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists() or (git_dir / "REBASE_HEAD").exists():
+                operation = "rebase"
+            elif (git_dir / "CHERRY_PICK_HEAD").exists():
+                operation = "cherry-pick"
+            elif (git_dir / "REVERT_HEAD").exists():
+                operation = "revert"
+
+            merge_heads_full: list[str] = []
+            if operation == "merge":
+                merge_heads_full = [line.strip() for line in self._read_git_file("MERGE_HEAD").splitlines() if line.strip()]
+
+            merge_base = ""
+            if merge_heads_full and head:
+                try:
+                    bases = self.repo.merge_base("HEAD", merge_heads_full[0])
+                    if bases:
+                        merge_base = self._short_sha(bases[0].hexsha)
+                except Exception:
+                    merge_base = ""
+
+            has_conflicts = bool(self._get_unmerged_stages())
+            return GitState(
+                branch=branch,
+                head=head,
+                operation=operation,
+                in_progress=operation != "none",
+                has_conflicts=has_conflicts,
+                merge_head=self._short_sha(merge_heads_full[0]) if merge_heads_full else "",
+                merge_heads=[self._short_sha(sha) for sha in merge_heads_full],
+                merge_base=merge_base,
+                head_parents=head_parents,
+                is_merge_commit=len(head_parents) > 1,
+            )
+        except GitWrapperError:
+            raise
+        except Exception as exc:
+            raise GitWrapperError(f"Erreur lors de la lecture de l'état Git : {exc}") from exc
+
+    def _show_stage(self, path: str, stage: int) -> tuple[str | None, bool]:
+        """Retourne le contenu texte d'un stage Git et indique s'il est binaire."""
+        cwd = self.repo.working_tree_dir or self.repo.git_dir
+        try:
+            proc = subprocess.run(
+                ["git", "show", f":{stage}:{path}"],
+                cwd=cwd,
+                capture_output=True,
+                check=False,
+            )
+        except OSError as exc:
+            raise GitWrapperError(f"Impossible d'exécuter git show pour '{path}' : {exc}") from exc
+
+        if proc.returncode != 0:
+            return None, False
+        data = proc.stdout
+        if b"\x00" in data:
+            return None, True
+        try:
+            return data.decode("utf-8"), False
+        except UnicodeDecodeError:
+            return None, True
+
+    def _read_worktree_text(self, path: str) -> tuple[str | None, bool]:
+        """Lit le fichier de travail courant et détecte un contenu binaire."""
+        root = self.repo.working_tree_dir
+        if not root:
+            return None, False
+        try:
+            data = (Path(root) / path).read_bytes()
+        except OSError:
+            return None, False
+        if b"\x00" in data:
+            return None, True
+        try:
+            return data.decode("utf-8"), False
+        except UnicodeDecodeError:
+            return None, True
+
+    @staticmethod
+    def _parse_conflict_sections(
+        file_path: str,
+        text: str,
+        context_lines: int = 3,
+        conflict_type: str = "text",
+    ) -> list[ConflictSection]:
+        """Découpe un fichier contenant des marqueurs de conflit en sections."""
+        lines = text.splitlines()
+        sections: list[ConflictSection] = []
+        section_index = 0
+        index = 0
+
+        while index < len(lines):
+            if not lines[index].startswith("<<<<<<<"):
+                index += 1
+                continue
+
+            start = index
+            index += 1
+            ours_lines: list[str] = []
+            base_lines: list[str] = []
+            theirs_lines: list[str] = []
+            in_base = False
+
+            while index < len(lines) and not lines[index].startswith("=======") and not lines[index].startswith(">>>>>>>"):
+                if lines[index].startswith("|||||||"):
+                    in_base = True
+                elif in_base:
+                    base_lines.append(lines[index])
+                else:
+                    ours_lines.append(lines[index])
+                index += 1
+
+            if index < len(lines) and lines[index].startswith("======="):
+                index += 1
+                while index < len(lines) and not lines[index].startswith(">>>>>>>"):
+                    theirs_lines.append(lines[index])
+                    index += 1
+
+            end = index if index < len(lines) and lines[index].startswith(">>>>>>>") else index - 1
+            if index < len(lines) and lines[index].startswith(">>>>>>>"):
+                index += 1
+
+            context_before = "\n".join(lines[max(0, start - context_lines):start])
+            context_after = "\n".join(lines[end + 1:end + 1 + context_lines]) if end + 1 <= len(lines) else ""
+
+            sections.append(
+                ConflictSection(
+                    file_path=file_path,
+                    ours="\n".join(ours_lines),
+                    theirs="\n".join(theirs_lines),
+                    base="\n".join(base_lines) if in_base else None,
+                    section_index=section_index,
+                    start_line=start + 1,
+                    end_line=end + 1,
+                    context_before=context_before,
+                    context_after=context_after,
+                    conflict_type=conflict_type,
+                    resolution_supported=True,
+                    source="markers",
+                )
+            )
+            section_index += 1
+
+        return sections
+
+    @staticmethod
+    def _truncate(text: str | None, limit: int) -> tuple[str | None, bool]:
+        """Tronque un texte à une limite et signale si une troncature a eu lieu."""
+        if text is None:
+            return None, False
+        if limit < 0:
+            limit = 0
+        if len(text) <= limit:
+            return text, False
+        return text[:limit] + "\n... [TRUNCATED] ...", True
+
+    def get_conflict_files(self, max_chars: int = 8000, context_lines: int = 3) -> list[ConflictFile]:
+        """Retourne les fichiers en conflit avec leurs sections et versions Git."""
+        try:
+            stages_map = self._get_unmerged_stages()
+            conflicts: list[ConflictFile] = []
+
+            for path in sorted(stages_map):
+                stages = stages_map[path]
+                conflict_type = self._conflict_type_from_stages(set(stages))
+
+                base_content, base_binary = self._show_stage(path, 1)
+                ours_content, ours_binary = self._show_stage(path, 2)
+                theirs_content, theirs_binary = self._show_stage(path, 3)
+                worktree_text, worktree_binary = self._read_worktree_text(path)
+                is_binary = base_binary or ours_binary or theirs_binary or worktree_binary
+
+                sections: list[ConflictSection] = []
+                if not is_binary and worktree_text is not None:
+                    sections = self._parse_conflict_sections(path, worktree_text, context_lines, conflict_type)
+
+                if not is_binary and not sections:
+                    side_text = ours_content if ours_content is not None else theirs_content
+                    if side_text is not None:
+                        sections = [
+                            ConflictSection(
+                                file_path=path,
+                                ours=ours_content or "",
+                                theirs=theirs_content or "",
+                                base=base_content,
+                                section_index=0,
+                                start_line=1,
+                                end_line=max(1, len(side_text.splitlines())),
+                                conflict_type=conflict_type,
+                                resolution_supported=True,
+                                source="index",
+                            )
+                        ]
+
+                resolution_supported = not is_binary and conflict_type not in {"both_deleted", "unknown"}
+                reason = ""
+                if is_binary:
+                    reason = "fichier binaire"
+                elif conflict_type == "both_deleted":
+                    reason = "fichier supprimé des deux côtés"
+                elif conflict_type == "unknown":
+                    reason = "type de conflit non pris en charge"
+
+                truncated = False
+                base_content, truncated_base = self._truncate(base_content, max_chars)
+                ours_content, truncated_ours = self._truncate(ours_content, max_chars)
+                theirs_content, truncated_theirs = self._truncate(theirs_content, max_chars)
+                truncated = truncated or truncated_base or truncated_ours or truncated_theirs
+
+                for section in sections:
+                    section.ours, truncated_section_ours = self._truncate(section.ours, max_chars)
+                    section.theirs, truncated_section_theirs = self._truncate(section.theirs, max_chars)
+                    section.base, truncated_section_base = self._truncate(section.base, max_chars)
+                    section.context_before, truncated_before = self._truncate(section.context_before, max_chars)
+                    section.context_after, truncated_after = self._truncate(section.context_after, max_chars)
+                    truncated = (
+                        truncated
+                        or truncated_section_ours
+                        or truncated_section_theirs
+                        or truncated_section_base
+                        or truncated_before
+                        or truncated_after
+                    )
+
+                conflicts.append(
+                    ConflictFile(
+                        path=path,
+                        conflict_type=conflict_type,
+                        resolution_supported=resolution_supported,
+                        is_binary=is_binary,
+                        sections=sections,
+                        base_content=base_content,
+                        ours_content=ours_content,
+                        theirs_content=theirs_content,
+                        reason=reason,
+                        truncated=truncated,
+                    )
+                )
+
+            return conflicts
+        except GitWrapperError:
+            raise
+        except Exception as exc:
+            raise GitWrapperError(f"Erreur lors de l'extraction des conflits : {exc}") from exc
+
+    def get_conflict_sections(self, max_chars: int = 8000, context_lines: int = 3) -> list[ConflictSection]:
+        """Retourne toutes les sections de conflit, tous fichiers confondus."""
+        sections: list[ConflictSection] = []
+        for conflict_file in self.get_conflict_files(max_chars=max_chars, context_lines=context_lines):
+            sections.extend(conflict_file.sections)
+        return sections
+
+    @staticmethod
+    def _contains_truncation(value: object) -> bool:
+        if isinstance(value, str):
+            return "TRUNCATED" in value
+        if isinstance(value, list):
+            return any(GitWrapper._contains_truncation(item) for item in value)
+        if isinstance(value, dict):
+            return any(GitWrapper._contains_truncation(item) for item in value.values())
+        return False
+
+    @staticmethod
+    def _apply_total_budget(
+        payload: dict[str, object],
+        total_max_chars: int,
+        truncated_files: set[str],
+    ) -> dict[str, object]:
+        """Réduit progressivement le payload pour respecter un budget global."""
+        if total_max_chars <= 0:
+            return payload
+
+        for _ in range(12):
+            if len(json.dumps(payload, ensure_ascii=False)) <= total_max_chars:
+                break
+
+            # Les conflits sont prioritaires : on réduit d'abord les fichiers
+            # indexés classiques, puis seulement les sections de conflit.
+            changed_files = False
+            files = payload.get("files", [])
+            if isinstance(files, list):
+                for file_payload in files:
+                    if not isinstance(file_payload, dict):
+                        continue
+                    patch = file_payload.get("patch")
+                    if isinstance(patch, str) and len(patch) > 200:
+                        file_payload["patch"] = patch[: max(200, len(patch) // 2)] + "\n... [TRUNCATED] ..."
+                        truncated_files.add(str(file_payload.get("path", "")))
+                        changed_files = True
+            if changed_files:
+                continue
+
+            changed_conflicts = False
+            conflicts = payload.get("conflicts", [])
+            if isinstance(conflicts, list):
+                for conflict in conflicts:
+                    if not isinstance(conflict, dict):
+                        continue
+                    for key in ("base_content", "ours_content", "theirs_content"):
+                        content = conflict.get(key)
+                        if isinstance(content, str) and len(content) > 200:
+                            conflict[key] = content[: max(200, len(content) // 2)] + "\n... [TRUNCATED] ..."
+                            truncated_files.add(str(conflict.get("path", "")))
+                            changed_conflicts = True
+                    sections = conflict.get("sections", [])
+                    if isinstance(sections, list):
+                        for section in sections:
+                            if not isinstance(section, dict):
+                                continue
+                            for key in ("base", "ours", "theirs", "context_before", "context_after"):
+                                content = section.get(key)
+                                if isinstance(content, str) and len(content) > 200:
+                                    section[key] = content[: max(200, len(content) // 2)] + "\n... [TRUNCATED] ..."
+                                    truncated_files.add(str(conflict.get("path", "")))
+                                    changed_conflicts = True
+
+            if not changed_conflicts:
+                break
+
+        return payload
+
+    def get_merge_payload(
+        self,
+        max_chars: int = 8000,
+        total_max_chars: int = 60000,
+        context_lines: int = 3,
+    ) -> dict[str, object]:
+        """Construit le payload complet diff + état Git + conflits pour le LLM."""
+        state = self.get_git_state()
+        files = self.get_staged_diff(max_chars=max_chars)
+        conflicts = self.get_conflict_files(max_chars=max_chars, context_lines=context_lines)
+
+        files_payload = [diff.to_dict() for diff in files]
+        conflicts_payload = [conflict.to_dict() for conflict in conflicts]
+        truncated_files: set[str] = set()
+
+        for diff_payload in files_payload:
+            if self._contains_truncation(diff_payload.get("patch", "")):
+                truncated_files.add(str(diff_payload.get("path", "")))
+        for conflict_payload in conflicts_payload:
+            if conflict_payload.get("truncated") or self._contains_truncation(conflict_payload):
+                truncated_files.add(str(conflict_payload.get("path", "")))
+
+        payload: dict[str, object] = {
+            "repository": state.to_dict(),
+            "summary": {
+                "file_count": len(files_payload),
+                "conflict_count": len(conflicts_payload),
+                "binary_file_count": sum(1 for conflict in conflicts if conflict.is_binary),
+                "binary_conflict_count": sum(1 for conflict in conflicts if conflict.is_binary),
+                "truncated": bool(truncated_files),
+                "truncated_files": sorted(truncated_files),
+            },
+            "files": files_payload,
+            "conflicts": conflicts_payload,
+        }
+
+        payload = self._apply_total_budget(payload, total_max_chars, truncated_files)
+        summary = payload.get("summary")
+        if isinstance(summary, dict):
+            summary["truncated"] = bool(truncated_files)
+            summary["truncated_files"] = sorted(truncated_files)
+        return payload
+
     def get_staged_diff_as_json(self, max_chars: int = 8000) -> list[dict[str, str | int | bool]]:
         """Retourne le diff indexé sous forme de liste JSON-ready, par fichier modifié."""
         return [diff_file.to_dict() for diff_file in self.get_staged_diff(max_chars=max_chars)]
@@ -428,9 +881,23 @@ class GitWrapper:
             "files": [diff.to_dict() for diff in files],
         }
 
-    def get_llm_payload(self, max_chars: int = 8000) -> dict[str, object]:
-        """Retourne le payload directement exploitable par le modèle, sans bloc prompt interne."""
-        return self.get_staged_diff_payload(max_chars=max_chars)
+    def get_llm_payload(
+        self,
+        max_chars: int = 8000,
+        total_max_chars: int = 60000,
+        context_lines: int = 3,
+    ) -> dict[str, object]:
+        """Retourne le payload directement exploitable par le modèle.
+
+        Le payload contient le diff indexé, l'état Git et les conflits non
+        résolus. Il reste compatible avec les clés historiques `summary` et
+        `files`, tout en ajoutant `repository` et `conflicts`.
+        """
+        return self.get_merge_payload(
+            max_chars=max_chars,
+            total_max_chars=total_max_chars,
+            context_lines=context_lines,
+        )
 
     def get_recent_commits(self, limit: int = 0) -> list[CommitInfo]:
         """Récupère l'historique complet ou récent des commits avec leurs tags associés."""

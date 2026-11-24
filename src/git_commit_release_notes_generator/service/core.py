@@ -15,6 +15,7 @@ import logging
 import sys
 import time
 
+from git_commit_release_notes_generator.models import DiffFile
 from git_commit_release_notes_generator.ollama_client.exceptions import (
     CommitMessageValidationError,
     OllamaCallError,
@@ -26,6 +27,9 @@ from git_commit_release_notes_generator.ollama_client.llm import (
 )
 from git_commit_release_notes_generator.ollama_client.release_notes import (
     generate_release_notes,
+)
+from git_commit_release_notes_generator.ollama_client.vision import (
+    describe_image_change,
 )
 from git_commit_release_notes_generator.service.git_wrapper import GitWrapper
 
@@ -154,6 +158,7 @@ def action_generate_commit(repo_path: str = ".", feedback: str = "") -> dict:
     try:
         wrapper = GitWrapper(repo_path)
         diff_files = wrapper.get_staged_diff()
+        image_changes = wrapper.get_staged_image_changes()
     except Exception as e:
         logger.error(f"action_generate_commit git error: {e}")
         return {"success": False, "error": str(e)}
@@ -164,16 +169,43 @@ def action_generate_commit(repo_path: str = ".", feedback: str = "") -> dict:
             "error": "Aucune modification indexée (staged) exploitable pour le modèle LLM.",
         }
 
-    reachable, ping_error = check_ollama_reachable()
+    reachable, ping_error = check_ollama_reachable(validate_model=True)
     if not reachable:
-        logger.warning(f"Serveur Ollama non joignable : {ping_error}")
+        logger.warning(f"Serveur Ollama non joignable ou modèle absent : {ping_error}")
         return {
             "success": False,
             "error": ping_error or "Serveur Ollama non joignable.",
         }
 
+    # Les images sont déjà dans diff_files comme binaires sans contenu : on
+    # remplace leur entrée par la description du modèle de vision (appelé ici
+    # seulement, get_staged_diff() restant sans réseau). Si la description
+    # échoue, l'entrée binaire reste : le LLM sait au moins que le fichier a changé.
+    all_diff_files = list(diff_files)
+    index_by_path = {f.path: i for i, f in enumerate(all_diff_files)}
+    for image in image_changes:
+        try:
+            description = describe_image_change(
+                image.path, image.status, image.new_bytes, old_image=image.old_bytes
+            )
+        except Exception as e:
+            logger.warning(f"Description visuelle de '{image.path}' échouée, gardé comme binaire : {e}")
+            continue
+        described = DiffFile(
+            path=image.path,
+            status=image.status,
+            added=0,
+            removed=0,
+            is_binary=False,
+            patch=f"[Analyse visuelle] {description}",
+        )
+        if image.path in index_by_path:
+            all_diff_files[index_by_path[image.path]] = described
+        else:
+            all_diff_files.append(described)
+
     try:
-        msg = generate_commit_message(diff_files, feedback=feedback)
+        msg = generate_commit_message(all_diff_files, feedback=feedback)
     except (OllamaCallError, CommitMessageValidationError, ValueError) as e:
         logger.warning(f"Génération commit échouée : {e}")
         return {"success": False, "error": str(e)}
@@ -286,9 +318,12 @@ def action_release_notes(repo_path: str = ".", from_tag: str = "", to_tag: str =
 
     # Vérification stricte de joignabilité d'Ollama avant génération (no-op
     # côté réseau en mode MOCK_AI, géré en interne par check_ollama_reachable).
-    reachable, ping_error = check_ollama_reachable(timeout=3.0)
+    # validate_model=True : échoue explicitement si OLLAMA_MODEL n'est pas
+    # installé sur le serveur, plutôt que de le découvrir après une tentative
+    # de génération (erreur HTTP 404 réactive).
+    reachable, ping_error = check_ollama_reachable(timeout=3.0, validate_model=True)
     if not reachable:
-        logger.warning(f"Serveur Ollama non joignable pour release-notes : {ping_error}")
+        logger.warning(f"Serveur Ollama non joignable ou modèle absent pour release-notes : {ping_error}")
         return {
             "success": False,
             "error": ping_error or "Serveur Ollama non joignable.",

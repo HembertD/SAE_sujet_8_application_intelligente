@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import difflib
+import io
 import json
 import re
 import subprocess
@@ -18,6 +20,58 @@ from git_commit_release_notes_generator.models import (
 
 class GitWrapperError(Exception):
     """Exception métier levée lors d'un échec de commande Git."""
+
+
+def _extract_docx_text(data: bytes) -> str:
+    """Extrait le texte brut d'un document Word (.docx), paragraphes et tableaux inclus.
+
+    `document.paragraphs` ignore le contenu situé à l'intérieur des tableaux
+    (`python-docx`) : on parcourt donc aussi `document.tables` pour ne pas
+    perdre le texte d'un cahier des charges, d'un chiffrage, etc.
+    """
+    from docx import Document  # import différé : dépendance optionnelle, coûteuse à charger
+
+    document = Document(io.BytesIO(data))
+    lines = [p.text for p in document.paragraphs if p.text.strip()]
+    for table in document.tables:
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if cells:
+                lines.append(" | ".join(cells))
+    return "\n".join(lines)
+
+
+def _extract_pdf_text(data: bytes) -> str:
+    """Extrait le texte brut d'un PDF, page par page."""
+    from pypdf import PdfReader  # import différé : dépendance optionnelle, coûteuse à charger
+
+    reader = PdfReader(io.BytesIO(data))
+    return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+
+# Formats de document "riches" pour lesquels on tente une extraction de texte
+# et un diff ligne à ligne, plutôt que de les traiter comme des binaires opaques
+# (images, archives, ...) qui restent exclus du payload LLM.
+_DOCUMENT_TEXT_EXTRACTORS = {
+    ".docx": _extract_docx_text,
+    ".pdf": _extract_pdf_text,
+}
+
+# Formats image pour lesquels get_staged_image_changes() expose les octets
+# bruts, à destination d'une description par un modèle de vision (cf.
+# ollama_client.vision). Contrairement aux documents riches ci-dessus, on ne
+# tente aucune extraction de texte ici : seul l'appelant décide d'invoquer
+# le modèle de vision, et seulement quand il en a réellement besoin.
+_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
+
+
+@dataclass(frozen=True)
+class ImageChange:
+    """Un fichier image ajouté, modifié ou supprimé, avec son contenu avant/après."""
+    path: str
+    status: str
+    old_bytes: bytes | None
+    new_bytes: bytes | None
 
 
 @dataclass(frozen=True)
@@ -171,8 +225,108 @@ class GitWrapper:
         except Exception as exc:
             raise GitWrapperError(f"Erreur lors de la récupération des fichiers indexés : {exc}") from exc
 
+    def _read_staged_blob_bytes(self, file_path: str) -> bytes | None:
+        """Lit le contenu brut (octets) tel qu'indexé (staged), sans dépendre du
+        contenu actuel sur disque (qui peut avoir divergé depuis le `git add`)."""
+        entry = self.repo.index.entries.get((file_path, 0))
+        if entry is None:
+            return None
+        return self.repo.odb.stream(entry.binsha).read()
+
+    def _read_head_blob_bytes(self, file_path: str) -> bytes | None:
+        """Lit le contenu brut (octets) de la version HEAD d'un fichier, ou None s'il est nouveau."""
+        try:
+            if not self.repo.head.is_valid():
+                return None
+            blob = self.repo.head.commit.tree / file_path
+            return blob.data_stream.read()
+        except Exception:
+            return None
+
+    def _get_staged_rename_sources(self) -> dict[str, str]:
+        """Associe, pour les fichiers renommés (status "R") indexés, le nouveau
+        chemin à son chemin d'origine dans HEAD.
+
+        Nécessite une détection explicite des renommages (`-M`), car
+        `get_staged_diff()` ne l'active pas par défaut (coût de calcul inutile
+        pour l'essentiel des diffs). Best-effort : renvoie un dict vide en cas
+        d'échec plutôt que de faire planter l'appelant, cette information ne
+        servant qu'à affiner un diff déjà fonctionnel sans elle (cf.
+        `_try_build_document_diff`).
+        """
+        try:
+            output = self.repo.git.diff("--cached", "--no-color", "-M", "--diff-filter=R", "--name-status")
+        except Exception:
+            return {}
+
+        sources: dict[str, str] = {}
+        for line in output.splitlines():
+            parts = line.split("\t")
+            if len(parts) == 3 and parts[0].startswith("R"):
+                sources[parts[2]] = parts[1]
+        return sources
+
+    def _try_build_document_diff(self, diff_file: DiffFile, old_path: str | None = None) -> DiffFile | None:
+        """Tente de transformer un DiffFile binaire en diff textuel exploitable
+        par le LLM, pour les formats de document "riches" supportés (.docx, .pdf).
+
+        `old_path` permet de lire la version HEAD depuis le chemin d'origine
+        d'un fichier renommé (`diff_file.path` porte alors déjà le nouveau nom,
+        introuvable dans HEAD) ; par défaut, identique à `diff_file.path`.
+
+        Renvoie None si l'extension n'est pas supportée ou si l'extraction
+        échoue (document corrompu, format inattendu, dépendance manquante) :
+        l'appelant doit alors conserver le comportement binaire existant
+        (fichier exclu du payload LLM) plutôt que de faire planter le diff.
+        """
+        extractor = _DOCUMENT_TEXT_EXTRACTORS.get(Path(diff_file.path).suffix.lower())
+        if extractor is None:
+            return None
+
+        try:
+            new_bytes = None if diff_file.status == "D" else self._read_staged_blob_bytes(diff_file.path)
+            old_bytes = None if diff_file.status == "A" else self._read_head_blob_bytes(old_path or diff_file.path)
+
+            new_text = extractor(new_bytes) if new_bytes else ""
+            old_text = extractor(old_bytes) if old_bytes else ""
+        except Exception:
+            return None
+
+        if not new_text and not old_text:
+            return None
+
+        diff_lines = list(
+            difflib.unified_diff(
+                old_text.splitlines(),
+                new_text.splitlines(),
+                fromfile=f"a/{diff_file.path}",
+                tofile=f"b/{diff_file.path}",
+                lineterm="",
+            )
+        )
+        added = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
+        removed = sum(1 for line in diff_lines if line.startswith("-") and not line.startswith("---"))
+
+        header = f"diff --git a/{diff_file.path} b/{diff_file.path}"
+        patch = header + "\n" + "\n".join(diff_lines) if diff_lines else header + "\n(contenu textuel identique)"
+
+        return DiffFile(
+            path=diff_file.path,
+            status=diff_file.status,
+            added=added,
+            removed=removed,
+            is_binary=False,
+            patch=self._sanitize_diff_text(patch),
+        )
+
     def get_staged_diff(self, max_chars: int = 8000) -> list[DiffFile]:
-        """Extrait le diff indexé en objets DiffFile structurés, sans fichiers binaires."""
+        """Extrait le diff indexé en objets DiffFile structurés.
+
+        Les formats de document "riches" supportés (.docx, .pdf) sont convertis
+        en diff textuel par extraction de contenu (cf. `_try_build_document_diff`).
+        Les autres binaires (images, archives, ...) sont conservés avec
+        `is_binary=True` et un patch vide : présents dans la liste, sans contenu.
+        """
         try:
             diff_text = self.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTBD")
             if not diff_text.strip():
@@ -193,10 +347,41 @@ class GitWrapper:
                 return []
 
             parsed = self._parse_diff(diff_text)
+            rename_sources: dict[str, str] | None = None
             sanitized_files: list[DiffFile] = []
             for diff_file in parsed:
-                if diff_file.is_binary:
-                    continue
+                # Un PDF n'a pas forcément d'octet nul dans ses premiers kilo-octets :
+                # Git peut le classer comme "texte" (is_binary=False) et produire un
+                # diff ligne à ligne du bytecode brut. On tente donc l'extraction pour
+                # toute extension supportée, que Git l'ait étiqueté binaire ou non —
+                # sinon ce bytecode (avec ses octets non-UTF8) finit dans le patch et
+                # fait planter la sérialisation JSON en aval (surrogates invalides).
+                is_supported_doc = Path(diff_file.path).suffix.lower() in _DOCUMENT_TEXT_EXTRACTORS
+                if diff_file.is_binary or is_supported_doc:
+                    old_path = None
+                    if is_supported_doc and diff_file.status == "R":
+                        # Calculé une seule fois, à la demande : un document
+                        # renommé (diff_file.path = le nouveau nom) a sa version
+                        # HEAD sous l'ancien nom, pas sous le nouveau.
+                        if rename_sources is None:
+                            rename_sources = self._get_staged_rename_sources()
+                        old_path = rename_sources.get(diff_file.path)
+                    document_diff = self._try_build_document_diff(diff_file, old_path=old_path)
+                    if document_diff is not None:
+                        diff_file = document_diff
+                    else:
+                        # Binaire opaque (image, archive, document illisible) : on le garde
+                        # pour que le TUI l'affiche ("[Binaire]") et que le LLM sache qu'il
+                        # a changé, mais sans patch, qui contiendrait des octets bruts non-UTF8.
+                        diff_file = DiffFile(
+                            path=diff_file.path,
+                            status=diff_file.status,
+                            added=0,
+                            removed=0,
+                            is_binary=True,
+                            patch="",
+                        )
+
                 patch = diff_file.patch
                 if len(patch) > max_chars:
                     patch = patch[:max_chars] + "\n\n... [DIFF TRUNCATED: TROP VOLUMINEUX] ..."
@@ -206,13 +391,46 @@ class GitWrapper:
                         status=diff_file.status,
                         added=diff_file.added,
                         removed=diff_file.removed,
-                        is_binary=False,
+                        is_binary=diff_file.is_binary,
                         patch=patch,
                     )
                 )
             return sanitized_files
         except Exception as exc:
             raise GitWrapperError(f"Erreur lors de la récupération du diff indexé : {exc}") from exc
+
+    def get_staged_image_changes(self) -> list[ImageChange]:
+        """Liste les fichiers image indexés (ajoutés/modifiés/supprimés), avec
+        leurs octets avant/après.
+
+        N'effectue aucun appel réseau : c'est à l'appelant (service/core.py,
+        uniquement au moment de générer un message de commit) de décider s'il
+        invoque un modèle de vision sur ces octets. Reste donc indépendant de
+        get_staged_diff(), qui doit rester rapide et sans réseau.
+        """
+        try:
+            diff_text = self.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTUXBD")
+            if not diff_text.strip():
+                return []
+
+            changes: list[ImageChange] = []
+            for diff_file in self._parse_diff(diff_text):
+                if not diff_file.is_binary:
+                    continue
+                if Path(diff_file.path).suffix.lower() not in _IMAGE_EXTENSIONS:
+                    continue
+
+                new_bytes = None if diff_file.status == "D" else self._read_staged_blob_bytes(diff_file.path)
+                old_bytes = None if diff_file.status == "A" else self._read_head_blob_bytes(diff_file.path)
+                if not new_bytes and not old_bytes:
+                    continue
+
+                changes.append(
+                    ImageChange(path=diff_file.path, status=diff_file.status, old_bytes=old_bytes, new_bytes=new_bytes)
+                )
+            return changes
+        except Exception as exc:
+            raise GitWrapperError(f"Erreur lors de la détection des images modifiées : {exc}") from exc
 
     @staticmethod
     def _short_sha(sha: str) -> str:

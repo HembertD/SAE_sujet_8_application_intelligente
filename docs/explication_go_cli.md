@@ -15,10 +15,14 @@ Le binaire propose les options suivantes pour s'adapter à tous les contextes d'
 
 | Option | Valeur par défaut | Description |
 |---|---|---|
+| `-h, --help` | `-` | **Aide intégrée** : affiche l'aide complète détaillée et quitte immédiatement avec le code de succès `0`. |
+| `-v, --version` | `-` | **Version de l'application** : affiche la version courante de Gitelligence et quitte avec le code `0`. |
 | `--repo <chemin>` | `.` (répertoire courant) | **Dépôt Git cible à analyser** : chemin du projet sur lequel vous travaillez (pour extraire le `git diff`, générer un message de commit ou créer les release notes). |
-| `--dev` | `false` | **Mode développeur** : débloque l'utilisation des drapeaux de mock en CLI et autorise l'affichage et la modification des réglages de mock dans l'écran de configuration. |
-| `--mockInterface` | `false` | **Mock de l'interface** : force le `MockClient` pour manipuler et tester l'interface TUI hors-ligne sans sous-processus Python (requiert obligatoirement `--dev`). |
-| `--mockIA` | `false` | **Mock de l'IA** : active la simulation des réponses Ollama (commits et release notes déterministes hors-ligne, requiert obligatoirement `--dev`). |
+| `--dev` | `false` | **Mode développeur** : débloque les options de mockage nécessaires au développement et aux tests de l'application. |
+| `--mockInterface` | `false` | **Mockage de l'interface** : active le mockage complet pour développer et tester l'interface sans dépendre de Git ni de Python (requiert obligatoirement `--dev`). |
+| `--mockIA` | `false` | **Mockage de l'IA** : active le mockage des réponses du modèle pour développer l'application sans serveur Ollama (requiert obligatoirement `--dev`). |
+| `--docker-llm` | `false` | **Ollama via Docker** : force l'usage du serveur Ollama conteneurisé sous Docker. |
+| `--python-bin <chemin>` | Auto-détecté | **Interpréteur Python** : surcharge le chemin de l'exécutable Python (.env et .venv). |
 | `--app-dir <chemin>` | Auto-détecté | **Racine de l'application Gitelligence** : chemin vers le dossier de notre outil (`SAE_sujet_8_application_intelligente`), où résident le fichier `.env` applicatif et le code Python. |
 
 > [!CAUTION]
@@ -35,22 +39,26 @@ Le binaire propose les options suivantes pour s'adapter à tous les contextes d'
 
 ### Lancer l'application :
 ```bash
-# 1. Lancement standard dans le dépôt courant (mode réel ou mock selon le .env) :
+# 1. Afficher l'aide générale ou la version :
+./git-generator --help
+./git-generator --version
+
+# 2. Lancement standard dans le dépôt courant (mode réel ou mock selon le .env) :
 ./git-generator
 
-# 2. Lancement en mode développeur (accès à la configuration des mocks) :
+# 3. Lancement en mode développeur (accès à la configuration des mocks) :
 ./git-generator --dev
 
-# 3. Lancement avec mock de l'interface (autonome, requiert --dev) :
+# 4. Lancement avec mockage de l'interface pour le développement (sans Git ni Python, requiert --dev) :
 ./git-generator --dev --mockInterface
 
-# 4. Lancement avec mock de l'IA (requiert --dev) :
+# 5. Lancement avec mockage de l'IA pour le développement (sans serveur Ollama, requiert --dev) :
 ./git-generator --dev --mockIA
 
-# 5. Lancement en ciblant un autre dépôt Git :
+# 6. Lancement en ciblant un autre dépôt Git :
 ./git-generator --repo /chemin/vers/un/autre/projet
 
-# 6. Lancement avec indication explicite de la racine de l'application :
+# 7. Lancement avec indication explicite de la racine de l'application :
 ./git-generator --repo /chemin/vers/projet --app-dir /chemin/vers/SAE_sujet_8_application_intelligente
 ```
 

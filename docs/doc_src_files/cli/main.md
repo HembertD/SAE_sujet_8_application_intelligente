@@ -1,37 +1,49 @@
 # Point d'Entrée Principal CLI
 
-Fichier source associé : src/cli/main.go
+Fichier source associé : `src/cli/main.go`
 
 ## Description
 
-Ce fichier constitue le point d'entrée exécutable de l'interface en ligne de commande. Il initialise l'environnement, configure l'interception des signaux système, instancie le client de pontage vers Python et pilote la boucle d'événements principale du menu.
+Ce fichier constitue le point d'entrée exécutable de l'interface en ligne de commande. Il intercepte immédiatement les demandes d'aide (`--help`, `-h`) et de version (`--version`, `-v`), consomme les drapeaux CLI définis dans `flags/flags.go`, instancie le client de pontage vers Python et pilote la boucle interactive du menu TUI principal.
 
 ## Responsabilités
 
-- analyser les arguments et flags de la ligne de commande (`--dev`, `--mockInterface`, `--mockIA`, `--repo`, `--app-dir`) ;
-- localiser la racine applicative via `FindAppRoot` pour pointer sur le `.env` de l'application indépendamment du dépôt cible analysé ;
-- tester et vérifier automatiquement l'environnement Python et ses dépendances (`bridge.VerifyPythonEnvironment`) avant toute initialisation du backend, sauf en mode mock-interface ; affichage du statut et arrêt immédiat (`os.Exit(1)`) avec carte d'erreur explicite si une dépendance est manquante ou si l'environnement est défaillant ;
-- intercepter les signaux d'interruption système (`SIGINT` / `SIGTERM` / `Ctrl+C`) pour restaurer l'état du terminal (réaffichage du curseur et réinitialisation des couleurs) ;
-- initialiser le `BackendClient` relié au répertoire du dépôt Git et à la racine de l'application (en respectant la priorité du fichier `.env`) ;
-- interroger l'état du dépôt auprès du backend Python à chaque itération ;
-- aiguiller l'utilisateur vers les différentes vues (`commit`, `release-notes`, `config`, ou sortie propre) en transmettant le mode développeur `--dev` à l'écran de configuration.
+- **Interception prioritaire d'aide et de version** : détecte `-h`, `--help`, `help` ou `-v`, `--version` pour afficher la documentation appropriée et quitter immédiatement avec le code de succès `0`, sans charger Python ni la TUI ;
+- **Analyse des drapeaux de la ligne de commande** :
+  - `--repo <chemin>` : dépôt Git cible à analyser (défaut : `.`) ;
+  - `--app-dir <chemin>` : racine de l'application Gitelligence contenant le `.env` (auto-détecté) ;
+  - `--dev` : active le mode développeur (débloque les options de mock pour développer l'application) ;
+  - `--mockInterface` : active le mockage complet de l'interface pour le développement (sans Git ni Python, requiert `--dev`) ;
+  - `--mockIA` : active le mockage de l'IA pour le développement (sans serveur Ollama, requiert `--dev`) ;
+  - `--docker-llm` : force l'usage du serveur Ollama local via conteneur Docker ;
+  - `--python-bin <chemin>` : chemin explicite vers l'interpréteur Python (surcharge le `.env` et le `.venv`) ;
+  - `-h, --help` : affiche l'aide détaillée ;
+  - `-v, --version` : affiche la version du programme ;
+- **Contrôle d'accès au mode mock** : vérifie que l'utilisation de `--mockInterface` ou `--mockIA` s'accompagne bien de `--dev` sous peine d'interruption immédiate ;
+- **Vérification automatique et approfondie de l'environnement Python** : s'assure qu'un environnement valide est configuré (`bridge.VerifyPythonEnvironment`) avant toute initialisation du backend, sauf en mode mock-interface ;
+- **Interception des signaux OS** : capture `SIGINT` / `SIGTERM` (`Ctrl+C`) pour restaurer la visibilité du curseur et réinitialiser les attributs du terminal ;
+- **Pilote de la boucle interactive TUI** : initialise le `BackendClient`, interroge l'état du dépôt Git et dirige l'utilisateur vers les différentes vues (`views.ShowMainMenu`).
 
 ## Arguments de la ligne de commande
 
-- `--repo <chemin>` : chemin vers le dépôt Git cible à analyser (défaut : `.`).
-- `--dev` : active le mode développeur, autorisant l'utilisation des drapeaux de simulation en CLI et la modification des réglages de mock dans l'écran de configuration.
-- `--mockInterface` : activation forcée du mock de l'interface (`MockClient`) sans exécuter le backend Python (requiert obligatoirement `--dev`).
-- `--mockIA` : activation forcée du mock de l'IA sans serveur Ollama (requiert obligatoirement `--dev`).
-- `--python-bin <chemin>` : chemin explicite vers l'interpréteur Python à utiliser (surcharge prioritaire du `.env` et du `.venv`).
-- `--app-dir <chemin>` : chemin explicite vers la racine de l'application Gitelligence (où se trouvent le code et le `.env` applicatif). Permet d'isoler à 100% la configuration applicative lorsque le binaire est exécuté sur un dépôt tiers.
+| Option | Valeur par défaut | Description |
+|---|---|---|
+| `-h, --help` | `-` | Affiche l'aide détaillée et quitte avec le code 0 |
+| `-v, --version` | `-` | Affiche la version de Gitelligence et quitte avec le code 0 |
+| `--repo <chemin>` | `.` | Chemin vers le dépôt Git cible à analyser |
+| `--app-dir <chemin>` | Auto-détecté | Racine de l'application Gitelligence contenant le `.env` |
+| `--dev` | `false` | Active le mode développeur (débloque les options de mock pour développer l'application) |
+| `--mockInterface` | `false` | Active le mockage complet de l'interface pour le développement (mode sans Git ni Python, requiert `--dev`) |
+| `--mockIA` | `false` | Active le mockage de l'IA pour le développement (sans serveur Ollama, requiert `--dev`) |
+| `--docker-llm` | `false` | Force l'usage du serveur Ollama local via conteneur Docker |
+| `--python-bin <chemin>` | Auto-détecté | Chemin explicite vers l'interpréteur Python à utiliser |
 
 ## Points clés
 
-- **Gestion des signaux OS** : mise en place d'une goroutine dédiée et d'un `signal.Notify` pour intercepter `Ctrl+C` et garantir que le terminal ne reste jamais dans un état dégradé (curseur masqué) ;
-- **Boucle interactive robuste** : gestion de la fin de flux (EOF) et réaffichage automatique du contexte après chaque action ;
-- **Séparation stricte dépôt cible vs application** : l'application dissocie totalement le dépôt analysé (`repoRoot`) de l'arborescence de l'outil (`appRoot`), empêchant toute écriture de `.env` dans le projet inspecté.
+- **Code de sortie 0 garanti sur l'aide et la version** : conformité stricte avec les standards Unix ;
+- **Restauration propre du terminal** : gestion des signaux pour réactiver le curseur ANSI en toute circonstance.
 
-## Rôle dans l’architecture
+## Rôle dans l'architecture
 
 `main.go` est le chef d'orchestre du front-end. Il lie la couche de présentation (vues et utilitaires ANSI) au client de pontage backend sans intégrer la moindre règle métier.
 
@@ -41,7 +53,7 @@ Précisions issues des commentaires retirés de `main.go` et non redondantes ave
 
 - En cas d'erreur de `GetRepoStatus`, le statut est dégradé à `nil` (`status = nil`) et le menu principal est quand même affiché via `views.ShowMainMenu`.
 - Toute option non reconnue dans le `switch` (`default`) provoque un retour direct au menu, sans message d'erreur ni sortie.
-- Le contrôle de l'environnement Python (`VerifyPythonEnvironment` / `CheckPythonEnvironment`) vérifie à la fois la résolution de l'interpréteur, la présence de toutes les dépendances indispensables (`GitPython`, `PyYAML`) et le chargement du backend applicatif. Il arrête immédiatement l'application avec `ui.PrintErrorCard` et des conseils de remédiation clairs en cas de manquement. Il est volontairement sauté si le mode mock-interface est actif (flag `--mockInterface` ou `.env`), puisqu'aucun sous-processus Python n'est alors jamais lancé.
+- Le contrôle de l'environnement Python (`VerifyPythonEnvironment`) vérifie à la fois la résolution de l'interpréteur, la présence de toutes les dépendances indispensables (`GitPython`, `PyYAML`) et le chargement du backend applicatif. Il arrête immédiatement l'application avec `ui.PrintErrorCard` et des conseils de remédiation clairs en cas de manquement. Il est volontairement sauté si le mode mock-interface est actif (flag `--mockInterface` ou `.env`), puisqu'aucun sous-processus Python n'est alors jamais lancé.
 
 ## Commentaires de fonction (dupliqués du code source)
 

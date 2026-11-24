@@ -11,19 +11,35 @@ import (
 	"syscall"
 
 	"sae-git-cli/bridge"
+	"sae-git-cli/flags"
 	"sae-git-cli/ui"
 	"sae-git-cli/views"
 )
 
 func main() {
-	// Options de la ligne de commande
-	devFlag := flag.Bool("dev", false, "Active le mode développement (débloque les options de mock et leur modification)")
-	mockInterfaceFlag := flag.Bool("mockInterface", false, "Force la simulation complète de l'interface (mode démo sans Git ni Python, requiert --dev)")
-	mockIAFlag := flag.Bool("mockIA", false, "Force la simulation de l'IA hors-ligne sans serveur Ollama (requiert --dev)")
-	dockerLLMFlag := flag.Bool("docker-llm", false, "Force l'usage du serveur Ollama local via Docker")
-	repoFlag := flag.String("repo", ".", "Chemin du dépôt Git à analyser")
-	appFlag := flag.String("app-dir", "", "Chemin vers l'application Gitelligence (dossier contenant le .env applicatif)")
-	pythonBinFlag := flag.String("python-bin", "", "Chemin explicite vers l'interpréteur Python à utiliser (surcharge le .env et .venv)")
+	// 1. Interception prioritaire et immédiate de l'aide et de la version.
+	// Cela garantit un code de retour 0 sans charger Python, ni TUI, ni Git.
+	if ui.IsVersionRequested(os.Args[1:]) {
+		ui.PrintVersion(os.Stdout)
+		os.Exit(0)
+	}
+	if ui.IsHelpRequested(os.Args[1:]) {
+		ui.PrintHelp(os.Stdout)
+		os.Exit(0)
+	}
+
+	// 2. Options de la ligne de commande standard
+	flag.Usage = func() {
+		ui.PrintHelp(os.Stdout)
+	}
+
+	devFlag := flags.Dev
+	mockInterfaceFlag := flags.MockInterface
+	mockIAFlag := flags.MockIA
+	dockerLLMFlag := flags.DockerLLM
+	repoFlag := flags.Repo
+	appFlag := flags.AppDir
+	pythonBinFlag := flags.PythonBin
 	flag.Parse()
 
 	// Si un interpréteur Python est explicitement passé en argument CLI, il surcharge l'environnement
@@ -112,7 +128,6 @@ func main() {
 		// Récupération de l'état du dépôt auprès du backend Python
 		status, errStatus := client.GetRepoStatus()
 		if errStatus != nil {
-			// En cas d'erreur inattendue, on crée un statut dégradé
 			status = nil
 		}
 

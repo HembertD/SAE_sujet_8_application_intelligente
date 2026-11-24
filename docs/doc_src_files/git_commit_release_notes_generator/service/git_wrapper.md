@@ -45,11 +45,13 @@ Récupère l'historique complet ou récent des commits avec leurs tags associés
 
 Pour que l'IA puisse "lire" les changements dans des formats que Git traite nativement comme des binaires opaques, `get_staged_diff()` tente une conversion en diff textuel avant d'exclure un fichier binaire :
 
-- `_extract_docx_text(data)` / `_extract_pdf_text(data)` : extraction de texte brut via `python-docx` (paragraphe par paragraphe) et `pypdf` (page par page). Dépendances optionnelles importées à la demande (coût de chargement non payé si le dépôt n'en contient pas).
+- `_extract_docx_text(data)` : extraction de texte brut via `python-docx`, paragraphes **et tableaux** (`document.tables`, ignorés par défaut par `document.paragraphs`).
+- `_extract_pdf_text(data)` : extraction page par page via `pypdf`. Dépendances optionnelles importées à la demande (coût de chargement non payé si le dépôt n'en contient pas).
 - `_DOCUMENT_TEXT_EXTRACTORS` : associe une extension à son extracteur. Seules `.docx` et `.pdf` sont supportées ; les autres binaires (images, archives, ...) gardent le comportement existant (exclus du payload LLM).
 - `_read_staged_blob_bytes(file_path)` : lit le contenu indexé (staged) directement depuis l'object database Git (`repo.odb`), sans dépendre du fichier sur disque qui a pu diverger depuis le `git add`.
 - `_read_head_blob_bytes(file_path)` : lit la version `HEAD` du fichier, ou `None` s'il est nouveau (pas encore commité).
 - `_try_build_document_diff(diff_file)` : orchestre l'extraction des deux côtés (ancien/nouveau, `None` si ajout ou suppression), calcule un diff ligne à ligne (`difflib.unified_diff`) et renvoie un `DiffFile` texte (`is_binary=False`) prêt à suivre le chemin standard (sanitisation, troncature). Renvoie `None` en cas d'extension non supportée ou d'échec d'extraction (document corrompu, dépendance manquante) : l'appelant conserve alors le comportement binaire existant plutôt que de planter.
+- **Point de vigilance (corrigé)** : un `.pdf` n'a pas forcément d'octet nul dans ses premiers kilo-octets — Git peut donc le classer comme "texte" (`is_binary=False`) et produire un diff ligne à ligne du bytecode PDF brut, qui contient des octets non-UTF8 (surrogates une fois décodés par GitPython). `get_staged_diff()` tente donc l'extraction pour **toute** extension présente dans `_DOCUMENT_TEXT_EXTRACTORS`, que Git l'ait étiqueté binaire ou non — jamais seulement quand `diff_file.is_binary` est vrai. Si l'extraction échoue malgré tout, le fichier est exclu plutôt que de laisser passer ce bytecode brut, pour éviter un crash `UnicodeEncodeError` lors de la sérialisation JSON en aval.
 
 ### Images modifiées (`get_staged_image_changes`)
 

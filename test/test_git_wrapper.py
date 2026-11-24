@@ -1,4 +1,5 @@
 import io
+import json
 import subprocess
 import sys
 import unittest
@@ -160,6 +161,23 @@ def test_extract_docx_text_reads_paragraphs():
     assert "seconde ligne" in text
 
 
+def test_extract_docx_text_reads_table_cells():
+    from docx import Document
+
+    document = Document()
+    document.add_paragraph("intro")
+    table = document.add_table(rows=1, cols=2)
+    table.rows[0].cells[0].text = "budget"
+    table.rows[0].cells[1].text = "1200 euros"
+    buf = io.BytesIO()
+    document.save(buf)
+
+    text = _extract_docx_text(buf.getvalue())
+    assert "intro" in text
+    assert "budget" in text
+    assert "1200 euros" in text
+
+
 def test_extract_pdf_text_reads_content():
     data = _make_pdf_bytes("Hello PDF")
     text = _extract_pdf_text(data)
@@ -225,6 +243,50 @@ def test_get_staged_diff_converts_newly_added_pdf_to_text_diff(tmp_path):
     assert "Contenu du PDF" in entry.patch
     assert entry.added > 0
     assert entry.removed == 0
+    # Un PDF minimal n'a pas forcément d'octet nul dans ses premiers Ko : Git peut
+    # le classer comme "texte" et laisser passer le bytecode brut (en-tête %PDF,
+    # octets non-UTF8) s'il n'est pas réellement passé par l'extracteur pypdf.
+    assert "%PDF" not in entry.patch
+    json.dumps(entry.to_dict(), ensure_ascii=False)
+
+
+def test_get_staged_diff_handles_corrupted_document_without_crashing(tmp_path):
+    """Un .docx/.pdf corrompu ne doit jamais faire planter le diff : l'extraction
+    échoue silencieusement et le fichier est exclu, comme un binaire opaque."""
+    repo_dir = tmp_path / "repo"
+    _init_repo_with_base_commit(repo_dir)
+
+    (repo_dir / "corrompu.docx").write_bytes(b"faux_document_corrompu")
+    (repo_dir / "corrompu.pdf").write_bytes(b"faux_document_corrompu")
+    _run_git(["add", "-A"], repo_dir)
+
+    wrapper = GitWrapper(repo_dir)
+    files = wrapper.get_staged_diff()
+
+    assert all(f.path not in ("corrompu.docx", "corrompu.pdf") for f in files)
+
+
+def test_get_staged_diff_handles_deleted_document(tmp_path):
+    repo_dir = tmp_path / "repo"
+    _init_repo_with_base_commit(repo_dir)
+
+    docx_path = repo_dir / "rapport.docx"
+    docx_path.write_bytes(_make_docx_bytes("contenu a supprimer"))
+    _run_git(["add", "-A"], repo_dir)
+    _run_git(["commit", "-m", "ajout du rapport"], repo_dir)
+
+    _run_git(["rm", "rapport.docx"], repo_dir)
+
+    wrapper = GitWrapper(repo_dir)
+    files = wrapper.get_staged_diff()
+
+    docx_entries = [f for f in files if f.path == "rapport.docx"]
+    assert len(docx_entries) == 1
+    entry = docx_entries[0]
+    assert entry.status == "D"
+    assert entry.is_binary is False
+    assert "contenu a supprimer" in entry.patch
+    json.dumps(entry.to_dict(), ensure_ascii=False)
 
 
 def test_get_staged_diff_still_excludes_unsupported_binary_files(tmp_path):

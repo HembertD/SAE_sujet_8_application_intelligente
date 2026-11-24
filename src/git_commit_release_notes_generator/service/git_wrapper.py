@@ -16,11 +16,22 @@ class GitWrapperError(Exception):
 
 
 def _extract_docx_text(data: bytes) -> str:
-    """Extrait le texte brut d'un document Word (.docx), paragraphe par paragraphe."""
+    """Extrait le texte brut d'un document Word (.docx), paragraphes et tableaux inclus.
+
+    `document.paragraphs` ignore le contenu situé à l'intérieur des tableaux
+    (`python-docx`) : on parcourt donc aussi `document.tables` pour ne pas
+    perdre le texte d'un cahier des charges, d'un chiffrage, etc.
+    """
     from docx import Document  # import différé : dépendance optionnelle, coûteuse à charger
 
     document = Document(io.BytesIO(data))
-    return "\n".join(p.text for p in document.paragraphs)
+    lines = [p.text for p in document.paragraphs if p.text.strip()]
+    for table in document.tables:
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if cells:
+                lines.append(" | ".join(cells))
+    return "\n".join(lines)
 
 
 def _extract_pdf_text(data: bytes) -> str:
@@ -302,7 +313,14 @@ class GitWrapper:
             parsed = self._parse_diff(diff_text)
             sanitized_files: list[DiffFile] = []
             for diff_file in parsed:
-                if diff_file.is_binary:
+                # Un PDF n'a pas forcément d'octet nul dans ses premiers kilo-octets :
+                # Git peut le classer comme "texte" (is_binary=False) et produire un
+                # diff ligne à ligne du bytecode brut. On tente donc l'extraction pour
+                # toute extension supportée, que Git l'ait étiqueté binaire ou non —
+                # sinon ce bytecode (avec ses octets non-UTF8) finit dans le patch et
+                # fait planter la sérialisation JSON en aval (surrogates invalides).
+                is_supported_doc = Path(diff_file.path).suffix.lower() in _DOCUMENT_TEXT_EXTRACTORS
+                if diff_file.is_binary or is_supported_doc:
                     document_diff = self._try_build_document_diff(diff_file)
                     if document_diff is None:
                         continue

@@ -31,6 +31,7 @@ Ce module constitue le point d'entrée exécutable sous forme de sous-processus 
 | `release-notes` | `--repo`, `--from`, `--to` | `{"success", "from_tag", "to_tag", "markdown", "commit_count"}` | Synthèse Markdown des commits entre deux révisions via le LLM ; échec explicite (`success=False`) si l'appel échoue, aucun repli silencieux |
 | `save-config` | `--base-url`, `--model`, `--timeout`, `--language` | `{"success", "message"}` | Notification de sauvegarde de configuration |
 | `ping-ollama` | — | `{"success", "reachable", "latency_ms", "installed_models"}` | Vérification HTTP de joignabilité et des modèles disponibles sur Ollama |
+| `check-env` | — | `{"success", "version", "executable", "status"}` | Vérification de l'intégrité de l'environnement Python et du module applicatif |
 
 ## Fonctions clés
 

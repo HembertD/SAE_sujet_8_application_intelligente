@@ -41,11 +41,17 @@ func TestFlagsPackage(t *testing.T) {
 	if flags.MockIA == nil || *flags.MockIA != false {
 		t.Errorf("flags.MockIA inattendu : attendu false, obtenu %v", flags.MockIA)
 	}
+	if flags.DockerLLM == nil || *flags.DockerLLM != false {
+		t.Errorf("flags.DockerLLM inattendu : attendu false, obtenu %v", flags.DockerLLM)
+	}
 	if flags.Repo == nil || *flags.Repo != "." {
 		t.Errorf("flags.Repo inattendu : attendu '.', obtenu %v", flags.Repo)
 	}
 	if flags.AppDir == nil || *flags.AppDir != "" {
 		t.Errorf("flags.AppDir inattendu : attendu '', obtenu %v", flags.AppDir)
+	}
+	if flags.PythonBin == nil || *flags.PythonBin != "" {
+		t.Errorf("flags.PythonBin inattendu : attendu '', obtenu %v", flags.PythonBin)
 	}
 }
 
@@ -101,6 +107,8 @@ func TestGeneralHelpContent(t *testing.T) {
 		{"--dev", "false"},
 		{"--mockInterface", "false"},
 		{"--mockIA", "false"},
+		{"--docker-llm", "false"},
+		{"--python-bin", "auto-détecté"},
 		{"--help", ""},
 		{"--version", ""},
 	}
@@ -126,6 +134,7 @@ func TestGeneralHelpContent(t *testing.T) {
 		{"PYTHON_BIN", "auto-détecté"},
 		{"MOCK_INTERFACE", "false"},
 		{"MOCK_AI", "false"},
+		{"USE_DOCKER_LLM", "false"},
 	}
 	for _, ev := range expectedEnvVars {
 		if !strings.Contains(rawText, ev.name) {

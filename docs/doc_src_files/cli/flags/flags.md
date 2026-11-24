@@ -4,7 +4,7 @@ Fichier source associé : `src/cli/flags/flags.go`
 
 ## Description
 
-Ce module centralise la déclaration de l'ensemble des options et drapeaux de la ligne de commande de Gitelligence (`--repo`, `--app-dir`, `--dev`, `--mockInterface`, `--mockIA`). En découplant ces définitions du moteur d'affichage (`ui/help.go`) et du point d'entrée exécutable (`main.go`), il garantit une source unique de vérité (*Single Source of Truth*) pour les paramètres CLI.
+Ce module centralise la déclaration de l'ensemble des options et drapeaux de la ligne de commande de Gitelligence (`--repo`, `--app-dir`, `--dev`, `--mockInterface`, `--mockIA`, `--docker-llm`, `--python-bin`). En découplant ces définitions du moteur d'affichage (`ui/help.go`) et du point d'entrée exécutable (`main.go`), il garantit une source unique de vérité (*Single Source of Truth*) pour les paramètres CLI.
 
 ## Variables et Drapeaux
 
@@ -13,8 +13,10 @@ Toutes les options sont enregistrées directement dans le registre standard `fla
 - **`Dev`** (`*bool`) : active le mode développeur, autorisant les drapeaux de simulation et débloquant l'accès à la modification des réglages de mock dans la configuration (défaut : `false`) ;
 - **`MockInterface`** (`*bool`) : force la simulation complète de l'interface en mode autonome, sans solliciter Git ni exécuter le backend Python (requiert `--dev`, défaut : `false`) ;
 - **`MockIA`** (`*bool`) : active la simulation déterministe des réponses du LLM hors-ligne sans serveur Ollama (requiert `--dev`, défaut : `false`) ;
+- **`DockerLLM`** (`*bool`) : force l'utilisation du serveur Ollama local conteneurisé sous Docker (défaut : `false`) ;
 - **`Repo`** (`*string`) : chemin vers le répertoire du dépôt Git cible à analyser (défaut : `"."`) ;
-- **`AppDir`** (`*string`) : chemin explicite vers la racine de l'application Gitelligence hébergeant le code Python et le fichier `.env` applicatif (auto-détecté par défaut).
+- **`AppDir`** (`*string`) : chemin explicite vers la racine de l'application Gitelligence hébergeant le code Python et le fichier `.env` applicatif (auto-détecté par défaut) ;
+- **`PythonBin`** (`*string`) : chemin explicite vers l'interpréteur Python à utiliser, surchargeant le `.env` et le `.venv` (auto-détecté par défaut).
 
 ## Guide Développeur : Ajouter un nouveau drapeau CLI
 

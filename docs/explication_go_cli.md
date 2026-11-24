@@ -21,6 +21,8 @@ Le binaire propose les options suivantes pour s'adapter à tous les contextes d'
 | `--dev` | `false` | **Mode développeur** : débloque les options de mockage nécessaires au développement et aux tests de l'application. |
 | `--mockInterface` | `false` | **Mockage de l'interface** : active le mockage complet pour développer et tester l'interface sans dépendre de Git ni de Python (requiert obligatoirement `--dev`). |
 | `--mockIA` | `false` | **Mockage de l'IA** : active le mockage des réponses du modèle pour développer l'application sans serveur Ollama (requiert obligatoirement `--dev`). |
+| `--docker-llm` | `false` | **Ollama via Docker** : force l'usage du serveur Ollama conteneurisé sous Docker. |
+| `--python-bin <chemin>` | Auto-détecté | **Interpréteur Python** : surcharge le chemin de l'exécutable Python (.env et .venv). |
 | `--app-dir <chemin>` | Auto-détecté | **Racine de l'application Gitelligence** : chemin vers le dossier de notre outil (`SAE_sujet_8_application_intelligente`), où résident le fichier `.env` applicatif et le code Python. |
 
 > [!CAUTION]
@@ -240,7 +242,7 @@ C'est le cœur de l'outil :
    * `[D]` en rouge pour supprimé.
    * Badge spécial `🔒 [Secret Masqué]` si Dorian a détecté une clé API ou un token dans le patch.
    * Badge `[Binaire]` pour les images ou exécutables exclus.
-4. **Appel IA** : Le spinner tourne pendant que le modèle `gemma4:12b` réfléchit.
+4. **Appel IA** : Le spinner tourne pendant que le modèle `gemma4:26b` réfléchit.
 5. **Carte Conventional Commits** : Affichage encadré du résultat structuré :
    * `Type` (`feat`, `fix`, `docs`, etc.)
    * `Scope` (`auth`, `cli`, etc.)

@@ -371,6 +371,20 @@ def action_ping_ollama() -> dict:
     return check_ollama_reachable(timeout=3.0, fetch_models=True).to_dict()
 
 
+def action_check_env() -> dict:
+    """Vérifie l'intégrité de l'environnement Python et du module applicatif.
+
+    Format attendu côté Go :
+    {"success": bool, "version": str, "executable": str, "status": str}
+    """
+    return {
+        "success": True,
+        "version": sys.version.split()[0],
+        "executable": sys.executable,
+        "status": "ready",
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Service Core CLI pour Gitelligence")
     parser.add_argument("--action", required=True, help="Action à exécuter")
@@ -398,6 +412,7 @@ def main() -> None:
         "release-notes": lambda: action_release_notes(args.repo, from_tag=args.from_tag, to_tag=args.to_tag),
         "save-config": lambda: action_save_config(args.base_url, args.model, args.timeout),
         "ping-ollama": action_ping_ollama,
+        "check-env": action_check_env,
     }
 
     handler = handlers.get(args.action)

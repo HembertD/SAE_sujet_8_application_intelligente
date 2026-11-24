@@ -37,7 +37,8 @@ func formatFlagSignature(f *flag.Flag) (string, string) {
 	if !isBoolFlag(f) {
 		if strings.Contains(strings.ToLower(f.Name), "dir") ||
 			strings.Contains(strings.ToLower(f.Name), "repo") ||
-			strings.Contains(strings.ToLower(f.Name), "path") {
+			strings.Contains(strings.ToLower(f.Name), "path") ||
+			strings.Contains(strings.ToLower(f.Name), "bin") {
 			name += " <chemin>"
 		} else {
 			name += " <valeur>"
@@ -45,7 +46,7 @@ func formatFlagSignature(f *flag.Flag) (string, string) {
 	}
 
 	defStr := ""
-	if f.Name == "app-dir" && f.DefValue == "" {
+	if (f.Name == "app-dir" || f.Name == "python-bin") && f.DefValue == "" {
 		defStr = fmt.Sprintf(" %s(défaut : auto-détecté)%s", Dim, Reset)
 	} else if isBoolFlag(f) {
 		defStr = fmt.Sprintf(" %s(défaut : false)%s", Dim, Reset)
@@ -107,6 +108,11 @@ var EnvVariables = []EnvVarInfo{
 		Name:        "MOCK_AI",
 		Default:     "false",
 		Description: "Mockage de l'IA pour le développement sans serveur Ollama",
+	},
+	{
+		Name:        "USE_DOCKER_LLM",
+		Default:     "false",
+		Description: "Serveur Ollama local lancé via conteneur Docker",
 	},
 }
 

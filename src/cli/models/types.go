@@ -48,6 +48,14 @@ type ActionResult struct {
 	Error   string `json:"error,omitempty"`
 }
 
+// DockerStatusResponse décrit l'état du conteneur Ollama piloté par Docker Compose.
+type DockerStatusResponse struct {
+	Success     bool   `json:"success"`
+	Running     bool   `json:"running"`
+	ContainerID string `json:"container_id,omitempty"`
+	Error       string `json:"error,omitempty"`
+}
+
 // ReleaseNotesResponse contient le texte Markdown synthétisé par le LLM.
 type ReleaseNotesResponse struct {
 	Success     bool   `json:"success"`
@@ -76,14 +84,17 @@ type CommitsResponse struct {
 
 // ConfigResponse contient les paramètres lus ou écrits dans le .env par Python.
 type ConfigResponse struct {
-	Success       bool    `json:"success"`
-	Error         string  `json:"error,omitempty"`
-	OllamaBaseURL string  `json:"ollama_base_url"`
-	OllamaModel   string  `json:"ollama_model"`
-	TimeoutS      float64 `json:"timeout_s"`
+	Success             bool    `json:"success"`
+	Error               string  `json:"error,omitempty"`
+	OllamaBaseURL       string  `json:"ollama_base_url"`
+	OllamaModel         string  `json:"ollama_model"`
+	TimeoutS            float64 `json:"timeout_s"`
 	MockInterface       bool    `json:"mock_interface"`
 	MockAI              bool    `json:"mock_ai"`
+	DockerLLM           bool    `json:"docker_llm"`
 	EnableNotifications bool    `json:"enable_notifications"`
+	PythonBin           string  `json:"python_bin,omitempty"`
+	ResolvedPythonBin   string  `json:"resolved_python_bin,omitempty"`
 }
 
 // PingResponse contient le diagnostic de joignabilité du serveur Ollama IUT.

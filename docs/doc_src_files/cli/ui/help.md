@@ -11,7 +11,7 @@ Ce module implémente le système complet d'aide en ligne de commande de Gitelli
 - **Identification de l'application** : référence les constantes centralisées du package `version` (`AppName`, `BinaryName`, `AppVersion`) ;
 - **Intégration du module de drapeaux** :
   - Découplage de la définition des drapeaux via le paquet `sae-git-cli/flags` ;
-  - `EnvVariables` : documente toutes les variables configurables du `.env` (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT_S`, `OLLAMA_NUM_CTX`, `ENABLE_NOTIFICATIONS`, `PYTHON_BIN`, `MOCK_INTERFACE`, `MOCK_AI`) ;
+  - `EnvVariables` : documente toutes les variables configurables du `.env` (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT_S`, `OLLAMA_NUM_CTX`, `ENABLE_NOTIFICATIONS`, `PYTHON_BIN`, `MOCK_INTERFACE`, `MOCK_AI`, `USE_DOCKER_LLM`) ;
 - **Génération et rendu dynamique** :
   - `GetGeneralHelp()` : découvre dynamiquement l'ensemble des drapeaux enregistrés dans `flag.CommandLine` (provenant de `sae-git-cli/flags`) via `VisitAll()`, détecte automatiquement le typage (booléen ou avec paramètre `<chemin>` / `<valeur>`), extrait les valeurs par défaut et met en page le rendu avec coloration ANSI et alignement optimal ;
   - `PrintHelp(w)` : écrit l'aide sur le flux de sortie fourni (`os.Stdout`) ;

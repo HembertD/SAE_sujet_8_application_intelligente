@@ -2,8 +2,10 @@ package cli_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -90,7 +92,7 @@ func TestMockClientBasics(t *testing.T) {
 		t.Errorf("le body doit contenir le feedback '%s'", feedback)
 	}
 
-	// 5.b GenerateCommit avec type forcé 
+	// 5.b GenerateCommit avec type forcé
 	propFix, err := mock.GenerateCommit("type: fix")
 	if err != nil || propFix.Type != "fix" {
 		t.Errorf("attendu type 'fix', obtenu %s (err: %v)", propFix.Type, err)
@@ -233,20 +235,20 @@ func TestBridgeClientSwitching(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Initialisation en forçant le mode démo
-	bridgeDemo := bridge.NewBackendClient(tempDir, true)
+	bridgeDemo := bridge.NewBackendClient(tempDir, true, false)
 	if !bridgeDemo.IsMock() {
 		t.Errorf("attendu bridgeDemo.IsMock() == true avec forceDemo=true")
 	}
 
 	// Initialisation normale
-	bridgeNormal := bridge.NewBackendClient(tempDir, false)
+	bridgeNormal := bridge.NewBackendClient(tempDir, false, false)
 	// Sans configuration, le mode démo est inactif
 	if bridgeNormal.IsMock() {
 		t.Errorf("attendu bridgeNormal.IsMock() == false par défaut sans variable d'env")
 	}
 
 	// Activation du mode démo
-	res, err := bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, true)
+	res, err := bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:26b", 60, true)
 	if err != nil || !res.Success {
 		t.Fatalf("SaveConfig échoué : %v", err)
 	}
@@ -257,7 +259,7 @@ func TestBridgeClientSwitching(t *testing.T) {
 	}
 
 	// Bascule inverse
-	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, false)
+	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:26b", 60, false)
 	if err != nil {
 		t.Fatalf("SaveConfig échoué : %v", err)
 	}
@@ -266,7 +268,7 @@ func TestBridgeClientSwitching(t *testing.T) {
 	}
 
 	// Test de sauvegarde conjointe de MockInterface et MockAI
-	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:12b", 60, false, true)
+	_, err = bridgeNormal.SaveConfig("http://127.0.0.1:11434", "gemma4:26b", 60, false, true)
 	if err != nil {
 		t.Fatalf("SaveConfig échoué avec MockAI : %v", err)
 	}
@@ -276,6 +278,27 @@ func TestBridgeClientSwitching(t *testing.T) {
 	}
 	if cfgAfter.MockInterface != false || cfgAfter.MockAI != true {
 		t.Errorf("attendu MockInterface=false et MockAI=true, obtenu %+v", cfgAfter)
+	}
+}
+
+func TestForcedMockInterfaceOverridesEnvFile(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	if err := os.WriteFile(envPath, []byte("MOCK_INTERFACE=false\n"), 0644); err != nil {
+		t.Fatalf("écriture .env : %v", err)
+	}
+	t.Setenv("MOCK_INTERFACE", "")
+
+	client := bridge.NewBackendClientWithAppRoot(dir, dir, true, false)
+	if !client.IsMock() {
+		t.Fatalf("le flag --mockInterface doit forcer IsMock() à true")
+	}
+	cfg, err := client.GetConfig()
+	if err != nil {
+		t.Fatalf("GetConfig : %v", err)
+	}
+	if !cfg.MockInterface {
+		t.Errorf("GetConfig().MockInterface doit rester true malgré MOCK_INTERFACE=false dans le .env")
 	}
 }
 
@@ -331,7 +354,7 @@ func TestAppEnvIsolationFromTargetRepo(t *testing.T) {
 	targetRepo := t.TempDir() // Répertoire du projet cible analysé
 	appRoot := t.TempDir()    // Répertoire où est installée l'application
 
-	client := bridge.NewBackendClientWithAppRoot(targetRepo, appRoot, true)
+	client := bridge.NewBackendClientWithAppRoot(targetRepo, appRoot, true, false)
 
 	// Sauvegarde d'une configuration
 	_, err := client.SaveConfig("http://10.22.28.190:11434", "qwen3.8:27b", 250.0, true)
@@ -377,8 +400,20 @@ func TestAppEnvNeverInSrc(t *testing.T) {
 	}
 
 	// Tenter d'écrire en forçant un chemin contenant /src/.env
+	// Sauvegarde/restauration du .env réel : ce test écrit volontairement à la
+	// racine de l'application, il ne doit pas écraser la configuration locale.
+	realRootEnv := filepath.Join(root, ".env")
+	originalEnv, errOriginal := os.ReadFile(realRootEnv)
+	t.Cleanup(func() {
+		if errOriginal == nil {
+			_ = os.WriteFile(realRootEnv, originalEnv, 0644)
+		} else {
+			_ = os.Remove(realRootEnv)
+		}
+	})
+
 	forcedSrcPath := filepath.Join(root, "src", ".env")
-	err := bridge.WriteEnvFile(forcedSrcPath, "http://localhost:11434", "gemma4:12b", 30.0, true)
+	err := bridge.WriteEnvFile(forcedSrcPath, "http://localhost:11434", "gemma4:26b", 30.0, true)
 	if err != nil {
 		t.Fatalf("WriteEnvFile a échoué: %v", err)
 	}
@@ -389,7 +424,6 @@ func TestAppEnvNeverInSrc(t *testing.T) {
 	}
 
 	// S'assurer que le fichier a bien été écrit à la racine
-	realRootEnv := filepath.Join(root, ".env")
 	if _, errStat := os.Stat(realRootEnv); errStat != nil {
 		t.Fatalf("Le fichier .env devrait exister à la racine (%s)", realRootEnv)
 	}
@@ -464,3 +498,510 @@ func TestBuildForcedTypeFeedback(t *testing.T) {
 	}
 }
 
+func TestBridgeClientMockNeExecutePasDocker(t *testing.T) {
+	tempDir := t.TempDir()
+	client := bridge.NewBackendClient(tempDir, true, false)
+
+	status, err := client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus en mode mock ne doit pas échouer : %v", err)
+	}
+	if status == nil || !status.Success || status.Running {
+		t.Errorf("attendu un conteneur simulé arrêté, obtenu : %+v", status)
+	}
+
+	resStart, err := client.StartDockerOllama()
+	if err != nil {
+		t.Fatalf("StartDockerOllama en mode mock ne doit pas échouer : %v", err)
+	}
+	if resStart == nil || !resStart.Success || !strings.Contains(strings.ToLower(resStart.Message), "mock") {
+		t.Errorf("attendu un démarrage simulé en mode mock, obtenu : %+v", resStart)
+	}
+
+	status, err = client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus après démarrage : %v", err)
+	}
+	if status == nil || !status.Success || !status.Running {
+		t.Errorf("attendu un conteneur simulé en cours après démarrage, obtenu : %+v", status)
+	}
+
+	resStop, err := client.StopDockerOllama()
+	if err != nil {
+		t.Fatalf("StopDockerOllama en mode mock ne doit pas échouer : %v", err)
+	}
+	if resStop == nil || !resStop.Success || !strings.Contains(strings.ToLower(resStop.Message), "mock") {
+		t.Errorf("attendu un arrêt simulé en mode mock, obtenu : %+v", resStop)
+	}
+
+	status, err = client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus après arrêt : %v", err)
+	}
+	if status == nil || !status.Success || status.Running {
+		t.Errorf("attendu un conteneur simulé arrêté après arrêt, obtenu : %+v", status)
+	}
+}
+
+func TestPythonClientDockerOllamaStatus(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("script shell factice non portable sous Windows")
+	}
+
+	appRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(appRoot, "docker-compose.yml"), []byte("services: {}\n"), 0644); err != nil {
+		t.Fatalf("écriture docker-compose.yml : %v", err)
+	}
+
+	binDir := t.TempDir()
+	dockerScript := `#!/bin/sh
+if [ "$4" = "ps" ]; then
+  if [ "$FAKE_DOCKER_RUNNING" = "1" ]; then
+    echo "abc123"
+  fi
+  if [ "$FAKE_DOCKER_WARNING" = "1" ]; then
+    echo "warning: variable non definie" >&2
+  fi
+fi
+`
+	if err := os.WriteFile(filepath.Join(binDir, "docker"), []byte(dockerScript), 0755); err != nil {
+		t.Fatalf("écriture faux docker : %v", err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	client := bridge.NewPythonClientWithAppRoot(appRoot, appRoot)
+
+	t.Setenv("FAKE_DOCKER_RUNNING", "1")
+	status, err := client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus (en cours) : %v", err)
+	}
+	if status == nil || !status.Success || !status.Running || status.ContainerID != "abc123" {
+		t.Errorf("attendu conteneur en cours avec ID abc123, obtenu : %+v", status)
+	}
+
+	t.Setenv("FAKE_DOCKER_RUNNING", "0")
+	status, err = client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus (arrêté) : %v", err)
+	}
+	if status == nil || !status.Success || status.Running {
+		t.Errorf("attendu conteneur arrêté, obtenu : %+v", status)
+	}
+
+	// Un warning Docker Compose sur stderr ne doit pas être interprété comme un
+	// identifiant de conteneur : seul stdout détermine l'état réel.
+	t.Setenv("FAKE_DOCKER_WARNING", "1")
+	status, err = client.DockerOllamaStatus()
+	if err != nil {
+		t.Fatalf("DockerOllamaStatus (warning stderr) : %v", err)
+	}
+	if status == nil || !status.Success || status.Running || status.ContainerID != "" {
+		t.Errorf("un warning stderr ne doit pas simuler un conteneur actif, obtenu : %+v", status)
+	}
+}
+
+func TestEffectiveOllamaBaseURL(t *testing.T) {
+	const remote = "http://10.22.28.190:11434"
+
+	if got := bridge.EffectiveOllamaBaseURL(&models.ConfigResponse{OllamaBaseURL: remote}); got != remote {
+		t.Errorf("hors Docker, URL attendue %q, obtenu %q", remote, got)
+	}
+	if got := bridge.EffectiveOllamaBaseURL(&models.ConfigResponse{OllamaBaseURL: remote, DockerLLM: true}); got != bridge.DockerOllamaBaseURL {
+		t.Errorf("en Docker, URL attendue %q, obtenu %q", bridge.DockerOllamaBaseURL, got)
+	}
+	if got := bridge.EffectiveOllamaBaseURL(nil); got != "" {
+		t.Errorf("config nil : URL attendue vide, obtenu %q", got)
+	}
+}
+
+func TestReadDockerLLMSettingFromEnvPriorite(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	if err := os.WriteFile(envPath, []byte("USE_DOCKER_LLM=true\n"), 0644); err != nil {
+		t.Fatalf("écriture .env : %v", err)
+	}
+
+	// Fichier seul
+	t.Setenv("USE_DOCKER_LLM", "")
+	if !bridge.ReadDockerLLMSettingFromEnv(dir) {
+		t.Errorf("attendu true depuis le .env")
+	}
+
+	// Variable d'environnement prioritaire sur le fichier
+	t.Setenv("USE_DOCKER_LLM", "false")
+	if bridge.ReadDockerLLMSettingFromEnv(dir) {
+		t.Errorf("attendu false depuis la variable d'environnement")
+	}
+	t.Setenv("USE_DOCKER_LLM", "true")
+	if err := os.WriteFile(envPath, []byte("USE_DOCKER_LLM=false\n"), 0644); err != nil {
+		t.Fatalf("écriture .env : %v", err)
+	}
+	if !bridge.ReadDockerLLMSettingFromEnv(dir) {
+		t.Errorf("attendu true depuis la variable d'environnement prioritaire")
+	}
+
+	// PythonClient doit refléter la configuration
+	t.Setenv("USE_DOCKER_LLM", "")
+	if err := os.WriteFile(envPath, []byte("USE_DOCKER_LLM=true\n"), 0644); err != nil {
+		t.Fatalf("écriture .env : %v", err)
+	}
+	pyClient := bridge.NewPythonClientWithAppRoot(dir, dir)
+	if !pyClient.IsDockerLLM() {
+		t.Errorf("PythonClient.IsDockerLLM() doit lire USE_DOCKER_LLM")
+	}
+}
+
+func TestWriteEnvFilePreserveDockerLLM(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+
+	if err := bridge.WriteEnvFileWithDockerLLM(envPath, "http://remote:11434", "gemma4:26b", 300, false, true); err != nil {
+		t.Fatalf("WriteEnvFileWithDockerLLM(true) : %v", err)
+	}
+	content, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("lecture .env : %v", err)
+	}
+	if !strings.Contains(string(content), "USE_DOCKER_LLM=true") {
+		t.Errorf("attendu USE_DOCKER_LLM=true, contenu :\n%s", content)
+	}
+
+	// L'ancienne signature WriteEnvFile ne doit pas écraser le réglage existant
+	if err := bridge.WriteEnvFile(envPath, "http://remote:11434", "gemma4:26b", 300, false); err != nil {
+		t.Fatalf("WriteEnvFile : %v", err)
+	}
+	content, err = os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("lecture .env : %v", err)
+	}
+	if !strings.Contains(string(content), "USE_DOCKER_LLM=true") {
+		t.Errorf("WriteEnvFile a écrasé USE_DOCKER_LLM, contenu :\n%s", content)
+	}
+
+	// La variante explicite doit pouvoir le désactiver
+	if err := bridge.WriteEnvFileWithDockerLLM(envPath, "http://remote:11434", "gemma4:26b", 300, false, false); err != nil {
+		t.Fatalf("WriteEnvFileWithDockerLLM(false) : %v", err)
+	}
+	content, err = os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("lecture .env : %v", err)
+	}
+	if !strings.Contains(string(content), "USE_DOCKER_LLM=false") {
+		t.Errorf("attendu USE_DOCKER_LLM=false, contenu :\n%s", content)
+	}
+}
+
+func TestSaveConfigDockerLLMCanBeDisabledAtRuntime(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	if err := os.WriteFile(envPath, []byte("USE_DOCKER_LLM=true\nOLLAMA_MODEL=gemma4:26b\n"), 0644); err != nil {
+		t.Fatalf("écriture .env : %v", err)
+	}
+	// Simule une variable héritée du shell : la sauvegarde doit aussi
+	// resynchroniser l'environnement du processus, pas seulement le .env.
+	t.Setenv("USE_DOCKER_LLM", "true")
+
+	// Mock interface pour éviter de lancer le backend Python pendant le test.
+	client := bridge.NewBackendClientWithAppRoot(dir, dir, true, false)
+
+	if !client.IsDockerLLM() {
+		t.Fatalf("état initial attendu : USE_DOCKER_LLM=true")
+	}
+
+	res, err := client.SaveConfigWithDockerLLM("http://10.22.28.190:11434", "gemma4:26b", 300, true, false)
+	if err != nil {
+		t.Fatalf("SaveConfigWithDockerLLM(false) : %v", err)
+	}
+	if res == nil || !res.Success {
+		t.Fatalf("sauvegarde attendue réussie, obtenu : %+v", res)
+	}
+
+	// Le .env et l'état exposé par le client doivent immédiatement refléter false.
+	content, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("lecture .env : %v", err)
+	}
+	if !strings.Contains(string(content), "USE_DOCKER_LLM=false") {
+		t.Errorf("le .env doit contenir USE_DOCKER_LLM=false, contenu :\n%s", content)
+	}
+	if client.IsDockerLLM() {
+		t.Errorf("IsDockerLLM() doit passer à false après sauvegarde")
+	}
+	if got := os.Getenv("USE_DOCKER_LLM"); got != "false" {
+		t.Errorf("USE_DOCKER_LLM du processus doit être resynchronisé à false, obtenu %q", got)
+	}
+	cfg, err := client.GetConfig()
+	if err != nil {
+		t.Fatalf("GetConfig : %v", err)
+	}
+	if cfg.DockerLLM {
+		t.Errorf("GetConfig().DockerLLM doit refléter false après sauvegarde")
+	}
+}
+
+func TestReadWritePythonBinSetting(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Nettoyage préventif de toute variable d'environnement système
+	oldEnv := os.Getenv("PYTHON_BIN")
+	_ = os.Unsetenv("PYTHON_BIN")
+	defer func() {
+		if oldEnv != "" {
+			_ = os.Setenv("PYTHON_BIN", oldEnv)
+		} else {
+			_ = os.Unsetenv("PYTHON_BIN")
+		}
+	}()
+
+	// 1. Initialement vide
+	initial := bridge.ReadPythonBinFromEnv(tempDir)
+	if initial != "" {
+		t.Errorf("attendu PythonBin initial vide, obtenu '%s'", initial)
+	}
+
+	// 2. Écriture d'un chemin d'interpréteur
+	targetBin := "/opt/custom/python3"
+	err := bridge.WritePythonBinSetting(tempDir, targetBin)
+	if err != nil {
+		t.Fatalf("WritePythonBinSetting a échoué : %v", err)
+	}
+
+	readVal := bridge.ReadPythonBinFromEnv(tempDir)
+	if readVal != targetBin {
+		t.Errorf("ReadPythonBinFromEnv attendu '%s', obtenu '%s'", targetBin, readVal)
+	}
+
+	cfg := bridge.LoadConfigFromEnv(tempDir, false)
+	if cfg.PythonBin != targetBin {
+		t.Errorf("LoadConfigFromEnv.PythonBin attendu '%s', obtenu '%s'", targetBin, cfg.PythonBin)
+	}
+
+	// 3. Réinitialisation vers vide (détection auto)
+	err = bridge.WritePythonBinSetting(tempDir, "")
+	if err != nil {
+		t.Fatalf("WritePythonBinSetting(vide) a échoué : %v", err)
+	}
+
+	readAfterReset := bridge.ReadPythonBinFromEnv(tempDir)
+	if readAfterReset != "" {
+		t.Errorf("attendu PythonBin vide après réinitialisation, obtenu '%s'", readAfterReset)
+	}
+}
+
+func TestResolvePythonBinPriority(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Nettoyage préventif de toute variable d'environnement système
+	oldEnv := os.Getenv("PYTHON_BIN")
+	_ = os.Unsetenv("PYTHON_BIN")
+	defer func() {
+		if oldEnv != "" {
+			_ = os.Setenv("PYTHON_BIN", oldEnv)
+		} else {
+			_ = os.Unsetenv("PYTHON_BIN")
+		}
+	}()
+
+	// 1. Sans .venv ni PYTHON_BIN : échec explicite
+	_, err := bridge.ResolvePythonBin(tempDir)
+	if err == nil {
+		t.Errorf("attendu erreur lorsque aucun environnement Python n'est présent")
+	}
+
+	// 2. Avec un faux .venv créé
+	venvDir := filepath.Join(tempDir, ".venv", "bin")
+	if runtime.GOOS == "windows" {
+		venvDir = filepath.Join(tempDir, ".venv", "Scripts")
+	}
+	if errMkdir := os.MkdirAll(venvDir, 0755); errMkdir != nil {
+		t.Fatalf("MkdirAll a échoué : %v", errMkdir)
+	}
+	fakePy := filepath.Join(venvDir, "python")
+	if runtime.GOOS == "windows" {
+		fakePy = filepath.Join(venvDir, "python.exe")
+	}
+	if errWrite := os.WriteFile(fakePy, []byte("#!/bin/sh\n"), 0755); errWrite != nil {
+		t.Fatalf("WriteFile faux python a échoué : %v", errWrite)
+	}
+
+	resolved, errResolved := bridge.ResolvePythonBin(tempDir)
+	if errResolved != nil {
+		t.Fatalf("ResolvePythonBin avec .venv a échoué : %v", errResolved)
+	}
+	if resolved != fakePy {
+		t.Errorf("ResolvePythonBin attendu '%s', obtenu '%s'", fakePy, resolved)
+	}
+
+	// 3. Avec PYTHON_BIN explicite qui surcharge le .venv
+	customBin := "/usr/local/bin/python3-custom"
+	if errWriteEnv := bridge.WritePythonBinSetting(tempDir, customBin); errWriteEnv != nil {
+		t.Fatalf("WritePythonBinSetting a échoué : %v", errWriteEnv)
+	}
+
+	resolvedCustom, errCustom := bridge.ResolvePythonBin(tempDir)
+	if errCustom != nil {
+		t.Fatalf("ResolvePythonBin avec customBin a échoué : %v", errCustom)
+	}
+	if resolvedCustom != customBin {
+		t.Errorf("attendu customBin prioritaire '%s', obtenu '%s'", customBin, resolvedCustom)
+	}
+}
+
+func TestVerifyPythonEnvironmentReal(t *testing.T) {
+	appRoot := bridge.FindAppRoot()
+
+	report, err := bridge.VerifyPythonEnvironment(appRoot)
+	if err != nil {
+		t.Fatalf("VerifyPythonEnvironment a échoué sur appRoot : %v", err)
+	}
+
+	if !report.Success {
+		t.Errorf("attendu report.Success == true, obtenu false (missing: %v, appLoadError: %s)", report.MissingDeps, report.AppLoadError)
+	}
+	if report.Version == "" {
+		t.Errorf("attendu version Python non vide")
+	}
+	if report.Executable == "" {
+		t.Errorf("attendu executable Python non vide")
+	}
+
+	// CheckPythonEnvironment doit réussir sans erreur
+	if errCheck := bridge.CheckPythonEnvironment(appRoot); errCheck != nil {
+		t.Errorf("CheckPythonEnvironment a échoué inopinément : %v", errCheck)
+	}
+}
+
+func TestVerifyPythonEnvironmentInvalid(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Nettoyage préventif de toute variable d'environnement système
+	oldEnv := os.Getenv("PYTHON_BIN")
+	_ = os.Unsetenv("PYTHON_BIN")
+	defer func() {
+		if oldEnv != "" {
+			_ = os.Setenv("PYTHON_BIN", oldEnv)
+		} else {
+			_ = os.Unsetenv("PYTHON_BIN")
+		}
+	}()
+
+	// 1. Sans aucun environnement Python
+	_, err := bridge.VerifyPythonEnvironment(tempDir)
+	if err == nil {
+		t.Errorf("attendu erreur pour VerifyPythonEnvironment sans environnement")
+	}
+
+	// 2. Avec un faux exécutable qui échoue
+	venvDir := filepath.Join(tempDir, ".venv", "bin")
+	if runtime.GOOS == "windows" {
+		venvDir = filepath.Join(tempDir, ".venv", "Scripts")
+	}
+	_ = os.MkdirAll(venvDir, 0755)
+	fakePy := filepath.Join(venvDir, "python")
+	if runtime.GOOS == "windows" {
+		fakePy = filepath.Join(venvDir, "python.exe")
+	}
+	_ = os.WriteFile(fakePy, []byte("#!/bin/sh\necho 'crash'\nexit 1\n"), 0755)
+
+	_, errInvalid := bridge.VerifyPythonEnvironment(tempDir)
+	if errInvalid == nil {
+		t.Errorf("attendu erreur pour VerifyPythonEnvironment avec exécutable défaillant")
+	}
+}
+
+func TestVerifyPythonEnvironmentMissingDep(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Nettoyage préventif de toute variable d'environnement système
+	oldEnv := os.Getenv("PYTHON_BIN")
+	_ = os.Unsetenv("PYTHON_BIN")
+	defer func() {
+		if oldEnv != "" {
+			_ = os.Setenv("PYTHON_BIN", oldEnv)
+		} else {
+			_ = os.Unsetenv("PYTHON_BIN")
+		}
+	}()
+
+	// Simule un script python qui renvoie missing_deps: ["git"]
+	venvDir := filepath.Join(tempDir, ".venv", "bin")
+	if runtime.GOOS == "windows" {
+		venvDir = filepath.Join(tempDir, ".venv", "Scripts")
+	}
+	_ = os.MkdirAll(venvDir, 0755)
+	fakePy := filepath.Join(venvDir, "python")
+	if runtime.GOOS == "windows" {
+		fakePy = filepath.Join(venvDir, "python.exe")
+	}
+	mockOutput := `{"executable": "/bin/mock", "version": "3.12.0", "missing_deps": ["git"], "app_load_error": "", "success": false}`
+	_ = os.WriteFile(fakePy, []byte(fmt.Sprintf("#!/bin/sh\necho '%s'\n", mockOutput)), 0755)
+
+	report, err := bridge.VerifyPythonEnvironment(tempDir)
+	if err != nil {
+		t.Fatalf("VerifyPythonEnvironment inattendu err: %v", err)
+	}
+	if report.Success {
+		t.Errorf("attendu report.Success == false quand missing_deps est non vide")
+	}
+	if len(report.MissingDeps) != 1 || report.MissingDeps[0] != "git" {
+		t.Errorf("attendu missing_deps=[git], obtenu %v", report.MissingDeps)
+	}
+
+	// CheckPythonEnvironment doit échouer avec l'erreur explicite
+	errCheck := bridge.CheckPythonEnvironment(tempDir)
+	if errCheck == nil {
+		t.Errorf("attendu erreur pour CheckPythonEnvironment quand dépendances manquantes")
+	}
+}
+
+func TestVerifyPythonCandidate(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// 1. Candidat introuvable
+	_, errNotFound := bridge.VerifyPythonCandidate(tempDir, "/chemin/inexistant/vers/python", false)
+	if errNotFound == nil {
+		t.Errorf("attendu erreur pour binaire inexistant")
+	}
+
+	// 2. Mode auto sans .venv
+	_, errAutoNoVenv := bridge.VerifyPythonCandidate(tempDir, "", true)
+	if errAutoNoVenv == nil {
+		t.Errorf("attendu erreur pour mode auto sans .venv")
+	}
+
+	// 3. Candidat valide simulé
+	fakeValidPy := filepath.Join(tempDir, "fake_valid_python")
+	if runtime.GOOS == "windows" {
+		fakeValidPy = filepath.Join(tempDir, "fake_valid_python.exe")
+	}
+	validOutput := `{"executable": "/bin/python3", "version": "3.12.0", "missing_deps": [], "app_load_error": "", "success": true}`
+	_ = os.WriteFile(fakeValidPy, []byte(fmt.Sprintf("#!/bin/sh\necho '%s'\n", validOutput)), 0755)
+
+	reportValid, errValid := bridge.VerifyPythonCandidate(tempDir, fakeValidPy, false)
+	if errValid != nil {
+		t.Fatalf("VerifyPythonCandidate valide inattendu err : %v", errValid)
+	}
+	if !reportValid.Success {
+		t.Errorf("attendu Success == true pour candidat valide")
+	}
+
+	// 4. Candidat avec dépendances manquantes
+	fakeInvalidPy := filepath.Join(tempDir, "fake_invalid_python")
+	if runtime.GOOS == "windows" {
+		fakeInvalidPy = filepath.Join(tempDir, "fake_invalid_python.exe")
+	}
+	invalidOutput := `{"executable": "/bin/python3", "version": "3.12.0", "missing_deps": ["yaml", "git"], "app_load_error": "", "success": false}`
+	_ = os.WriteFile(fakeInvalidPy, []byte(fmt.Sprintf("#!/bin/sh\necho '%s'\n", invalidOutput)), 0755)
+
+	reportInvalid, errInvalid := bridge.VerifyPythonCandidate(tempDir, fakeInvalidPy, false)
+	if errInvalid != nil {
+		t.Fatalf("VerifyPythonCandidate invalide inattendu err : %v", errInvalid)
+	}
+	if reportInvalid.Success {
+		t.Errorf("attendu Success == false quand dépendances manquantes")
+	}
+	if len(reportInvalid.MissingDeps) != 2 {
+		t.Errorf("attendu 2 dépendances manquantes, obtenu %v", reportInvalid.MissingDeps)
+	}
+}

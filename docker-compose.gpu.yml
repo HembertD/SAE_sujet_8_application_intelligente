@@ -1,0 +1,18 @@
+# docker-compose.gpu.yml - Override optionnel pour activer le GPU NVIDIA
+#
+# Prérequis : pilote NVIDIA et nvidia-container-toolkit installés sur l'hôte.
+# Usage :
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+#
+# Sans ce fichier, le conteneur reste en CPU (comportement par défaut, compatible
+# avec les machines sans GPU NVIDIA).
+
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

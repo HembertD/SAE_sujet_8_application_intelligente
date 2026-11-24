@@ -181,6 +181,36 @@ func ReadMockSettingFromEnv(appRoot string) bool {
 	return false
 }
 
+// ReadDockerLLMSettingFromEnv lit la variable USE_DOCKER_LLM dans l'environnement ou le fichier .env applicatif.
+func ReadDockerLLMSettingFromEnv(appRoot string) bool {
+	if envVal := os.Getenv("USE_DOCKER_LLM"); envVal != "" {
+		return ParseBoolFromString(envVal)
+	}
+
+	envPath := FindAppEnvPath(appRoot)
+	data, err := os.ReadFile(envPath)
+	if err != nil {
+		return false
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			k := strings.TrimSpace(parts[0])
+			v := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+			if k == "USE_DOCKER_LLM" {
+				return ParseBoolFromString(v)
+			}
+		}
+	}
+	return false
+}
+
 // ReadMockAISettingFromEnv lit la variable MOCK_AI dans l'environnement ou le fichier .env applicatif.
 func ReadMockAISettingFromEnv(appRoot string) bool {
 	if envVal := os.Getenv("MOCK_AI"); envVal != "" {
@@ -310,6 +340,50 @@ func WriteNotificationsSetting(appRoot string, enabled bool) error {
 	return os.WriteFile(cleanPath, []byte(content), 0644)
 }
 
+// WritePythonBinSetting met à jour la variable PYTHON_BIN dans le fichier .env applicatif.
+// Si pythonBin est vide, réinitialise la ligne (PYTHON_BIN=) pour rétablir la détection automatique (.venv).
+func WritePythonBinSetting(appRoot string, pythonBin string) error {
+	cleanPath := FindAppEnvPath(appRoot)
+	dir := filepath.Dir(cleanPath)
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	found := false
+	var newLines []string
+	if existing, errRead := os.ReadFile(cleanPath); errRead == nil {
+		scanner := bufio.NewScanner(bytes.NewReader(existing))
+		for scanner.Scan() {
+			line := scanner.Text()
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "PYTHON_BIN=") {
+				newLines = append(newLines, fmt.Sprintf("PYTHON_BIN=%s", pythonBin))
+				found = true
+			} else {
+				newLines = append(newLines, line)
+			}
+		}
+	}
+
+	if !found {
+		newLines = append(newLines, fmt.Sprintf("\n# Interpréteur Python personnalisé (vide = détection automatique .venv)\nPYTHON_BIN=%s", pythonBin))
+	}
+
+	content := strings.Join(newLines, "\n")
+	if !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+
+	if pythonBin != "" {
+		_ = os.Setenv("PYTHON_BIN", pythonBin)
+	} else {
+		_ = os.Unsetenv("PYTHON_BIN")
+	}
+
+	return os.WriteFile(cleanPath, []byte(content), 0644)
+}
+
 // LoadConfigFromEnv lit la configuration depuis le fichier .env applicatif et renvoie une structure ConfigResponse.
 func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse {
 	cfg := &models.ConfigResponse{
@@ -319,7 +393,12 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 		TimeoutS:            300.0,
 		MockInterface:       isMockActive,
 		MockAI:              ReadMockAISettingFromEnv(appRoot),
+		DockerLLM:           ReadDockerLLMSettingFromEnv(appRoot),
 		EnableNotifications: ReadEnableNotificationsFromEnv(appRoot),
+		PythonBin:           ReadPythonBinFromEnv(appRoot),
+	}
+	if resolved, err := ResolvePythonBin(appRoot); err == nil {
+		cfg.ResolvedPythonBin = resolved
 	}
 
 	envPath := FindAppEnvPath(appRoot)
@@ -361,9 +440,17 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 					if os.Getenv("MOCK_AI") == "" {
 						cfg.MockAI = ParseBoolFromString(v)
 					}
+				case "USE_DOCKER_LLM":
+					if os.Getenv("USE_DOCKER_LLM") == "" {
+						cfg.DockerLLM = ParseBoolFromString(v)
+					}
 				case "ENABLE_NOTIFICATIONS":
 					if os.Getenv("ENABLE_NOTIFICATIONS") == "" {
 						cfg.EnableNotifications = ParseBoolFromString(v)
+					}
+				case "PYTHON_BIN":
+					if os.Getenv("PYTHON_BIN") == "" {
+						cfg.PythonBin = v
 					}
 				}
 			}
@@ -373,8 +460,43 @@ func LoadConfigFromEnv(appRoot string, isMockActive bool) *models.ConfigResponse
 	return cfg
 }
 
-// WriteEnvFile réécrit le fichier .env STRICTEMENT à la racine du projet.
+// readDockerLLMFromEnvFile lit USE_DOCKER_LLM dans le .env applicatif sans
+// consulter les variables d'environnement système. Utilisé par WriteEnvFile
+// (ancienne signature) pour ne pas écraser un réglage qu'elle ne reçoit pas.
+func readDockerLLMFromEnvFile(envPath string) bool {
+	cleanPath := filepath.Clean(envPath)
+	dir := filepath.Dir(cleanPath)
+	for filepath.Base(dir) == "src" || filepath.Base(dir) == "cli" {
+		dir = filepath.Dir(dir)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ".env"))
+	if err != nil {
+		return false
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 && strings.TrimSpace(parts[0]) == "USE_DOCKER_LLM" {
+			return ParseBoolFromString(strings.Trim(strings.TrimSpace(parts[1]), "\"'"))
+		}
+	}
+	return false
+}
+
+// WriteEnvFile réécrit le fichier .env STRICTEMENT à la racine du projet en
+// conservant la valeur existante de USE_DOCKER_LLM.
 func WriteEnvFile(envPath string, baseURL, model string, timeout float64, mockInterface bool, mockAIArgs ...bool) error {
+	return WriteEnvFileWithDockerLLM(envPath, baseURL, model, timeout, mockInterface, readDockerLLMFromEnvFile(envPath), mockAIArgs...)
+}
+
+// WriteEnvFileWithDockerLLM réécrit le fichier .env STRICTEMENT à la racine du projet, avec prise en compte de USE_DOCKER_LLM.
+func WriteEnvFileWithDockerLLM(envPath string, baseURL, model string, timeout float64, mockInterface bool, dockerLLM bool, mockAIArgs ...bool) error {
 	cleanPath := filepath.Clean(envPath)
 	dir := filepath.Dir(cleanPath)
 	for filepath.Base(dir) == "src" || filepath.Base(dir) == "cli" {
@@ -397,6 +519,7 @@ func WriteEnvFile(envPath string, baseURL, model string, timeout float64, mockIn
 	managedKeys := map[string]bool{
 		"OLLAMA_BASE_URL": true, "OLLAMA_MODEL": true, "OLLAMA_TIMEOUT_S": true,
 		"MOCK_INTERFACE": true, "MOCKAGE_INTERFACE": true, "MOCK_AI": true,
+		"USE_DOCKER_LLM": true,
 	}
 	var preserved []string
 	if existing, errRead := os.ReadFile(cleanPath); errRead == nil {
@@ -427,7 +550,10 @@ MOCK_INTERFACE=%t
 
 # Simulation de l'IA hors-ligne (true / false)
 MOCK_AI=%t
-`, baseURL, model, timeout, mockInterface, mockAI)
+
+# Utilise le serveur Ollama local via Docker (true / false)
+USE_DOCKER_LLM=%t
+`, baseURL, model, timeout, mockInterface, mockAI, dockerLLM)
 
 	if len(preserved) > 0 {
 		content += "\n# Autres paramètres (préservés automatiquement)\n" + strings.Join(preserved, "\n") + "\n"

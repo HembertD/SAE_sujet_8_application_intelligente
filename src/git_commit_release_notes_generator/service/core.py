@@ -163,7 +163,7 @@ def action_generate_commit(repo_path: str = ".", feedback: str = "") -> dict:
         logger.error(f"action_generate_commit git error: {e}")
         return {"success": False, "error": str(e)}
 
-    if not diff_files and not image_changes:
+    if not diff_files:
         return {
             "success": False,
             "error": "Aucune modification indexée (staged) exploitable pour le modèle LLM.",
@@ -177,35 +177,32 @@ def action_generate_commit(repo_path: str = ".", feedback: str = "") -> dict:
             "error": ping_error or "Serveur Ollama non joignable.",
         }
 
-    # Décrit les images modifiées via le modèle de vision (au moment de générer
-    # le commit uniquement : get_staged_diff()/get_staged_image_changes() eux-
-    # mêmes restent rapides et sans réseau). Une image dont la description
-    # échoue est ignorée plutôt que de bloquer toute la génération du commit.
+    # Les images sont déjà dans diff_files comme binaires sans contenu : on
+    # remplace leur entrée par la description du modèle de vision (appelé ici
+    # seulement, get_staged_diff() restant sans réseau). Si la description
+    # échoue, l'entrée binaire reste : le LLM sait au moins que le fichier a changé.
     all_diff_files = list(diff_files)
+    index_by_path = {f.path: i for i, f in enumerate(all_diff_files)}
     for image in image_changes:
         try:
             description = describe_image_change(
                 image.path, image.status, image.new_bytes, old_image=image.old_bytes
             )
         except Exception as e:
-            logger.warning(f"Description visuelle de '{image.path}' échouée, fichier ignoré : {e}")
+            logger.warning(f"Description visuelle de '{image.path}' échouée, gardé comme binaire : {e}")
             continue
-        all_diff_files.append(
-            DiffFile(
-                path=image.path,
-                status=image.status,
-                added=0,
-                removed=0,
-                is_binary=False,
-                patch=f"[Analyse visuelle] {description}",
-            )
+        described = DiffFile(
+            path=image.path,
+            status=image.status,
+            added=0,
+            removed=0,
+            is_binary=False,
+            patch=f"[Analyse visuelle] {description}",
         )
-
-    if not all_diff_files:
-        return {
-            "success": False,
-            "error": "Aucune modification exploitable pour le modèle LLM (analyse visuelle des images échouée).",
-        }
+        if image.path in index_by_path:
+            all_diff_files[index_by_path[image.path]] = described
+        else:
+            all_diff_files.append(described)
 
     try:
         msg = generate_commit_message(all_diff_files, feedback=feedback)

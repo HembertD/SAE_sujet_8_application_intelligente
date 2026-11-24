@@ -278,10 +278,12 @@ def generate_commit_message(diff_files: list[DiffFile], feedback: str = "") -> C
 
 
 def _build_diff_summary(diff_files: list[DiffFile]) -> str:
-    parts = [
-        f"Fichier: {f.path} (statut={f.status}, +{f.added}/-{f.removed})\n{f.patch}"
-        for f in diff_files
-    ]
+    parts = []
+    for f in diff_files:
+        if f.is_binary:
+            parts.append(f"Fichier: {f.path} (statut={f.status}, binaire : contenu non lisible, déduire l'intention du nom et du statut)")
+        else:
+            parts.append(f"Fichier: {f.path} (statut={f.status}, +{f.added}/-{f.removed})\n{f.patch}")
     return "\n\n".join(parts)
 
 

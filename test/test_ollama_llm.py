@@ -351,3 +351,13 @@ def test_diff_file_accepts_legacy_binary_keyword():
     assert diff.binary is True
     assert diff.to_dict()["is_binary"] is True
     assert "binary" not in diff.to_dict()
+
+
+def test_diff_summary_marks_binary_files_explicitly():
+    summary = llm._build_diff_summary([
+        DiffFile(path="archive.zip", status="A", added=0, removed=0, is_binary=True, patch=""),
+        DiffFile(path="app.py", status="M", added=1, removed=0, is_binary=False, patch="+x = 1"),
+    ])
+
+    assert "archive.zip (statut=A, binaire" in summary
+    assert "app.py (statut=M, +1/-0)\n+x = 1" in summary

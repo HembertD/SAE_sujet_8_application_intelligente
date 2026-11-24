@@ -282,7 +282,7 @@ def test_get_staged_diff_converts_newly_added_pdf_to_text_diff(tmp_path):
 
 def test_get_staged_diff_handles_corrupted_document_without_crashing(tmp_path):
     """Un .docx/.pdf corrompu ne doit jamais faire planter le diff : l'extraction
-    échoue silencieusement et le fichier est exclu, comme un binaire opaque."""
+    échoue et le fichier est gardé comme binaire opaque, sans patch."""
     repo_dir = tmp_path / "repo"
     _init_repo_with_base_commit(repo_dir)
 
@@ -291,9 +291,12 @@ def test_get_staged_diff_handles_corrupted_document_without_crashing(tmp_path):
     _run_git(["add", "-A"], repo_dir)
 
     wrapper = GitWrapper(repo_dir)
-    files = wrapper.get_staged_diff()
+    files = {f.path: f for f in wrapper.get_staged_diff()}
 
-    assert all(f.path not in ("corrompu.docx", "corrompu.pdf") for f in files)
+    for name in ("corrompu.docx", "corrompu.pdf"):
+        assert files[name].is_binary is True
+        assert files[name].patch == ""
+        json.dumps(files[name].to_dict(), ensure_ascii=False)
 
 
 def test_get_staged_diff_handles_deleted_document(tmp_path):
@@ -319,19 +322,24 @@ def test_get_staged_diff_handles_deleted_document(tmp_path):
     json.dumps(entry.to_dict(), ensure_ascii=False)
 
 
-def test_get_staged_diff_still_excludes_unsupported_binary_files(tmp_path):
-    """Les binaires sans extracteur dédié (images, archives, ...) restent
-    exclus du diff exploitable par le LLM, comportement inchangé."""
+def test_get_staged_diff_keeps_opaque_binary_files_without_patch(tmp_path):
+    """Les binaires sans extracteur (images, archives) restent dans la liste avec
+    is_binary=True : sinon le TUI Go croit que rien n'est indexé alors qu'un
+    fichier l'est. Patch vide pour ne jamais exposer d'octets bruts."""
     repo_dir = tmp_path / "repo"
     _init_repo_with_base_commit(repo_dir)
 
     (repo_dir / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50)
+    (repo_dir / "archive.zip").write_bytes(b"PK\x03\x04" + b"\x00" * 50)
     _run_git(["add", "-A"], repo_dir)
 
     wrapper = GitWrapper(repo_dir)
-    files = wrapper.get_staged_diff()
+    files = {f.path: f for f in wrapper.get_staged_diff()}
 
-    assert all(f.path != "logo.png" for f in files)
+    for name in ("logo.png", "archive.zip"):
+        assert files[name].is_binary is True
+        assert files[name].status == "A"
+        assert files[name].patch == ""
 
 
 _PNG_BYTES_V1 = b"\x89PNG\r\n\x1a\n" + bytes(range(50))

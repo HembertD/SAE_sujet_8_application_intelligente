@@ -121,7 +121,9 @@ def test_action_generate_commit_includes_image_description():
         captured_diff_files["value"] = diff_files
         return fake_commit
 
-    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_diff", return_value=[]):
+    staged_binary = [DiffFile(path="photo.png", status="A", added=0, removed=0, is_binary=True, patch="")]
+
+    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_diff", return_value=staged_binary):
         with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_image_changes", return_value=[fake_image]):
             with patch("git_commit_release_notes_generator.service.core.check_ollama_reachable", return_value=(True, None)):
                 with patch("git_commit_release_notes_generator.service.core.describe_image_change", return_value="Un éléphant dans la savane.") as mock_describe:
@@ -136,8 +138,11 @@ def test_action_generate_commit_includes_image_description():
     assert "Un éléphant dans la savane." in diff_files[0].patch
 
 
-def test_action_generate_commit_skips_image_on_description_failure():
-    fake_text_diff = [DiffFile(path="calc.py", status="M", added=1, removed=0, is_binary=False, patch="+x=1")]
+def test_action_generate_commit_keeps_image_as_binary_on_description_failure():
+    fake_text_diff = [
+        DiffFile(path="calc.py", status="M", added=1, removed=0, is_binary=False, patch="+x=1"),
+        DiffFile(path="broken.png", status="A", added=0, removed=0, is_binary=True, patch=""),
+    ]
     fake_image = ImageChange(path="broken.png", status="A", old_bytes=None, new_bytes=b"\x89PNG...")
     fake_commit = CommitMessage(type="feat", scope=None, subject="ajout", body=None)
 
@@ -156,21 +161,29 @@ def test_action_generate_commit_skips_image_on_description_failure():
 
     assert result["success"] is True
     diff_files = captured_diff_files["value"]
-    assert len(diff_files) == 1
-    assert diff_files[0].path == "calc.py"
+    assert [f.path for f in diff_files] == ["calc.py", "broken.png"]
+    assert diff_files[1].is_binary is True
 
 
-def test_action_generate_commit_fails_when_only_image_and_description_fails():
-    fake_image = ImageChange(path="broken.png", status="A", old_bytes=None, new_bytes=b"\x89PNG...")
+def test_action_generate_commit_accepts_opaque_binary_only():
+    """Un .zip seul (ni texte, ni image) doit quand même produire un commit,
+    pas l'erreur "aucune modification exploitable" qui bloquait l'utilisateur."""
+    staged = [DiffFile(path="archive.zip", status="A", added=0, removed=0, is_binary=True, patch="")]
+    fake_commit = CommitMessage(type="chore", scope=None, subject="ajout de l'archive de sauvegarde", body=None)
+    captured_diff_files = {}
 
-    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_diff", return_value=[]):
-        with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_image_changes", return_value=[fake_image]):
+    def _fake_generate(diff_files, feedback=""):
+        captured_diff_files["value"] = diff_files
+        return fake_commit
+
+    with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_diff", return_value=staged):
+        with patch("git_commit_release_notes_generator.service.core.GitWrapper.get_staged_image_changes", return_value=[]):
             with patch("git_commit_release_notes_generator.service.core.check_ollama_reachable", return_value=(True, None)):
-                with patch("git_commit_release_notes_generator.service.core.describe_image_change", side_effect=Exception("vision indisponible")):
+                with patch("git_commit_release_notes_generator.service.core.generate_commit_message", side_effect=_fake_generate):
                     result = core.action_generate_commit(str(ROOT))
 
-    assert result["success"] is False
-    assert "error" in result
+    assert result["success"] is True
+    assert captured_diff_files["value"][0].path == "archive.zip"
 
 
 def test_action_generate_commit_ollama_unreachable():

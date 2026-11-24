@@ -322,10 +322,10 @@ class GitWrapper:
     def get_staged_diff(self, max_chars: int = 8000) -> list[DiffFile]:
         """Extrait le diff indexé en objets DiffFile structurés.
 
-        Les fichiers binaires "opaques" (images, archives, ...) restent exclus.
         Les formats de document "riches" supportés (.docx, .pdf) sont convertis
-        en diff textuel par extraction de contenu (cf. `_try_build_document_diff`)
-        plutôt que d'être traités comme des binaires silencieusement ignorés.
+        en diff textuel par extraction de contenu (cf. `_try_build_document_diff`).
+        Les autres binaires (images, archives, ...) sont conservés avec
+        `is_binary=True` et un patch vide : présents dans la liste, sans contenu.
         """
         try:
             diff_text = self.repo.git.diff("--cached", "--no-color", "--diff-filter=ACMRTBD")
@@ -367,9 +367,20 @@ class GitWrapper:
                             rename_sources = self._get_staged_rename_sources()
                         old_path = rename_sources.get(diff_file.path)
                     document_diff = self._try_build_document_diff(diff_file, old_path=old_path)
-                    if document_diff is None:
-                        continue
-                    diff_file = document_diff
+                    if document_diff is not None:
+                        diff_file = document_diff
+                    else:
+                        # Binaire opaque (image, archive, document illisible) : on le garde
+                        # pour que le TUI l'affiche ("[Binaire]") et que le LLM sache qu'il
+                        # a changé, mais sans patch, qui contiendrait des octets bruts non-UTF8.
+                        diff_file = DiffFile(
+                            path=diff_file.path,
+                            status=diff_file.status,
+                            added=0,
+                            removed=0,
+                            is_binary=True,
+                            patch="",
+                        )
 
                 patch = diff_file.patch
                 if len(patch) > max_chars:
@@ -380,7 +391,7 @@ class GitWrapper:
                         status=diff_file.status,
                         added=diff_file.added,
                         removed=diff_file.removed,
-                        is_binary=False,
+                        is_binary=diff_file.is_binary,
                         patch=patch,
                     )
                 )

@@ -38,6 +38,10 @@ nav:
                   - Commit: doc_src_files/cli/views/commit_view.md
                   - Config: doc_src_files/cli/views/config_view.md
                   - Release notes: doc_src_files/cli/views/release_notes_view.md
+          - GUI Wails:
+              - Point d'entrée: doc_src_files/gui/main.md
+              - Orchestrateur App: doc_src_files/gui/app.md
+              - Interface Web: doc_src_files/gui/frontend.md
           - git_commit_release_notes_generator:
               - __init__: doc_src_files/git_commit_release_notes_generator/__init__.md
               - config: doc_src_files/git_commit_release_notes_generator/config.md
@@ -86,6 +90,8 @@ nav:
               - Bridge: doc_test_files/cli/bridge_test.md
               - Notifications: doc_test_files/cli/notification_test.md
               - Module Go: doc_test_files/cli/go_mod.md
+          - GUI Wails:
+              - Orchestrateur App: doc_test_files/gui/app_test.md
           - Tests de situation:
               - Initialisation: doc_test_files/situation_test/init_test.md
               - Désinitialisation: doc_test_files/situation_test/deinit_test.md

@@ -28,7 +28,7 @@ type PythonClient struct {
 
 // NewPythonClient instancie un client communiquant avec le backend Python réel.
 func NewPythonClient(repoRoot string) *PythonClient {
-	appRoot := FindAppRoot(repoRoot)
+	appRoot := FindAppRoot()
 	if isTestDir(repoRoot) {
 		appRoot = repoRoot
 	}
@@ -44,7 +44,7 @@ func NewPythonClient(repoRoot string) *PythonClient {
 // programme avant d'en arriver là quand le mode mock-interface n'est pas actif.
 func NewPythonClientWithAppRoot(repoRoot, appRoot string) *PythonClient {
 	if appRoot == "" {
-		appRoot = FindAppRoot(repoRoot)
+		appRoot = FindAppRoot()
 	}
 	if isTestDir(repoRoot) {
 		appRoot = repoRoot
@@ -244,6 +244,20 @@ func ResolvePythonBin(appRoot string) (string, error) {
 	}
 	if _, err := os.Stat(venvPy); err == nil {
 		return venvPy, nil
+	}
+
+	// 3. Repli automatique sur ~/monenv/bin/python (environnement standardisé du projet BUT3 / GEMINI.md)
+	// Ne s'applique pas dans les répertoires de test isolés (t.TempDir)
+	if !isTestDir(appRoot) {
+		if homeDir, err := os.UserHomeDir(); err == nil && homeDir != "" {
+			monenvPy := filepath.Join(homeDir, "monenv", "bin", "python")
+			if runtime.GOOS == "windows" {
+				monenvPy = filepath.Join(homeDir, "monenv", "Scripts", "python.exe")
+			}
+			if fi, errStat := os.Stat(monenvPy); errStat == nil && !fi.IsDir() {
+				return monenvPy, nil
+			}
+		}
 	}
 
 	return "", fmt.Errorf(
@@ -569,23 +583,55 @@ func (p *PythonClient) dockerComposeOutput(args ...string) ([]byte, error) {
 }
 
 // DockerOllamaStatus vérifie si le conteneur Ollama du projet Compose est en
-// cours d'exécution. Une indisponibilité de Docker n'est pas une erreur fatale :
-// elle est exposée dans le champ Error pour que l'interface puisse l'afficher.
+// cours d'exécution et renvoie un rapport détaillé (état, santé, pull en cours, modèle).
 func (p *PythonClient) DockerOllamaStatus() (*models.DockerStatusResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	cmd, err := p.dockerComposeCommand(ctx, "ps", "-q", "ollama")
-	if err != nil {
+	if _, err := exec.LookPath("docker"); err != nil {
 		return &models.DockerStatusResponse{
-			Success: false,
-			Running: false,
-			Error:   fmt.Sprintf("impossible de vérifier le conteneur Ollama : %s", err),
+			Success:    false,
+			Running:    false,
+			State:      "docker_missing",
+			StatusText: "Docker n'est pas installé sur ce système",
+			Error:      "binaire docker introuvable",
 		}, nil
 	}
 
-	// Output ne renvoie que stdout en cas de succès : un warning Docker Compose
-	// sur stderr ne peut donc pas être confondu avec un identifiant de conteneur.
+	targetModel := os.Getenv("OLLAMA_MODEL")
+	if targetModel == "" {
+		cfg := LoadConfigFromEnv(p.appRoot, false)
+		if cfg != nil && cfg.OllamaModel != "" {
+			targetModel = cfg.OllamaModel
+		} else {
+			targetModel = "gemma4:26b"
+		}
+	}
+
+	// Si aucun fichier docker-compose.yml n'existe dans l'application, quitter immédiatement sans erreur
+	composeFile := filepath.Join(p.appRoot, "docker-compose.yml")
+	if _, err := os.Stat(composeFile); err != nil {
+		return &models.DockerStatusResponse{
+			Success:     true,
+			Running:     false,
+			State:       "not_configured",
+			StatusText:  "Docker Compose non configuré (docker-compose.yml absent)",
+			TargetModel: targetModel,
+		}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	cmd, err := p.dockerComposeCommand(ctx, "ps", "-a", "-q", "ollama")
+	if err != nil {
+		return &models.DockerStatusResponse{
+			Success:     false,
+			Running:     false,
+			State:       "error",
+			StatusText:  "Erreur docker compose",
+			TargetModel: targetModel,
+			Error:       fmt.Sprintf("impossible de vérifier le conteneur Ollama : %s", err),
+		}, nil
+	}
+
 	output, err := cmd.Output()
 	if err != nil {
 		detail := ""
@@ -593,23 +639,127 @@ func (p *PythonClient) DockerOllamaStatus() (*models.DockerStatusResponse, error
 			detail = strings.TrimSpace(string(exitErr.Stderr))
 		}
 		if ctx.Err() == context.DeadlineExceeded {
-			detail = "délai d'attente dépassé (10s)"
+			detail = "délai d'attente dépassé (3s)"
 		}
 		if detail == "" {
 			detail = err.Error()
 		}
 		return &models.DockerStatusResponse{
-			Success: false,
-			Running: false,
-			Error:   fmt.Sprintf("impossible de vérifier le conteneur Ollama : %s", detail),
+			Success:     false,
+			Running:     false,
+			State:       "error",
+			StatusText:  "Démon Docker inaccessible ou en erreur",
+			TargetModel: targetModel,
+			Error:       fmt.Sprintf("impossible de vérifier le conteneur Ollama : %s", detail),
 		}, nil
 	}
 
 	containerID := strings.TrimSpace(string(output))
+	if containerID == "" {
+		return &models.DockerStatusResponse{
+			Success:     true,
+			Running:     false,
+			State:       "not_created",
+			StatusText:  "Arrêté (conteneur non créé ou arrêté)",
+			TargetModel: targetModel,
+		}, nil
+	}
+
+	// Par défaut, si compose ps -q renvoie un ID, le conteneur est en cours d'exécution
+	running := true
+	state := "running"
+	health := "none"
+
+	// Tenter une inspection approfondie pour récupérer le Healthcheck et l'état exact
+	inspectCtx, inspectCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer inspectCancel()
+	inspectCmd := exec.CommandContext(inspectCtx, "docker", "inspect", "--format", "{{.State.Status}}|||{{if .State.Health}}{{.State.Health.Status}}{{end}}", containerID)
+	if inspectOut, errInspect := inspectCmd.Output(); errInspect == nil {
+		parts := strings.Split(strings.TrimSpace(string(inspectOut)), "|||")
+		if len(parts) >= 1 && parts[0] != "" {
+			state = strings.ToLower(parts[0])
+			if state == "exited" || state == "dead" {
+				running = false
+			}
+		}
+		if len(parts) >= 2 && parts[1] != "" {
+			health = strings.ToLower(parts[1])
+		}
+	}
+
+	if !running {
+		return &models.DockerStatusResponse{
+			Success:     true,
+			Running:     false,
+			ContainerID: containerID,
+			State:       state,
+			Health:      health,
+			StatusText:  fmt.Sprintf("Arrêté (%s)", state),
+			TargetModel: targetModel,
+		}, nil
+	}
+
+	// Le conteneur tourne : si sain (healthy), prêt instantanément sans lire de logs.
+	isPulling := false
+	pullInfo := ""
+	isReady := false
+
+	if health == "healthy" {
+		isReady = true
+	} else {
+		// Le conteneur démarre ou télécharge : inspection rapide des 10 dernières lignes de logs
+		logCtx, logCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer logCancel()
+		logCmd, errLog := p.dockerComposeCommand(logCtx, "logs", "--tail=10", "--no-log-prefix", "ollama")
+		if errLog == nil {
+			if logBytes, errLogBytes := logCmd.Output(); errLogBytes == nil {
+				logText := string(logBytes)
+				lines := strings.Split(logText, "\n")
+				for i := len(lines) - 1; i >= 0; i-- {
+					line := strings.TrimSpace(lines[i])
+					if line == "" {
+						continue
+					}
+					lower := strings.ToLower(line)
+					if strings.Contains(lower, "pulling") || strings.Contains(lower, "downloading") || strings.Contains(lower, "verifying") || strings.Contains(lower, "%") {
+						isPulling = true
+						pullInfo = line
+						break
+					}
+					if strings.Contains(lower, "already present") || strings.Contains(lower, "success") || strings.Contains(lower, "server is ready") {
+						break
+					}
+				}
+			}
+		}
+	}
+
+	statusText := ""
+	if isPulling {
+		statusText = fmt.Sprintf("Téléchargement du modèle %s en cours...", targetModel)
+	} else if health == "healthy" {
+		isReady = true
+		statusText = fmt.Sprintf("Prêt & Opérationnel (modèle %s disponible)", targetModel)
+	} else if health == "starting" {
+		statusText = "Démarrage et initialisation d'Ollama..."
+	} else if health == "unhealthy" {
+		statusText = "Anomalie : serveur Ollama non sain (Unhealthy)"
+	} else {
+		isReady = true
+		statusText = fmt.Sprintf("En cours d'exécution (modèle %s)", targetModel)
+	}
+
 	return &models.DockerStatusResponse{
 		Success:     true,
-		Running:     containerID != "",
+		Running:     true,
 		ContainerID: containerID,
+		State:       state,
+		Health:      health,
+		StatusText:  statusText,
+		IsReady:     isReady,
+		IsPulling:   isPulling,
+		PullInfo:    pullInfo,
+		TargetModel: targetModel,
 	}, nil
 }
 
@@ -655,6 +805,47 @@ func (p *PythonClient) StartDockerOllama() (*models.ActionResult, error) {
 // StopDockerOllama arrête le conteneur Ollama via docker compose.
 func (p *PythonClient) StopDockerOllama() (*models.ActionResult, error) {
 	return p.runDockerCompose("down")
+}
+
+// RestartDockerOllama redémarre le conteneur Ollama via docker compose.
+func (p *PythonClient) RestartDockerOllama() (*models.ActionResult, error) {
+	return p.runDockerCompose("restart", "ollama")
+}
+
+// GetDockerLogs extrait les dernières lignes de journaux d'exécution du conteneur Ollama.
+func (p *PythonClient) GetDockerLogs(tailLines int) (*models.DockerLogsResponse, error) {
+	if tailLines <= 0 {
+		tailLines = 100
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cmd, err := p.dockerComposeCommand(ctx, "logs", fmt.Sprintf("--tail=%d", tailLines), "--timestamps", "--no-log-prefix", "ollama")
+	if err != nil {
+		return &models.DockerLogsResponse{
+			Success: false,
+			Error:   err.Error(),
+		}, nil
+	}
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		detail := strings.TrimSpace(string(out))
+		if detail == "" {
+			detail = err.Error()
+		}
+		return &models.DockerLogsResponse{
+			Success: false,
+			Logs:    detail,
+			Error:   detail,
+		}, nil
+	}
+
+	return &models.DockerLogsResponse{
+		Success:   true,
+		Logs:      string(out),
+		TailLines: tailLines,
+	}, nil
 }
 
 // SaveConfigWithDockerLLM persiste la configuration avec l'option USE_DOCKER_LLM explicite.

@@ -331,11 +331,30 @@ func (m *MockClient) IsDockerLLM() bool {
 	return false
 }
 
-// DockerOllamaStatus renvoie l'état simulé du conteneur Ollama.
+// DockerOllamaStatus renvoie l'état simulé détaillé du conteneur Ollama.
 func (m *MockClient) DockerOllamaStatus() (*models.DockerStatusResponse, error) {
+	if m.dockerRunning {
+		return &models.DockerStatusResponse{
+			Success:     true,
+			Running:     true,
+			ContainerID: "mock-container-ollama-84920",
+			State:       "running",
+			Health:      "healthy",
+			StatusText:  "Simulation : Prêt & Opérationnel (modèle gemma4:12b)",
+			IsReady:     true,
+			IsPulling:   false,
+			TargetModel: "gemma4:12b",
+		}, nil
+	}
 	return &models.DockerStatusResponse{
-		Success: true,
-		Running: m.dockerRunning,
+		Success:     true,
+		Running:     false,
+		State:       "exited",
+		Health:      "none",
+		StatusText:  "Simulation : Conteneur arrêté",
+		IsReady:     false,
+		IsPulling:   false,
+		TargetModel: "gemma4:12b",
 	}, nil
 }
 
@@ -354,6 +373,46 @@ func (m *MockClient) StopDockerOllama() (*models.ActionResult, error) {
 	return &models.ActionResult{
 		Success: true,
 		Message: "Mode mock : arrêt du conteneur Ollama simulé.",
+	}, nil
+}
+
+// RestartDockerOllama redémarre le conteneur Ollama (opération no-op en mock).
+func (m *MockClient) RestartDockerOllama() (*models.ActionResult, error) {
+	m.dockerRunning = true
+	return &models.ActionResult{
+		Success: true,
+		Message: "Mode mock : redémarrage du conteneur Ollama simulé.",
+	}, nil
+}
+
+// GetDockerLogs renvoie des logs simulés réalistes du conteneur Ollama.
+func (m *MockClient) GetDockerLogs(tailLines int) (*models.DockerLogsResponse, error) {
+	if !m.dockerRunning {
+		return &models.DockerLogsResponse{
+			Success:   true,
+			Logs:      "2026-11-18T15:30:00Z [docker] Conteneur gitelligence-ollama arrêté.\n2026-11-18T15:30:01Z [docker] En attente d'une commande de démarrage...",
+			TailLines: tailLines,
+			Running:   false,
+		}, nil
+	}
+
+	mockLogs := `2026-11-18T15:30:00Z [entrypoint] Démarre le serveur Ollama en arrière-plan...
+2026-11-18T15:30:01Z [entrypoint] Waiting for Ollama server... (1/30)
+2026-11-18T15:30:02Z [ollama] Listening on 0.0.0.0:11434 (schema: http)
+2026-11-18T15:30:02Z [ollama] GPU compute capability not detected, running CPU inference
+2026-11-18T15:30:03Z [entrypoint] Ollama server is ready.
+2026-11-18T15:30:03Z [entrypoint] Modèle configuré : gemma4:12b
+2026-11-18T15:30:04Z [entrypoint] Model gemma4:12b already present.
+2026-11-18T15:30:05Z [ollama] Health check passed: ollama list returned 0
+2026-11-18T15:30:10Z [ollama] [GIN] 200 | 127.0.0.1 | GET /api/tags
+2026-11-18T15:30:15Z [ollama] [GIN] 200 | 127.0.0.1 | POST /api/generate`
+
+	return &models.DockerLogsResponse{
+		Success:     true,
+		Logs:        mockLogs,
+		TailLines:   tailLines,
+		Running:     true,
+		ContainerID: "mock-container-ollama-84920",
 	}, nil
 }
 

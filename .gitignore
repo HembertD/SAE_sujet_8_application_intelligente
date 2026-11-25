@@ -57,7 +57,13 @@ docs/documentation.pdf
 *.p12
 *.pfx
 
-# Binaires compilés Go
+# Binaires compilés Go & GUI
 src/cli/git-generator
 git-generator
+!src/gui/build/
+src/gui/build/bin/
+git-gui
+src/gui/frontend/node_modules/
+src/gui/frontend/dist/
+src/gui/frontend/*.md5
 *.exe

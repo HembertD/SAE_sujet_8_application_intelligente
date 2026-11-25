@@ -47,6 +47,8 @@ type BackendClient interface {
 	DockerOllamaStatus() (*models.DockerStatusResponse, error)
 	StartDockerOllama() (*models.ActionResult, error)
 	StopDockerOllama() (*models.ActionResult, error)
+	RestartDockerOllama() (*models.ActionResult, error)
+	GetDockerLogs(tailLines int) (*models.DockerLogsResponse, error)
 }
 
 // BridgeClient coordonne l'accès au backend en déléguant à PythonClient ou MockClient.
@@ -81,7 +83,7 @@ func NewBackendClientWithAppRoot(repoRoot, appRoot string, forceMockInterface bo
 		}
 	}
 	mockActive := forceMockInterface || ReadMockSettingFromEnv(appRoot)
-	mockIAActive := forceMockIA
+	mockIAActive := forceMockIA || ReadMockAISettingFromEnv(appRoot)
 	if mockIAActive {
 		_ = os.Setenv("MOCK_AI", "true")
 	}
@@ -252,4 +254,14 @@ func (b *BridgeClient) StartDockerOllama() (*models.ActionResult, error) {
 // au client actif (no-op en mode mock).
 func (b *BridgeClient) StopDockerOllama() (*models.ActionResult, error) {
 	return b.activeDelegate().StopDockerOllama()
+}
+
+// RestartDockerOllama redémarre le conteneur Ollama via docker compose.
+func (b *BridgeClient) RestartDockerOllama() (*models.ActionResult, error) {
+	return b.activeDelegate().RestartDockerOllama()
+}
+
+// GetDockerLogs récupère les journaux d'exécution du conteneur Ollama.
+func (b *BridgeClient) GetDockerLogs(tailLines int) (*models.DockerLogsResponse, error) {
+	return b.activeDelegate().GetDockerLogs(tailLines)
 }

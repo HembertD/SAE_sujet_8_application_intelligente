@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Gitelligence — Assistant Git Intelligent</title>
+    <link rel="stylesheet" href="/src/style.css"/>
+</head>
+<body class="theme-dark">
+    <!-- Ambiance lumineuse d'arrière-plan (Glow Orbs) -->
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+
+    <div class="app-layout">
+        <!-- SIDEBAR DE NAVIGATION GAUCHE -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">⚡</div>
+                <div class="brand-text">
+                    <div class="brand-title">Gitelligence</div>
+                    <div class="brand-sub">Wails v2 + Python Bridge</div>
+                </div>
+            </div>
+
+            <!-- Résumé du dépôt courant dans la barre latérale -->
+            <div class="sidebar-repo-card">
+                <div class="repo-badge-label">DÉPÔT ACTIF</div>
+                <div class="repo-name" id="sidebar-repo-name" title="Dépôt cible">Chargement...</div>
+                <div class="repo-branch-pill">
+                    <span class="branch-icon">🌿</span>
+                    <span id="sidebar-branch-name">...</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">Dashboard & État</span>
+                </button>
+                <button class="nav-item" data-tab="diff">
+                    <span class="nav-icon">⚡</span>
+                    <span class="nav-label">Diffs Git</span>
+                    <span class="badge-count" id="sidebar-diff-badge" style="display: none;">0</span>
+                </button>
+                <button class="nav-item" data-tab="commit">
+                    <span class="nav-icon">🤖</span>
+                    <span class="nav-label">Générateur Commits</span>
+                </button>
+                <button class="nav-item" data-tab="release-notes">
+                    <span class="nav-icon">📝</span>
+                    <span class="nav-label">Release Notes</span>
+                </button>
+                <button class="nav-item" data-tab="config">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-label">Configuration</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-status-dot" id="sidebar-backend-dot"></div>
+                    <div class="user-info">
+                        <div class="user-name" id="sidebar-backend-label">Backend Python</div>
+                        <div class="user-role" id="sidebar-backend-sub">Initialisation...</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ZONE CENTRALE (TOPBAR + CONTENU) -->
+        <main class="main-wrapper">
+            <!-- TOPBAR SUPÉRIEURE -->
+            <header class="topbar">
+                <div class="breadcrumb" id="breadcrumb-title">
+                    <span class="crumb-root">Gitelligence</span>
+                    <span class="crumb-separator">/</span>
+                    <span class="crumb-active" id="crumb-active">Dashboard</span>
+                </div>
+
+                <!-- Sélecteur de répertoire cible -->
+                <div class="repo-selector-bar">
+                    <span class="folder-icon">📁</span>
+                    <input type="text" id="target-repo-input" placeholder="Chemin du dépôt Git à analyser..." title="Chemin du dépôt"/>
+                    <button class="btn btn-sm btn-ghost" id="btn-browse-repo" title="Parcourir le système de fichiers">Parcourir</button>
+                    <button class="btn btn-sm btn-primary" id="btn-apply-repo" title="Charger ce dépôt">Ouvrir</button>
+                </div>
+
+                <div class="header-actions">
+                    <!-- Bouton rafraîchir global -->
+                    <button class="btn-icon" id="btn-global-refresh" title="Actualiser le statut Git (F5)">
+                        🔄
+                    </button>
+
+                    <!-- Sélecteur de couleur d'accentuation -->
+                    <div class="accent-picker">
+                        <button class="accent-btn active" data-color="cyan" title="Cyan Vercel" style="background: #38bdf8;"></button>
+                        <button class="accent-btn" data-color="purple" title="Violet Cyber" style="background: #a855f7;"></button>
+                        <button class="accent-btn" data-color="green" title="Émeraude" style="background: #34d399;"></button>
+                        <button class="accent-btn" data-color="orange" title="Sunset Orange" style="background: #fb923c;"></button>
+                        <button class="accent-btn" data-color="rose" title="Rose Néon" style="background: #fb7185;"></button>
+                    </div>
+
+                    <!-- Bascule thème sombre / clair -->
+                    <button class="btn-theme-toggle" id="theme-toggle" title="Basculer Thème Sombre / Clair">
+                        🌙
+                    </button>
+                </div>
+            </header>
+
+            <!-- Bannière d'alerte environnement Python non valide -->
+            <div class="banner-alert banner-alert-danger" id="python-error-banner" style="display: none;">
+                <div class="banner-content">
+                    <span class="banner-icon">🐍</span>
+                    <div class="banner-text">
+                        <strong>Environnement Python non opérationnel :</strong>
+                        <span id="python-error-detail">Vérification en cours...</span>
+                    </div>
+                </div>
+                <button class="btn btn-xs btn-primary" id="btn-fix-python">⚙️ Configurer Python</button>
+            </div>
+
+            <!-- VUES DU CONTENU PRINCIPAL -->
+            <div class="content-stage">
+
+                <!-- ======================================================== -->
+                <!-- ONGLET 1 : DASHBOARD -->
+                <!-- ======================================================== -->
+                <section class="tab-view active" id="view-dashboard">
+                    <!-- Bannière d'accueil -->
+                    <div class="hero-card">
+                        <div class="hero-content">
+                            <h2 class="hero-title">Tableau de bord Gitelligence ⚡</h2>
+                            <p class="hero-desc">
+                                Analyse automatisée de vos diffs Git, génération intelligente de commits Conventional Commits et rédaction de release notes structurées via LLM.
+                            </p>
+                            <div class="hero-actions">
+                                <button class="btn btn-primary" id="dash-btn-gen-commit">🤖 Générer un commit</button>
+                                <button class="btn btn-secondary" id="dash-btn-view-diff">⚡ Inspecter les diffs</button>
+                                <button class="btn btn-ghost" id="dash-btn-stage-all">➕ Indexer tout (Stage All)</button>
+                                <button class="btn btn-ghost" id="dash-btn-push">🚀 Git Push</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cartes KPI État du dépôt et IA -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-icon">🌿</div>
+                            <div class="kpi-data">
+                                <div class="kpi-label">Branche courante</div>
+                                <div class="kpi-value" id="kpi-branch">Détection...</div>
+                                <div class="kpi-sub" id="kpi-repo-status">Vérification de l'index...</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon">📝</div>
+                            <div class="kpi-data">
+                                <div class="kpi-label">Fichiers modifiés</div>
+                                <div class="kpi-value" id="kpi-modified-count">0</div>
+                                <div class="kpi-sub" id="kpi-staged-unstaged">0 indexés · 0 non-indexés</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon">🤖</div>
+                            <div class="kpi-data">
+                                <div class="kpi-label">Serveur LLM Ollama</div>
+                                <div class="kpi-value" id="kpi-ollama-model">Modèle inconnu</div>
+                                <div class="kpi-sub" id="kpi-ollama-status">Test de connexion...</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon">🐳</div>
+                            <div class="kpi-data">
+                                <div class="kpi-label">Ollama Docker Compose</div>
+                                <div class="kpi-value" id="kpi-docker-status">Inactif</div>
+                                <div class="kpi-sub" id="kpi-docker-mode">Mode distant .env</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section Commits récents & Métriques -->
+                    <div class="dashboard-columns">
+                        <!-- Commits récents -->
+                        <div class="panel flex-2">
+                            <div class="panel-header">
+                                <div class="panel-title">📜 Historique des commits récents</div>
+                                <button class="btn btn-xs btn-ghost" id="dash-refresh-commits">Actualiser</button>
+                            </div>
+                            <div class="panel-body commits-list-container" id="dash-commits-list">
+                                <div class="empty-state">Chargement de l'historique...</div>
+                            </div>
+                        </div>
+
+                        <!-- Métriques Système Go -->
+                        <div class="panel flex-1">
+                            <div class="panel-header">
+                                <div class="panel-title">💻 Métriques Go Runtime</div>
+                            </div>
+                            <div class="panel-body">
+                                <ul class="specs-list" id="dash-specs-list">
+                                    <li><span class="spec-label">Système d'exploitation :</span> <span class="spec-val" id="spec-os">Linux</span></li>
+                                    <li><span class="spec-label">Architecture :</span> <span class="spec-val" id="spec-arch">amd64</span></li>
+                                    <li><span class="spec-label">Version Go :</span> <span class="spec-val" id="spec-go">1.27</span></li>
+                                    <li><span class="spec-label">Mémoire allouée :</span> <span class="spec-val" id="spec-mem">0 MB</span></li>
+                                    <li><span class="spec-label">Cœurs CPU :</span> <span class="spec-val" id="spec-cpu">0</span></li>
+                                    <li><span class="spec-label">Goroutines actives :</span> <span class="spec-val" id="spec-goroutines">0</span></li>
+                                    <li><span class="spec-label">Moteur Webview :</span> <span class="spec-val" id="spec-webview">WebKitGTK 4.1</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ======================================================== -->
+                <!-- ONGLET 2 : ANALYSEUR DE DIFFS -->
+                <!-- ======================================================== -->
+                <section class="tab-view" id="view-diff">
+                    <div class="diff-view-layout">
+                        <!-- Colonne gauche : liste des fichiers -->
+                        <div class="diff-files-sidebar panel">
+                            <div class="panel-header">
+                                <div class="panel-title">📂 Fichiers modifiés (<span id="diff-file-count">0</span>)</div>
+                                <button class="btn btn-xs btn-primary" id="diff-stage-all-btn" title="Indexer tous les fichiers">Stage All</button>
+                            </div>
+                            <div class="panel-body diff-files-list" id="diff-files-container">
+                                <div class="empty-state">Aucun fichier modifié détecté.</div>
+                            </div>
+                        </div>
+
+                        <!-- Colonne droite : contenu du patch -->
+                        <div class="diff-content-panel panel">
+                            <div class="panel-header">
+                                <div class="diff-header-info">
+                                    <span class="diff-active-file" id="diff-current-file">Sélectionnez un fichier</span>
+                                    <span class="badge badge-success" id="diff-added-badge">+0</span>
+                                    <span class="badge badge-danger" id="diff-deleted-badge">-0</span>
+                                    <span class="badge badge-warning" id="diff-secret-badge" style="display: none;">🔒 Secrets masqués</span>
+                                    <span class="badge badge-info" id="diff-binary-badge" style="display: none;">Fichier binaire</span>
+                                </div>
+                                <div class="diff-actions">
+                                    <button class="btn btn-xs btn-ghost" id="diff-copy-patch-btn">📋 Copier le patch</button>
+                                </div>
+                            </div>
+                            <div class="panel-body diff-viewer-wrapper">
+                                <pre class="diff-viewer" id="diff-patch-content"><code class="diff-code">Sélectionnez un fichier dans la liste à gauche pour afficher son patch différentiel.</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ======================================================== -->
+                <!-- ONGLET 3 : GÉNÉRATEUR DE COMMITS IA -->
+                <!-- ======================================================== -->
+                <section class="tab-view" id="view-commit">
+                    <div class="commit-view-container">
+                        <!-- En-tête de génération -->
+                        <div class="panel">
+                            <div class="panel-header">
+                                <div class="panel-title">🤖 Assistant Conventional Commits</div>
+                                <div class="commit-header-actions">
+                                    <button class="btn btn-primary" id="commit-generate-btn">
+                                        ⚡ Générer un message de commit
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="panel-body">
+                                <!-- Spinner de chargement -->
+                                <div class="loading-state" id="commit-loading" style="display: none;">
+                                    <div class="spinner"></div>
+                                    <p class="loading-text">Analyse des modifications et interrogation du LLM en cours...</p>
+                                </div>
+
+                                <!-- Décomposition du commit généré -->
+                                <div class="commit-proposal-card" id="commit-proposal-area" style="display: none;">
+                                    <div class="proposal-meta-row">
+                                        <div class="meta-field">
+                                            <label>Type :</label>
+                                            <span class="type-pill" id="commit-type-badge">feat</span>
+                                        </div>
+                                        <div class="meta-field">
+                                            <label>Scope :</label>
+                                            <span class="scope-pill" id="commit-scope-badge">core</span>
+                                        </div>
+                                        <div class="meta-field flex-grow">
+                                            <label>Sujet :</label>
+                                            <span class="subject-text" id="commit-subject-display">Ajout de la nouvelle fonctionnalité</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Éditeur du message de commit complet -->
+                                    <div class="commit-editor-group">
+                                        <label for="commit-full-message">Message complet (Titre + Corps détaillé selon norme) :</label>
+                                        <textarea id="commit-full-message" rows="8" class="form-control font-mono" placeholder="Le message de commit apparaîtra ici..."></textarea>
+                                    </div>
+
+                                    <!-- Actions d'application du commit -->
+                                    <div class="commit-actions-bar">
+                                        <button class="btn btn-success" id="commit-apply-btn">
+                                            ✅ Valider et appliquer le commit (`git commit`)
+                                        </button>
+                                        <button class="btn btn-secondary" id="commit-copy-btn">
+                                            📋 Copier dans le presse-papier
+                                        </button>
+                                        <button class="btn btn-ghost" id="commit-push-btn">
+                                            🚀 Pousser vers le distant (`git push`)
+                                        </button>
+                                    </div>
+
+                                    <!-- Proposition de Push post-commit (comme le prompt [o/N] du CLI) -->
+                                    <div class="post-commit-box" id="post-commit-push-prompt" style="display: none;">
+                                        <div class="post-commit-info">
+                                            <span class="post-commit-icon">🚀</span>
+                                            <div>
+                                                <div class="post-commit-title">Commit créé avec succès !</div>
+                                                <div class="text-muted" style="font-size: 12px;">Voulez-vous pousser vos modifications vers le serveur distant (git push) ?</div>
+                                            </div>
+                                        </div>
+                                        <div class="post-commit-actions">
+                                            <button class="btn btn-sm btn-primary" id="btn-post-commit-push">Pousser maintenant</button>
+                                            <button class="btn btn-sm btn-ghost" id="btn-post-commit-dismiss">Non merci</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Imposer un type Conventional Commit (Option [T] du CLI) -->
+                                <div class="forced-type-section" id="commit-forced-type-area" style="display: none;">
+                                    <div class="forced-type-title">
+                                        <span>🏷️ Imposer un type Conventional Commit (Option [T] du CLI) :</span>
+                                        <span class="text-muted" style="font-size: 12px;">Cliquez pour régénérer immédiatement en forçant ce type :</span>
+                                    </div>
+                                    <div class="type-chips-grid">
+                                        <button class="type-chip" data-type="feat" title="Nouvelle fonctionnalité"><span class="chip-badge badge-feat">feat</span> Fonctionnalité</button>
+                                        <button class="type-chip" data-type="fix" title="Correction de bug"><span class="chip-badge badge-fix">fix</span> Correction</button>
+                                        <button class="type-chip" data-type="chore" title="Maintenance générale"><span class="chip-badge badge-chore">chore</span> Maintenance</button>
+                                        <button class="type-chip" data-type="docs" title="Documentation"><span class="chip-badge badge-docs">docs</span> Documentation</button>
+                                        <button class="type-chip" data-type="refactor" title="Refactorisation de code"><span class="chip-badge badge-refactor">refactor</span> Refonte</button>
+                                        <button class="type-chip" data-type="perf" title="Performances"><span class="chip-badge badge-perf">perf</span> Performance</button>
+                                        <button class="type-chip" data-type="test" title="Tests unitaires/intégration"><span class="chip-badge badge-test">test</span> Tests</button>
+                                        <button class="type-chip" data-type="build" title="Build & Dépendances"><span class="chip-badge badge-build">build</span> Build</button>
+                                        <button class="type-chip" data-type="ci" title="Intégration continue CI/CD"><span class="chip-badge badge-ci">ci</span> CI/CD</button>
+                                    </div>
+                                </div>
+
+                                <!-- Zone de feedback interactif pour l'IA (Option [R] du CLI) -->
+                                <div class="feedback-group" id="commit-feedback-area" style="display: none;">
+                                    <label for="commit-feedback-input">💬 Refuser et commenter pour régénérer avec l'IA (Option [R] du CLI) :</label>
+                                    <div class="input-with-button">
+                                        <input type="text" id="commit-feedback-input" class="form-control" placeholder="Ex: Mentionne l'impact sur l'interface Wails et précise le refactoring..."/>
+                                        <button class="btn btn-primary" id="commit-refine-btn">Régénérer avec feedback</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ======================================================== -->
+                <!-- ONGLET 4 : RELEASE NOTES -->
+                <!-- ======================================================== -->
+                <section class="tab-view" id="view-release-notes">
+                    <div class="release-notes-container">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <div class="panel-title">📝 Rédacteur de Release Notes & Changelogs</div>
+                            </div>
+                            <div class="panel-body">
+                                <!-- Sélecteur interactif des commits (Copie Conforme CLI) -->
+                                <div class="rn-selection-container">
+                                    <!-- Bandeau de synthèse et déclencheur principal -->
+                                    <div class="rn-range-summary-card">
+                                        <div class="rn-range-flow">
+                                            <div class="rn-point-box point-start" id="rn-point-start-box">
+                                                <div class="point-badge-row">
+                                                    <span class="point-badge badge-start">Point de départ (1/2)</span>
+                                                </div>
+                                                <div class="point-sha-row">
+                                                    <span class="sha-pill" id="rn-selected-start-sha">Chargement...</span>
+                                                    <span class="tag-badge" id="rn-selected-start-tag" style="display: none;"></span>
+                                                </div>
+                                                <div class="point-msg text-truncate" id="rn-selected-start-msg">Sélectionnez le commit de départ ci-dessous</div>
+                                            </div>
+
+                                            <div class="rn-arrow-separator">
+                                                <span class="arrow-icon">➔</span>
+                                                <span class="rn-interval-badge" id="rn-interval-count-badge">0 commit(s)</span>
+                                            </div>
+
+                                            <div class="rn-point-box point-end" id="rn-point-end-box">
+                                                <div class="point-badge-row">
+                                                    <span class="point-badge badge-end">Point d'arrivée (2/2)</span>
+                                                </div>
+                                                <div class="point-sha-row">
+                                                    <span class="sha-pill" id="rn-selected-end-sha">HEAD</span>
+                                                    <span class="tag-badge" id="rn-selected-end-tag" style="display: none;"></span>
+                                                </div>
+                                                <div class="point-msg text-truncate" id="rn-selected-end-msg">Dernier commit (HEAD)</div>
+                                            </div>
+                                        </div>
+
+                                        <div class="rn-main-action-row">
+                                            <button class="btn btn-primary btn-lg" id="rn-generate-btn">
+                                                ⚡ Rédiger les Release Notes (Changelog)
+                                            </button>
+                                            <button class="btn btn-ghost btn-sm" id="rn-refresh-commits-btn" title="Recharger l'historique complet des commits">
+                                                🔄 Actualiser l'historique
+                                            </button>
+                                        </div>
+
+                                        <!-- Presets rapides de sélection -->
+                                        <div class="rn-presets-row">
+                                            <span class="presets-label">Raccourcis :</span>
+                                            <button class="btn-preset-chip" id="rn-preset-all" title="Sélectionne du premier commit jusqu'à HEAD">📜 Historique complet ➔ HEAD</button>
+                                            <button class="btn-preset-chip" id="rn-preset-last-tag" title="Sélectionne du dernier tag Git jusqu'à HEAD">🏷️ Dernier tag ➔ HEAD</button>
+                                            <button class="btn-preset-chip" id="rn-preset-last-5" title="Sélectionne les 5 derniers commits">5 derniers commits</button>
+                                            <button class="btn-preset-chip" id="rn-preset-last-10" title="Sélectionne les 10 derniers commits">10 derniers commits</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Double panneau de sélection interactive des commits (Start & End) -->
+                                    <div class="rn-commit-pickers-grid">
+                                        <!-- Colonne Commit de DÉPART -->
+                                        <div class="commit-picker-column">
+                                            <div class="picker-header start-header">
+                                                <span class="picker-step-badge">1</span>
+                                                <div>
+                                                    <h4 class="picker-title">Point de DÉPART (Ancien commit / Tag)</h4>
+                                                    <p class="picker-sub">Origine du changelog à synthétiser</p>
+                                                </div>
+                                            </div>
+                                            <div class="picker-search-bar">
+                                                <input type="text" id="rn-search-start" class="form-control form-control-sm" placeholder="🔍 Filtrer (message, sha, auteur, tag)..."/>
+                                            </div>
+                                            <div class="picker-commits-list" id="rn-commits-list-start">
+                                                <div class="loading-commits-text">Chargement des commits...</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Colonne Commit d'ARRIVÉE -->
+                                        <div class="commit-picker-column">
+                                            <div class="picker-header end-header">
+                                                <span class="picker-step-badge">2</span>
+                                                <div>
+                                                    <h4 class="picker-title">Point d'ARRIVÉE (Commit récent / HEAD)</h4>
+                                                    <p class="picker-sub">Fin de la période d'analyse (défaut : HEAD)</p>
+                                                </div>
+                                            </div>
+                                            <div class="picker-search-bar">
+                                                <input type="text" id="rn-search-end" class="form-control form-control-sm" placeholder="🔍 Filtrer (message, sha, auteur, tag)..."/>
+                                            </div>
+                                            <div class="picker-commits-list" id="rn-commits-list-end">
+                                                <div class="loading-commits-text">Chargement des commits...</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Spinner de génération des release notes -->
+                                <div class="loading-state" id="rn-loading" style="display: none;">
+                                    <div class="spinner"></div>
+                                    <p class="loading-text">Synthèse de l'historique et rédaction des release notes par l'IA...</p>
+                                </div>
+
+                                <!-- Zone de résultat -->
+                                <div class="rn-result-area" id="rn-result-area" style="display: none;">
+                                    <div class="rn-output-header">
+                                        <div class="rn-stats">
+                                            <span class="badge badge-info" id="rn-commit-count-badge">0 commits analysés</span>
+                                        </div>
+                                        <div class="rn-save-group">
+                                            <input type="text" id="rn-filename-input" class="form-control form-control-sm" value="RELEASE_NOTES.md"/>
+                                            <button class="btn btn-sm btn-success" id="rn-save-file-btn">💾 Enregistrer sur le disque</button>
+                                            <button class="btn btn-sm btn-ghost" id="rn-copy-btn">📋 Copier</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Aperçu rendu et brut -->
+                                    <div class="rn-preview-tabs">
+                                        <button class="subtab-btn active" data-subtab="rn-preview">Rendu Formaté</button>
+                                        <button class="subtab-btn" data-subtab="rn-raw">Markdown Brut</button>
+                                    </div>
+
+                                    <div class="rn-subtab-content active" id="rn-subtab-preview">
+                                        <div class="markdown-body" id="rn-rendered-html"></div>
+                                    </div>
+                                    <div class="rn-subtab-content" id="rn-subtab-raw">
+                                        <textarea id="rn-raw-markdown" rows="12" class="form-control font-mono"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ======================================================== -->
+                <!-- ONGLET 5 : CONFIGURATION & DIAGNOSTIC -->
+                <!-- ======================================================== -->
+                <section class="tab-view" id="view-config">
+                    <div class="config-view-container">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <div class="panel-title">⚙️ Paramètres & Diagnostics Système</div>
+                                <button class="btn btn-primary btn-sm" id="config-save-btn">💾 Enregistrer les réglages</button>
+                            </div>
+                            <div class="panel-body">
+                                <div class="config-grid">
+                                    <!-- Bloc Ollama Base URL & Modèle -->
+                                    <div class="config-section">
+                                        <h3 class="config-section-title">🤖 Serveur Ollama & IA</h3>
+                                        <div class="form-group">
+                                            <label for="cfg-base-url">Adresse URL du serveur Ollama :</label>
+                                            <input type="text" id="cfg-base-url" class="form-control" placeholder="http://localhost:11434"/>
+                                            <small class="form-hint">Serveur local ou serveur IUT.</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cfg-model">Modèle Ollama :</label>
+                                            <input type="text" id="cfg-model" class="form-control" placeholder="gemma4:12b"/>
+                                            <small class="form-hint">Exemples : gemma4:12b, gemma4:24b, smollm:135m</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cfg-timeout">Délai d'attente (timeout en secondes) :</label>
+                                            <input type="number" id="cfg-timeout" class="form-control" min="5" max="300" step="1" value="30"/>
+                                        </div>
+                                        <div class="form-group">
+                                            <button class="btn btn-secondary btn-sm" id="cfg-ping-btn">🧪 Tester la connexion (Ping Ollama - Option [T])</button>
+                                            <span class="ping-result" id="cfg-ping-result"></span>
+                                        </div>
+                                        <div id="cfg-installed-models-box" style="display: none; margin-top: 10px;">
+                                            <div class="text-muted" style="font-size: 11px; margin-bottom: 4px;">Modèles installés détectés sur le serveur :</div>
+                                            <div id="cfg-installed-models-list" class="installed-models-chips"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bloc Environnement & Interpréteur Python (Copie Conforme CLI) -->
+                                    <div class="config-section">
+                                        <h3 class="config-section-title">🐍 Interpréteur & Environnement Python</h3>
+                                        
+                                        <div class="py-status-box">
+                                            <div class="py-status-line">
+                                                <span class="py-label">Statut :</span>
+                                                <span class="badge" id="cfg-py-badge">Vérification...</span>
+                                            </div>
+                                            <div class="py-status-line">
+                                                <span class="py-label">Exécutable résolu :</span>
+                                                <code id="cfg-py-resolved-bin" class="font-mono text-cyan" style="font-size: 11.5px; word-break: break-all;">Détection...</code>
+                                            </div>
+                                            <div class="py-status-line">
+                                                <span class="py-label">Mode d'attribution :</span>
+                                                <span id="cfg-py-mode" class="text-yellow" style="font-size: 12px;">Détection...</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group" style="margin-top: 14px;">
+                                            <label for="cfg-python-bin">Interpréteur personnalisé (variable PYTHON_BIN) :</label>
+                                            <input type="text" id="cfg-python-bin" class="form-control" placeholder="/home/maxence/monenv/bin/python (ou vide pour .venv)"/>
+                                            <small class="form-hint">Chemin complet vers l'exécutable python (ou le script activate). Laisser vide pour rétablir la détection automatique (.venv).</small>
+                                        </div>
+
+                                        <div class="py-quick-actions">
+                                            <button class="btn btn-xs btn-ghost" id="cfg-py-quick-monenv" title="Pré-remplir avec l'environnement de référence BUT3">👤 ~/monenv</button>
+                                            <button class="btn btn-xs btn-ghost" id="cfg-py-quick-auto" title="Vider le champ pour réactiver .venv automatique">🔄 Auto (.venv)</button>
+                                            <button class="btn btn-xs btn-secondary" id="cfg-py-test-candidate" title="Vérifier avant d'enregistrer">🧪 Tester candidat</button>
+                                            <button class="btn btn-xs btn-primary" id="cfg-py-save-btn" title="Sauvegarder immédiatement dans le .env">💾 Appliquer Python</button>
+                                        </div>
+
+                                        <div style="margin-top: 14px; border-top: 1px solid var(--border-subtle); padding-top: 12px;">
+                                            <button class="btn btn-secondary btn-sm" id="cfg-py-diagnose-btn">🐍 Diagnostic complet (Option [P] du CLI)</button>
+                                            <div class="py-report-card" id="cfg-py-report-card" style="display: none; margin-top: 10px;"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bloc Docker Ollama -->
+                                    <div class="config-section docker-config-section">
+                                        <div class="config-section-header">
+                                            <h3 class="config-section-title">🐳 Serveur Ollama sous Docker Compose</h3>
+                                            <div class="docker-quick-status">
+                                                <span class="pulse-indicator" id="cfg-docker-pulse"></span>
+                                                <span class="badge" id="cfg-docker-badge">Détection...</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="switch-row">
+                                            <div>
+                                                <div class="switch-title">Activer le routage vers Ollama Docker (USE_DOCKER_LLM)</div>
+                                                <div class="switch-desc">Fait pointer Gitelligence vers le serveur local Docker (http://localhost:11434).</div>
+                                            </div>
+                                            <label class="switch">
+                                                <input type="checkbox" id="cfg-docker-llm"/>
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+
+                                        <!-- Carte d'état détaillée du conteneur -->
+                                        <div class="docker-detail-card" id="cfg-docker-detail-card">
+                                            <div class="docker-card-header">
+                                                <div class="docker-headline">
+                                                    <span class="docker-state-icon" id="cfg-docker-state-icon">⏳</span>
+                                                    <div>
+                                                        <div class="docker-status-text" id="cfg-docker-status-text">Interrogation du démon Docker...</div>
+                                                        <div class="docker-sub-text" id="cfg-docker-sub-text">Vérification de l'état du service ollama</div>
+                                                    </div>
+                                                </div>
+                                                <div class="docker-header-actions">
+                                                    <button class="btn btn-xs btn-ghost" id="cfg-docker-refresh-status-btn" title="Rafraîchir l'état du conteneur">🔄 Actualiser</button>
+                                                    <button class="btn btn-xs btn-secondary" id="cfg-docker-ping-btn" title="Tester la réactivité de l'API Ollama locale">🧪 Tester HTTP</button>
+                                                </div>
+                                            </div>
+
+                                            <!-- Jauge de progression du téléchargement de modèle (affichée si is_pulling) -->
+                                            <div class="docker-pull-progress-box" id="cfg-docker-pull-box" style="display: none;">
+                                                <div class="pull-label-row">
+                                                    <span class="pull-label">📥 Téléchargement du modèle en cours dans le conteneur...</span>
+                                                    <span class="pull-spinner"></span>
+                                                </div>
+                                                <div class="pull-progress-track">
+                                                    <div class="pull-progress-bar-indeterminate"></div>
+                                                </div>
+                                                <div class="pull-info-text text-truncate font-mono" id="cfg-docker-pull-info">Démarrage du téléchargement...</div>
+                                            </div>
+
+                                            <!-- Grille de métadonnées Docker -->
+                                            <div class="docker-meta-grid">
+                                                <div class="meta-item">
+                                                    <span class="meta-label">Modèle cible :</span>
+                                                    <code class="meta-val font-mono text-cyan" id="cfg-docker-meta-model">gemma4:26b</code>
+                                                </div>
+                                                <div class="meta-item">
+                                                    <span class="meta-label">Conteneur ID :</span>
+                                                    <code class="meta-val font-mono" id="cfg-docker-meta-cid">—</code>
+                                                </div>
+                                                <div class="meta-item">
+                                                    <span class="meta-label">Santé (Healthcheck) :</span>
+                                                    <span class="meta-val" id="cfg-docker-meta-health">Inconnue</span>
+                                                </div>
+                                                <div class="meta-item">
+                                                    <span class="meta-label">Statut Docker :</span>
+                                                    <span class="meta-val" id="cfg-docker-meta-state">Arrêté</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Barre d'actions Docker -->
+                                            <div class="docker-toolbar">
+                                                <button class="btn btn-sm btn-primary" id="cfg-docker-start">
+                                                    🚀 Démarrer Docker Ollama
+                                                </button>
+                                                <button class="btn btn-sm btn-secondary" id="cfg-docker-restart">
+                                                    🔄 Redémarrer
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" id="cfg-docker-stop">
+                                                    ⏹ Arrêter
+                                                </button>
+                                                <span class="docker-action-feedback" id="cfg-docker-action-feedback"></span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Visualiseur de Journaux d'Exécution (Logs Docker) -->
+                                        <div class="docker-logs-section">
+                                            <div class="logs-section-header">
+                                                <div class="logs-title-group">
+                                                    <span class="logs-icon">📋</span>
+                                                    <span class="logs-title">Journaux du conteneur (`docker compose logs`)</span>
+                                                    <span class="logs-updated-time text-muted" id="cfg-docker-logs-timestamp"></span>
+                                                </div>
+                                                <div class="logs-controls">
+                                                    <label class="logs-checkbox-label">
+                                                        <input type="checkbox" id="cfg-docker-log-autorefresh"/>
+                                                        <span>Auto-refresh (5s)</span>
+                                                    </label>
+                                                    <label class="logs-checkbox-label">
+                                                        <input type="checkbox" id="cfg-docker-log-autoscroll" checked/>
+                                                        <span>Défilement auto</span>
+                                                    </label>
+                                                    <select id="cfg-docker-log-lines" class="form-control form-control-xs font-mono" title="Nombre de lignes">
+                                                        <option value="50">50 lignes</option>
+                                                        <option value="100" selected>100 lignes</option>
+                                                        <option value="250">250 lignes</option>
+                                                        <option value="500">500 lignes</option>
+                                                    </select>
+                                                    <button class="btn btn-xs btn-ghost" id="cfg-docker-log-refresh" title="Recharger les logs maintenant">🔄 Actualiser</button>
+                                                    <button class="btn btn-xs btn-ghost" id="cfg-docker-log-copy" title="Copier les logs dans le presse-papier">📋 Copier</button>
+                                                    <button class="btn btn-xs btn-ghost" id="cfg-docker-log-clear" title="Vider l'affichage de la console">🧹 Vider</button>
+                                                </div>
+                                            </div>
+                                            <div class="docker-logs-terminal-wrap">
+                                                <pre class="docker-logs-terminal font-mono" id="cfg-docker-logs-terminal">En attente de chargement des logs...</pre>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bloc Simulation & Mode Développeur -->
+                                    <div class="config-section">
+                                        <h3 class="config-section-title">🛠️ Options de Développement & Mocks</h3>
+                                        <div class="switch-row">
+                                            <div>
+                                                <div class="switch-title">Simulation complète de l'interface (Mock Interface)</div>
+                                                <div class="switch-desc">Permet de tester l'interface de façon autonome sans dépôt Git réel ni Python.</div>
+                                            </div>
+                                            <label class="switch">
+                                                <input type="checkbox" id="cfg-mock-interface"/>
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                        <div class="switch-row">
+                                            <div>
+                                                <div class="switch-title">Simulation de l'IA (Mock IA)</div>
+                                                <div class="switch-desc">Simule les réponses de génération de commit et release notes sans serveur Ollama.</div>
+                                            </div>
+                                            <label class="switch">
+                                                <input type="checkbox" id="cfg-mock-ai"/>
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                        <div class="switch-row">
+                                            <div>
+                                                <div class="switch-title">Notifications de bureau</div>
+                                                <div class="switch-desc">Affiche les alertes système lors de la génération de commits ou d'erreurs.</div>
+                                            </div>
+                                            <label class="switch">
+                                                <input type="checkbox" id="cfg-notifications"/>
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Conteneur des notifications toasts -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Script principal de l'application -->
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>

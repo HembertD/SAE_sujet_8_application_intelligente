@@ -48,9 +48,26 @@ type ActionResult struct {
 	Error   string `json:"error,omitempty"`
 }
 
-// DockerStatusResponse décrit l'état du conteneur Ollama piloté par Docker Compose.
+// DockerStatusResponse décrit l'état détaillé du conteneur Ollama piloté par Docker Compose.
 type DockerStatusResponse struct {
 	Success     bool   `json:"success"`
+	Running     bool   `json:"running"`
+	ContainerID string `json:"container_id,omitempty"`
+	State       string `json:"state,omitempty"`        // ex: "running", "restarting", "exited", "not_created", "starting"
+	Health      string `json:"health,omitempty"`       // ex: "healthy", "unhealthy", "starting", "none"
+	StatusText  string `json:"status_text,omitempty"`  // Message lisible pour l'humain
+	IsReady     bool   `json:"is_ready"`               // true si le conteneur tourne et Ollama est prêt à servir
+	IsPulling   bool   `json:"is_pulling"`             // true si un téléchargement de modèle est en cours
+	PullInfo    string `json:"pull_info,omitempty"`    // Dernier log relatif à l'avancement du téléchargement
+	TargetModel string `json:"target_model,omitempty"` // Modèle configuré pour le conteneur
+	Error       string `json:"error,omitempty"`
+}
+
+// DockerLogsResponse contient les logs du conteneur Ollama récupérés depuis Docker Compose.
+type DockerLogsResponse struct {
+	Success     bool   `json:"success"`
+	Logs        string `json:"logs"`
+	TailLines   int    `json:"tail_lines"`
 	Running     bool   `json:"running"`
 	ContainerID string `json:"container_id,omitempty"`
 	Error       string `json:"error,omitempty"`

@@ -76,6 +76,20 @@ Exemples :
 │  │     ├─ config_view.go
 │  │     ├─ menu_view.go
 │  │     └─ release_notes_view.go
+│  ├─ gui/
+│  │  ├─ wails.json
+│  │  ├─ go.mod
+│  │  ├─ main.go
+│  │  ├─ app.go
+│  │  ├─ app_test.go
+│  │  ├─ build/
+│  │  └─ frontend/
+│  │     ├─ package.json
+│  │     ├─ vite.config.js
+│  │     ├─ index.html
+│  │     └─ src/
+│  │        ├─ main.js
+│  │        └─ style.css
 │  └─ git_commit_release_notes_generator/
 │     ├─ __init__.py
 │     ├─ config.py

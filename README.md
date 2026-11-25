@@ -72,11 +72,44 @@ Sécurité : filtrage pour exclure les fichiers binaires ou les données sensibl
    ./git-generator --repo /chemin/vers/un/autre/projet
    ```
 
+### Interface Graphique (GUI Wails) :
+
+Gitelligence propose également une interface graphique de bureau native et moderne développée avec **Wails v2** (orchestrateur Go, WebKitGTK 4.1 et frontend Web Cyber Glassmorphism).
+
+1. **Compilation de l'application GUI :**
+   ```bash
+   cd src/gui
+   ~/go/bin/wails build -tags webkit2_41
+   ```
+   Le binaire autonome `git-gui` est généré dans `src/gui/build/bin/git-gui` (et disponible à la racine).
+
+2. **Lancement de l'interface graphique :**
+   ```bash
+   # Lancement standard :
+   ./git-gui
+
+   # Lancement en mode développeur (débloque les options de mock) :
+   ./git-gui --dev
+
+   # Lancement en simulation complète (mode démo sans Git ni Python) :
+   ./git-gui --dev --mockInterface
+
+   # Lancement en ciblant un autre dépôt Git :
+   ./git-gui --repo /chemin/vers/un/autre/projet
+   ```
+
+3. **Exécution des tests de l'application GUI :**
+   ```bash
+   cd src/gui && go test -v ./...
+   ```
+
    **Options disponibles :**
    - `--repo <chemin>` : dépôt Git cible à analyser (par défaut `.`).
    - `--dev` : active le mode développement (autorise les flags de simulation en CLI et la modification des options de mock dans l'interface de configuration).
    - `--mockInterface` : force la simulation complète de l'interface en mode démo (requiert obligatoirement `--dev`).
    - `--mockIA` : force la simulation de l'IA hors-ligne sans serveur Ollama (requiert obligatoirement `--dev`).
+   - `--docker-llm` : force l'utilisation du conteneur Ollama local piloté par Docker Compose.
+   - `--python-bin <chemin>` : chemin explicite vers l'interpréteur Python à utiliser (surcharge le `.env` et `.venv`).
    - `--app-dir <chemin>` : racine de l'application Gitelligence (contenant le code et le `.env`). Détectée automatiquement dans 99% des cas pour garantir l'isolation complète du `.env`.
 
    > [!CAUTION]
